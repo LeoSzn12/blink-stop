@@ -298,6 +298,7 @@ shareBtn.addEventListener('click', async () => {
 function startGame(mode) {
     currentMode = mode;
     loadingMsg.style.display = 'block';
+    loadingMsg.innerText = 'INITIALIZING BLINK DETECTION...';
 
     // UI Setup based on mode
     if (mode === 'PRECISION') {
@@ -311,11 +312,27 @@ function startGame(mode) {
 
     camera.start()
         .then(() => {
-            startCalibration();
+            loadingMsg.innerText = 'CAMERA READY...';
+            setTimeout(() => {
+                startCalibration();
+            }, 500);
         })
         .catch(err => {
             console.error("Camera error:", err);
-            alert("Camera access denied. Please allow camera access.");
+            loadingMsg.style.display = 'none';
+
+            // User-friendly error messages
+            let errorMsg = "Camera access denied.";
+            if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+                errorMsg = "📷 Camera permission denied!\n\nPlease:\n1. Tap the 'AA' or settings icon in Safari\n2. Select 'Website Settings'\n3. Enable Camera access\n4. Refresh the page";
+            } else if (err.name === 'NotFoundError') {
+                errorMsg = "No camera found on this device.";
+            } else if (err.name === 'NotReadableError') {
+                errorMsg = "Camera is being used by another app.\n\nPlease close other apps and try again.";
+            }
+
+            alert(errorMsg);
+            showMenu();
         });
 }
 
