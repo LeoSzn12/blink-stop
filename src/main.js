@@ -125,8 +125,8 @@ const camera = new Camera(videoElement, {
     onFrame: async () => {
         await faceMesh.send({ image: videoElement });
     },
-    width: 1280,
-    height: 720
+    width: 640,  // Reduced from 1280 for mobile
+    height: 480  // Reduced from 720 for mobile
 });
 
 // Initialize
@@ -149,7 +149,7 @@ modeBtns.forEach(btn => {
 optionBtns.forEach(btn => {
     btn.addEventListener('click', (e) => {
         // Set target
-        precisionTarget = parseInt(e.target.dataset.time);
+        precisionTarget = parseFloat(e.target.dataset.time);
 
         // Update active state
         optionBtns.forEach(b => b.classList.remove('active'));
@@ -162,6 +162,18 @@ optionBtns.forEach(btn => {
 
 restartBtn.addEventListener('click', () => startGame(currentMode));
 menuBtn.addEventListener('click', showMenu);
+
+// Home button in HUD
+const homeBtnHud = document.getElementById('home-btn-hud');
+if (homeBtnHud) {
+    homeBtnHud.addEventListener('click', () => {
+        if (confirm('Return to menu? Your current game will end.')) {
+            cancelAnimationFrame(animationFrameId);
+            audioManager.stopDrone();
+            showMenu();
+        }
+    });
+}
 
 // Leaderboard System
 const Leaderboard = {
