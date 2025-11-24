@@ -160,6 +160,66 @@ optionBtns.forEach(btn => {
     });
 });
 
+// Help & Tutorial Logic
+const helpBtn = document.getElementById('help-btn');
+const helpModal = document.getElementById('help-modal');
+const closeHelpBtn = document.getElementById('close-help');
+const tutorialOverlay = document.getElementById('tutorial-overlay');
+
+// Help Modal
+if (helpBtn) {
+    helpBtn.addEventListener('click', () => {
+        helpModal.classList.remove('hidden');
+        helpModal.classList.add('active');
+    });
+}
+
+if (closeHelpBtn) {
+    closeHelpBtn.addEventListener('click', () => {
+        helpModal.classList.add('hidden');
+        helpModal.classList.remove('active');
+    });
+}
+
+// Close modal on outside click
+window.addEventListener('click', (e) => {
+    if (e.target === helpModal) {
+        helpModal.classList.add('hidden');
+        helpModal.classList.remove('active');
+    }
+});
+
+// Tutorial Logic
+const hasSeenTutorial = localStorage.getItem('blink_tutorial_seen');
+if (!hasSeenTutorial) {
+    setTimeout(() => {
+        tutorialOverlay.classList.remove('hidden');
+        tutorialOverlay.classList.add('active');
+    }, 1000);
+}
+
+// Tutorial Navigation
+const tutorialSteps = document.querySelectorAll('.tutorial-step');
+let currentStep = 0;
+
+document.querySelectorAll('.tutorial-next').forEach(btn => {
+    btn.addEventListener('click', () => {
+        tutorialSteps[currentStep].classList.add('hidden');
+        currentStep++;
+        if (currentStep < tutorialSteps.length) {
+            tutorialSteps[currentStep].classList.remove('hidden');
+        }
+    });
+});
+
+document.querySelectorAll('.tutorial-skip, .tutorial-finish').forEach(btn => {
+    btn.addEventListener('click', () => {
+        tutorialOverlay.classList.add('hidden');
+        tutorialOverlay.classList.remove('active');
+        localStorage.setItem('blink_tutorial_seen', 'true');
+    });
+});
+
 restartBtn.addEventListener('click', () => startGame(currentMode));
 menuBtn.addEventListener('click', showMenu);
 
