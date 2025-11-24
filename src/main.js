@@ -37,6 +37,15 @@ const playerNameInput = document.getElementById('player-name-input');
 const saveScoreBtn = document.getElementById('save-score-btn');
 const shareBtn = document.getElementById('share-btn');
 
+// Modals
+const privacyModal = document.getElementById('privacy-modal');
+const privacyLink = document.getElementById('privacy-link');
+const closePrivacy = document.getElementById('close-privacy');
+
+const tosModal = document.getElementById('tos-modal');
+const tosLink = document.getElementById('tos-link');
+const closeTos = document.getElementById('close-tos');
+
 // Game State
 let gameState = 'MENU'; // MENU, PLAYING, GAME_OVER, CALIBRATING, ENDURANCE
 let currentMode = 'CLASSIC'; // CLASSIC, PRECISION, ENDURANCE
@@ -78,6 +87,21 @@ closePrivacy.addEventListener('click', () => {
 privacyModal.addEventListener('click', (e) => {
     if (e.target === privacyModal) {
         privacyModal.classList.add('hidden');
+    }
+});
+
+// Terms of Service Modal
+tosLink.addEventListener('click', () => {
+    tosModal.classList.remove('hidden');
+});
+
+closeTos.addEventListener('click', () => {
+    tosModal.classList.add('hidden');
+});
+
+tosModal.addEventListener('click', (e) => {
+    if (e.target === tosModal) {
+        tosModal.classList.add('hidden');
     }
 });
 
