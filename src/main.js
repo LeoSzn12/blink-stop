@@ -70,10 +70,7 @@ document.addEventListener('click', () => {
     audioManager.resume();
 }, { once: true });
 
-// Privacy Modal
-const privacyModal = document.getElementById('privacy-modal');
-const privacyLink = document.getElementById('privacy-link');
-const closePrivacy = document.getElementById('close-privacy');
+// Privacy Modal Event Listeners
 
 privacyLink.addEventListener('click', () => {
     privacyModal.classList.remove('hidden');
