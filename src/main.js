@@ -1,0 +1,515 @@
+import { checkBlink, setBlinkThreshold } from './blinkDetection.js';
+import { audioManager } from './audioManager.js';
+
+// DOM Elements
+const videoElement = document.getElementsByClassName('input_video')[0];
+const canvasElement = document.getElementsByClassName('output_canvas')[0];
+const canvasCtx = canvasElement.getContext('2d');
+const container = document.querySelector('.container');
+
+// Screens
+const menuScreen = document.getElementById('menu-screen');
+const gameHud = document.getElementById('game-hud');
+const gameOverScreen = document.getElementById('game-over-screen');
+const calibrationScreen = document.getElementById('calibration-screen');
+const enduranceScreen = document.getElementById('endurance-screen');
+const adVideo = document.getElementById('ad-video');
+const uploadProgress = document.getElementById('upload-progress');
+const calibrationLoader = document.querySelector('.loader-bar');
+const calibrationStatus = document.getElementById('calibration-status');
+
+// UI Elements
+const modeBtns = document.querySelectorAll('.mode-btn');
+const optionBtns = document.querySelectorAll('.option-btn');
+const precisionOptions = document.getElementById('precision-options');
+const restartBtn = document.getElementById('restart-btn');
+const menuBtn = document.getElementById('menu-btn');
+const loadingMsg = document.getElementById('loading-msg');
+const scoreDisplay = document.getElementById('score');
+const targetDisplay = document.getElementById('target-display');
+const hudLabel = document.getElementById('hud-label');
+const eyeStatusDisplay = document.getElementById('eye-status');
+const gameOverTitle = document.getElementById('game-over-title');
+const finalScoreLabel = document.getElementById('final-score-label');
+const finalScoreVal = document.getElementById('final-score-val');
+const leaderboardList = document.getElementById('leaderboard-list');
+const playerNameInput = document.getElementById('player-name-input');
+const saveScoreBtn = document.getElementById('save-score-btn');
+const shareBtn = document.getElementById('share-btn');
+
+// Game State
+let gameState = 'MENU'; // MENU, PLAYING, GAME_OVER, CALIBRATING, ENDURANCE
+let currentMode = 'CLASSIC'; // CLASSIC, PRECISION, ENDURANCE
+let startTime = 0;
+let animationFrameId;
+let precisionTarget = 10.00; // Seconds
+let calibrationData = [];
+let calibrationStartTime = 0;
+let lastScore = null;
+
+// Service Worker Registration
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./service-worker.js')
+            .then(reg => console.log('Service Worker registered'))
+            .catch(err => console.log('Service Worker registration failed: ', err));
+    });
+}
+
+// Initialize Audio on user interaction
+document.addEventListener('click', () => {
+    audioManager.resume();
+}, { once: true });
+
+// Privacy Modal
+const privacyModal = document.getElementById('privacy-modal');
+const privacyLink = document.getElementById('privacy-link');
+const closePrivacy = document.getElementById('close-privacy');
+
+privacyLink.addEventListener('click', () => {
+    privacyModal.classList.remove('hidden');
+});
+
+closePrivacy.addEventListener('click', () => {
+    privacyModal.classList.add('hidden');
+});
+
+// Close modal on outside click
+privacyModal.addEventListener('click', (e) => {
+    if (e.target === privacyModal) {
+        privacyModal.classList.add('hidden');
+    }
+});
+
+// MediaPipe Setup
+const faceMesh = new FaceMesh({
+    locateFile: (file) => {
+        return `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`;
+    }
+});
+
+faceMesh.setOptions({
+    maxNumFaces: 1,
+    refineLandmarks: true,
+    minDetectionConfidence: 0.5,
+    minTrackingConfidence: 0.5
+});
+
+faceMesh.onResults(onResults);
+
+// Camera Setup
+const camera = new Camera(videoElement, {
+    onFrame: async () => {
+        await faceMesh.send({ image: videoElement });
+    },
+    width: 1280,
+    height: 720
+});
+
+// Initialize
+modeBtns.forEach(btn => {
+    btn.addEventListener('click', (e) => {
+        const mode = e.currentTarget.dataset.mode;
+
+        if (mode === 'CLASSIC') {
+            startGame('CLASSIC');
+        } else if (mode === 'ENDURANCE') {
+            startGame('ENDURANCE');
+        } else {
+            // Show options
+            document.querySelector('.mode-selection').classList.add('hidden');
+            precisionOptions.classList.remove('hidden');
+        }
+    });
+});
+
+optionBtns.forEach(btn => {
+    btn.addEventListener('click', (e) => {
+        // Set target
+        precisionTarget = parseInt(e.target.dataset.time);
+
+        // Update active state
+        optionBtns.forEach(b => b.classList.remove('active'));
+        e.target.classList.add('active');
+
+        // Start Game
+        startGame('PRECISION');
+    });
+});
+
+restartBtn.addEventListener('click', () => startGame(currentMode));
+menuBtn.addEventListener('click', showMenu);
+
+// Leaderboard System
+const Leaderboard = {
+    get(mode) {
+        const data = localStorage.getItem(`blink_lb_${mode}`);
+        if (!data) return [];
+
+        let parsed = JSON.parse(data);
+        // Migration: Convert old number scores to objects
+        return parsed.map(item => {
+            if (typeof item === 'number') {
+                return { name: 'ANONYMOUS', score: item };
+            }
+            return item;
+        });
+    },
+    save(mode, score, name) {
+        const scores = this.get(mode);
+        scores.push({ name: name || 'ANONYMOUS', score: score });
+
+        // Sort: Classic (Higher is better), Precision (Lower is better)
+        if (mode === 'CLASSIC') {
+            scores.sort((a, b) => b.score - a.score);
+        } else {
+            scores.sort((a, b) => a.score - b.score);
+        }
+
+        const top5 = scores.slice(0, 5);
+        localStorage.setItem(`blink_lb_${mode}`, JSON.stringify(top5));
+    },
+    render(mode) {
+        const scores = this.get(mode);
+        leaderboardList.innerHTML = '';
+
+        if (scores.length === 0) {
+            leaderboardList.innerHTML = '<li>No scores yet</li>';
+            return;
+        }
+
+        scores.forEach((entry, index) => {
+            const li = document.createElement('li');
+            const formattedScore = mode === 'CLASSIC' ? `${entry.score.toFixed(2)}s` : `${entry.score.toFixed(3)}s off`;
+            li.innerHTML = `<span>#${index + 1} ${entry.name}</span><span>${formattedScore}</span>`;
+            leaderboardList.appendChild(li);
+        });
+    }
+};
+
+// Save Score Event
+saveScoreBtn.addEventListener('click', () => {
+    const name = playerNameInput.value.trim().toUpperCase();
+    if (!name) return;
+
+    if (lastScore === null) return;
+
+    Leaderboard.save(currentMode, lastScore, name);
+    Leaderboard.render(currentMode);
+
+    saveScoreBtn.disabled = true;
+    saveScoreBtn.innerText = "SAVED";
+    playerNameInput.disabled = true;
+});
+
+// Share Logic
+shareBtn.addEventListener('click', async () => {
+    if (lastScore === null) return;
+
+    const text = `👁️ I survived ${lastScore.toFixed(2)}s in the Void! My eyes are made of steel. \n\nCan you beat my high score? Play Blink Stop now! #BlinkStop`;
+
+    if (navigator.share) {
+        try {
+            await navigator.share({
+                title: 'Blink Stop',
+                text: text,
+                url: window.location.href
+            });
+        } catch (err) {
+            console.log('Share failed:', err);
+        }
+    } else {
+        // Fallback to clipboard
+        navigator.clipboard.writeText(text).then(() => {
+            const originalText = shareBtn.innerText;
+            shareBtn.innerText = "COPIED!";
+            setTimeout(() => shareBtn.innerText = originalText, 2000);
+        });
+    }
+});
+
+function startGame(mode) {
+    currentMode = mode;
+    loadingMsg.style.display = 'block';
+
+    // UI Setup based on mode
+    if (mode === 'PRECISION') {
+        hudLabel.innerText = "TIME";
+        targetDisplay.classList.remove('hidden');
+        targetDisplay.querySelector('.digital-text-sm').innerText = `${precisionTarget.toFixed(2)}s`;
+    } else {
+        hudLabel.innerText = "TIME";
+        targetDisplay.classList.add('hidden');
+    }
+
+    camera.start()
+        .then(() => {
+            startCalibration();
+        })
+        .catch(err => {
+            console.error("Camera error:", err);
+            alert("Camera access denied. Please allow camera access.");
+        });
+}
+
+function startCalibration() {
+    gameState = 'CALIBRATING';
+    calibrationData = [];
+    calibrationStartTime = Date.now();
+
+    menuScreen.classList.add('hidden');
+    menuScreen.classList.remove('active');
+    precisionOptions.classList.add('hidden');
+    gameOverScreen.classList.add('hidden');
+    gameOverScreen.classList.remove('active');
+
+    calibrationScreen.classList.remove('hidden');
+    calibrationScreen.classList.add('active');
+
+    updateCalibrationLoop();
+}
+
+function updateCalibrationLoop() {
+    if (gameState === 'CALIBRATING') {
+        const elapsed = (Date.now() - calibrationStartTime) / 1000;
+        const progress = Math.min((elapsed / 3) * 100, 100);
+        const remaining = Math.max(3 - elapsed, 0);
+
+        calibrationLoader.style.width = `${progress}%`;
+        calibrationStatus.innerText = `${remaining.toFixed(2)}s`;
+
+        if (elapsed >= 3) {
+            finishCalibration();
+        } else {
+            requestAnimationFrame(updateCalibrationLoop);
+        }
+    }
+}
+
+function finishCalibration() {
+    if (calibrationData.length > 0) {
+        const sum = calibrationData.reduce((a, b) => a + b, 0);
+        const avg = sum / calibrationData.length;
+        const newThreshold = Math.max(0.15, Math.min(avg * 0.8, 0.35));
+        setBlinkThreshold(newThreshold);
+    }
+
+    calibrationScreen.classList.add('hidden');
+    calibrationScreen.classList.remove('active');
+
+    // Start Audio Drone
+    audioManager.startDrone();
+
+    if (currentMode === 'ENDURANCE') {
+        startEnduranceMode();
+    } else {
+        gameState = 'PLAYING';
+        startTime = Date.now();
+
+        gameHud.classList.remove('hidden');
+        gameHud.classList.add('active');
+
+        updateGameLoop();
+    }
+}
+
+function startEnduranceMode() {
+    gameState = 'ENDURANCE';
+    startTime = Date.now();
+
+    enduranceScreen.classList.remove('hidden');
+    enduranceScreen.classList.add('active');
+
+    adVideo.currentTime = 0;
+    adVideo.play();
+    uploadProgress.style.width = '0%';
+
+    updateEnduranceLoop();
+}
+
+function updateEnduranceLoop() {
+    if (gameState === 'ENDURANCE') {
+        const elapsed = (Date.now() - startTime) / 1000;
+        const duration = 30; // 30 seconds
+        const progress = Math.min((elapsed / duration) * 100, 100);
+
+        uploadProgress.style.width = `${progress}%`;
+
+        if (elapsed >= duration) {
+            endGame('WIN_ENDURANCE');
+        } else {
+            animationFrameId = requestAnimationFrame(updateEnduranceLoop);
+        }
+    }
+}
+
+function showMenu() {
+    gameState = 'MENU';
+    gameOverScreen.classList.add('hidden');
+    gameOverScreen.classList.remove('active');
+    menuScreen.classList.remove('hidden');
+    menuScreen.classList.add('active');
+
+    // Reset UI state
+    precisionOptions.classList.add('hidden');
+    document.querySelector('.mode-selection').classList.remove('hidden');
+
+    // Reset Chaos
+    container.className = 'container';
+
+    loadingMsg.style.display = 'none';
+}
+
+function onResults(results) {
+    canvasCtx.save();
+    canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+    canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+
+    if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
+        const landmarks = results.multiFaceLandmarks[0];
+        window.faceMissingFrames = 0; // Reset counter
+
+        const { blinking, ear } = checkBlink(landmarks);
+
+        if (gameState === 'CALIBRATING') {
+            calibrationData.push(ear);
+        } else if (gameState === 'PLAYING' || gameState === 'ENDURANCE') {
+            if (blinking) {
+                endGame();
+            } else {
+                eyeStatusDisplay.innerText = "OPEN";
+                eyeStatusDisplay.style.color = "var(--neon-cyan)";
+            }
+        }
+    } else {
+        // No face detected
+        if (gameState === 'PLAYING' || gameState === 'ENDURANCE') {
+            window.faceMissingFrames = (window.faceMissingFrames || 0) + 1;
+            if (window.faceMissingFrames > 30) { // ~1 second @ 30fps
+                endGame('DISQUALIFIED');
+            }
+        }
+    }
+    canvasCtx.restore();
+}
+
+function updateGameLoop() {
+    if (gameState === 'PLAYING') {
+        const elapsed = (Date.now() - startTime) / 1000;
+        scoreDisplay.innerText = `${elapsed.toFixed(2)}s`;
+
+        // Heartbeat Audio
+        const beatInterval = Math.max(0.3, 1.0 - (elapsed * 0.02));
+        const now = Date.now() / 1000;
+        if (!window.lastBeat || now - window.lastBeat > beatInterval) {
+            audioManager.playHeartbeat();
+            window.lastBeat = now;
+        }
+
+        // Chaos Visuals
+        if (elapsed > 10) container.classList.add('chaos-shake');
+        if (elapsed > 20) container.classList.add('chaos-glitch');
+        if (elapsed > 30) container.classList.add('chaos-invert');
+
+        animationFrameId = requestAnimationFrame(updateGameLoop);
+    }
+}
+
+function endGame(reason = 'BLINK') {
+    gameState = 'GAME_OVER';
+    cancelAnimationFrame(animationFrameId);
+
+    try {
+        // Stop/Effect Audio
+        audioManager.stopDrone();
+        audioManager.playGlitch();
+
+        // Reset Chaos
+        container.className = 'container';
+
+        const elapsed = (Date.now() - startTime) / 1000;
+        let finalScoreText = '';
+        let scoreToSave = 0;
+
+        if (reason === 'WIN_ENDURANCE') {
+            scoreToSave = 30;
+            finalScoreText = "30.00s";
+            finalScoreLabel.innerText = "EYES OF STEEL";
+            gameOverTitle.innerText = "THEME UNLOCKED";
+            gameOverTitle.style.color = "var(--neon-pink)";
+            audioManager.playWin();
+
+            // Unlock Theme
+            document.body.classList.add('theme-purple');
+            localStorage.setItem('blink_theme_purple', 'true');
+        } else if (reason === 'DISQUALIFIED') {
+            scoreToSave = 0;
+            finalScoreText = "DQ";
+            finalScoreLabel.innerText = "FACE LOST";
+            gameOverTitle.innerText = "DISQUALIFIED";
+            gameOverTitle.style.color = "var(--neon-red)";
+        } else if (currentMode === 'CLASSIC') {
+            scoreToSave = elapsed;
+            finalScoreText = `${elapsed.toFixed(2)}s`;
+            finalScoreLabel.innerText = "YOU SURVIVED";
+            gameOverTitle.innerText = "BLINK DETECTED";
+        } else if (currentMode === 'PRECISION') {
+            const diff = Math.abs(precisionTarget - elapsed);
+            scoreToSave = diff;
+            finalScoreText = `${diff.toFixed(3)}s`;
+            finalScoreLabel.innerText = "OFF BY";
+
+            if (diff < 0.1) {
+                gameOverTitle.innerText = "PERFECT!";
+                gameOverTitle.style.color = "var(--neon-cyan)";
+                audioManager.playWin();
+            } else {
+                gameOverTitle.innerText = "TOO EARLY/LATE";
+                gameOverTitle.style.color = "var(--neon-red)";
+            }
+        } else if (currentMode === 'ENDURANCE') {
+            scoreToSave = elapsed;
+            finalScoreText = `${elapsed.toFixed(2)}s`;
+            finalScoreLabel.innerText = "YOUR EYES GAVE UP AT";
+            gameOverTitle.innerText = "BLINK DETECTED";
+            gameOverTitle.style.color = "var(--neon-red)";
+        }
+
+        lastScore = scoreToSave;
+        finalScoreVal.innerText = finalScoreText;
+
+        playerNameInput.value = '';
+        playerNameInput.disabled = false;
+        saveScoreBtn.disabled = false;
+        saveScoreBtn.innerText = "SAVE";
+
+        Leaderboard.render(currentMode);
+    } catch (err) {
+        console.error("Error in endGame:", err);
+    }
+
+    // Stop video if in endurance mode
+    if (currentMode === 'ENDURANCE') {
+        adVideo.pause();
+        enduranceScreen.classList.add('hidden');
+        enduranceScreen.classList.remove('active');
+    }
+
+    // Always update UI
+    gameHud.classList.add('hidden');
+    gameHud.classList.remove('active');
+
+    gameOverScreen.classList.remove('hidden');
+    gameOverScreen.classList.add('active');
+}
+
+// Resize canvas to match video
+videoElement.addEventListener('loadedmetadata', () => {
+    canvasElement.width = videoElement.videoWidth;
+    canvasElement.height = videoElement.videoHeight;
+});
+
+// Check for unlocked theme on load
+if (localStorage.getItem('blink_theme_purple') === 'true') {
+    document.body.classList.add('theme-purple');
+}

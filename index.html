@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blink Stop - Don't Blink Challenge</title>
+    <link rel="stylesheet" href="src/style.css?v=3">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto+Mono:wght@400;700&display=swap"
+        rel="stylesheet">
+    <link rel="manifest" href="manifest.json">
+
+    <!-- Social Sharing Meta Tags -->
+    <meta property="og:title" content="Blink Stop - Don't Blink Challenge">
+    <meta name="description"
+        content="Test your willpower in Blink Stop. Stare into the void without blinking. How long can you last?">
+    <meta property="og:type" content="website">
+    <meta property="og:image"
+        content="https://raw.githubusercontent.com/google/mediapipe/master/mediapipe/graphs/face_mesh/data/face_mesh_android_gpu.png">
+    <!-- Placeholder image -->
+
+    <!-- MediaPipe Dependencies -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <!-- AdSense Script (Placeholder) -->
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-YOUR_ID_HERE"
+        crossorigin="anonymous"></script>
+</head>
+
+<body>
+    <div class="container">
+        <!-- Video Feed & Canvas Overlay -->
+        <div class="video-wrapper">
+            <video class="input_video" playsinline></video>
+            <canvas class="output_canvas"></canvas>
+
+            <!-- Game Overlay UI -->
+            <div class="ui-overlay" id="ui-layer">
+                <!-- Main Menu -->
+                <div id="menu-screen" class="screen active">
+                    <h1 class="glitch" data-text="BLINK STOP">BLINK STOP</h1>
+                    <p class="subtitle">Challenge your reflexes</p>
+
+                    <div class="mode-selection">
+                        <button class="neon-btn mode-btn" data-mode="CLASSIC">CLASSIC<span class="btn-sub">Survive the
+                                Void</span></button>
+                        <button class="neon-btn mode-btn" data-mode="PRECISION">PRECISION<span class="btn-sub">Target
+                                Mode</span></button>
+                        <button class="neon-btn mode-btn" data-mode="ENDURANCE">ENDURANCE<span class="btn-sub">30s
+                                Challenge</span></button>
+                    </div>
+
+                    <!-- Precision Options (Hidden by default) -->
+                    <div id="precision-options" class="options-container hidden">
+                        <p class="label">SELECT TARGET</p>
+                        <div class="option-btns">
+                            <button class="neon-btn-small option-btn active" data-time="5">5s</button>
+                            <button class="neon-btn-small option-btn" data-time="10">10s</button>
+                            <button class="neon-btn-small option-btn" data-time="20">20s</button>
+                        </div>
+                    </div>
+
+                    <p class="loading-text" id="loading-msg">ESTABLISHING NEURAL LINK...</p>
+
+                    <!-- AdSense Banner Placeholder -->
+                    <div class="ad-banner">
+                        <p>ADVERTISEMENT</p>
+                        <!-- <ins class="adsbygoogle" ...></ins> -->
+                    </div>
+                </div>
+
+                <!-- Calibration Screen -->
+                <div id="calibration-screen" class="screen hidden">
+                    <h2 class="glitch" data-text="CALIBRATING">CALIBRATING</h2>
+                    <p class="subtitle">Keep your eyes open normally</p>
+                    <div class="calibration-loader">
+                        <div class="loader-bar"></div>
+                    </div>
+                    <p id="calibration-status" class="digital-text-sm">3.00s</p>
+                </div>
+
+                <!-- Endurance Mode Screen (Video Player) -->
+                <div id="endurance-screen" class="screen hidden">
+                    <h2 class="glitch" data-text="ENDURANCE TEST">ENDURANCE TEST</h2>
+                    <div class="video-container">
+                        <!-- Placeholder Video (Sci-Fi Loop) -->
+                        <video id="ad-video"
+                            src="https://media.istockphoto.com/id/1322205588/video/abstract-digital-technology-background-loop-3d-render.mp4?s=mp4-640x640-is&k=20&c=y-lq7w0q_q_q_q_q_q_q_q_q_q_q_q_q"
+                            loop muted playsinline></video>
+                        <div class="upload-progress-bar">
+                            <div class="upload-progress" id="upload-progress"></div>
+                        </div>
+                    </div>
+                    <p class="subtitle warning">STARE INTO THE VOID FOR 30 SECONDS</p>
+                </div>
+
+                <!-- HUD -->
+                <div id="game-hud" class="screen hidden">
+                    <div class="score-container">
+                        <span class="label" id="hud-label">TIME</span>
+                        <span id="score" class="digital-text">0.00s</span>
+                    </div>
+                    <div class="target-container hidden" id="target-display">
+                        <span class="label">TARGET</span>
+                        <span class="digital-text-sm">10.00s</span>
+                    </div>
+                    <div class="status-indicator">
+                        <div class="eye-icon"></div>
+                        <span id="eye-status">OPEN</span>
+                    </div>
+                </div>
+
+                <!-- Game Over -->
+                <div id="game-over-screen" class="screen hidden">
+                    <h2 class="neon-text-red" id="game-over-title">BLINK DETECTED</h2>
+
+                    <div class="final-score">
+                        <span class="label" id="final-score-label">YOU SURVIVED</span>
+                        <span id="final-score-val" class="digital-text-lg">0.00s</span>
+                    </div>
+
+                    <div class="name-entry-container">
+                        <input type="text" id="player-name-input" placeholder="ENTER NAME" maxlength="10">
+                        <button id="save-score-btn" class="neon-btn-small">SAVE</button>
+                    </div>
+
+                    <div class="leaderboard-container">
+                        <h3>LEADERBOARD</h3>
+                        <ul id="leaderboard-list">
+                            <!-- Populated by JS -->
+                        </ul>
+                    </div>
+
+                    <div class="game-over-btns">
+                        <button id="restart-btn" class="neon-btn">RETRY</button>
+                        <button id="share-btn" class="neon-btn">SHARE</button>
+                    </div>
+                    <button id="menu-btn" class="neon-btn-small">MENU</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Privacy Policy Modal -->
+    <div id="privacy-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="glitch" data-text="PRIVACY POLICY">PRIVACY POLICY</h2>
+                <button class="close-btn" id="close-privacy">&times;</button>
+            </div>
+            <div class="modal-body">
+                <h3>Camera Access</h3>
+                <p>Blink Stop requires camera access to detect eye blinks using facial landmark detection.</p>
+
+                <h3>Data Processing</h3>
+                <p><strong>All camera data is processed locally on your device.</strong> We do not:</p>
+                <ul>
+                    <li>Upload or transmit camera footage to any server</li>
+                    <li>Store camera images or video recordings</li>
+                    <li>Share your camera data with third parties</li>
+                    <li>Collect personally identifiable information</li>
+                </ul>
+
+                <h3>Local Storage</h3>
+                <p>We use browser LocalStorage to save:</p>
+                <ul>
+                    <li>Leaderboard scores (name and time)</li>
+                    <li>Unlocked themes</li>
+                </ul>
+                <p>This data remains on your device and can be cleared at any time through your browser settings.</p>
+
+                <h3>Third-Party Services</h3>
+                <p>We use MediaPipe Face Mesh (Google) for facial landmark detection. The library runs entirely in your
+                    browser.</p>
+
+                <p class="last-updated">Last Updated: November 24, 2025</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <button class="footer-link" id="privacy-link">Privacy Policy</button>
+        <span class="footer-separator">|</span>
+        <a href="#" class="footer-link">Terms of Service</a>
+    </footer>
+
+    <script type="module" src="src/main.js?v=8"></script>
+</body>
+
+</html>
