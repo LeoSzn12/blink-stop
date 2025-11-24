@@ -41,6 +41,7 @@
             <div class="ui-overlay" id="ui-layer">
                 <!-- Main Menu -->
                 <div id="menu-screen" class="screen active">
+                    <button id="help-btn" class="help-btn" title="Help">?</button>
                     <h1 class="glitch" data-text="BLINK STOP">BLINK STOP</h1>
                     <p class="subtitle">Challenge your reflexes</p>
 
@@ -110,10 +111,6 @@
                     <div class="target-container hidden" id="target-display">
                         <span class="label">TARGET</span>
                         <span class="digital-text-sm">10.00s</span>
-                    </div>
-                    <div class="status-indicator">
-                        <div class="eye-icon"></div>
-                        <span id="eye-status">OPEN</span>
                     </div>
                 </div>
 
@@ -242,6 +239,102 @@
         </div>
     </div>
 
+    <!-- Help/FAQ Modal -->
+    <div id="help-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="glitch" data-text="HELP & FAQ">HELP & FAQ</h2>
+                <button class="close-btn" id="close-help">&times;</button>
+            </div>
+            <div class="modal-body">
+                <h3>📖 HOW TO PLAY</h3>
+
+                <h4>CLASSIC MODE</h4>
+                <p>Survive as long as possible without blinking. The longer you last, the more intense it gets with
+                    visual effects and faster audio!</p>
+
+                <h4>PRECISION MODE</h4>
+                <p>Choose a target time (5s, 10s, or 15s). Try to blink at the exact moment! Lower difference = better
+                    score.</p>
+
+                <h4>ENDURANCE MODE</h4>
+                <p>Stare for 30 seconds straight without blinking. Complete this challenge to unlock exclusive themes!
+                </p>
+
+                <h3>💡 TIPS</h3>
+                <ul>
+                    <li>Stare at the center of the screen</li>
+                    <li>Blink before starting, then keep eyes open</li>
+                    <li>Good lighting helps with detection</li>
+                    <li>Sit 1-2 feet away from your camera</li>
+                </ul>
+
+                <h3>📷 CAMERA & PRIVACY</h3>
+                <p><strong>Your privacy is protected!</strong></p>
+                <ul>
+                    <li>Camera feed is processed locally on your device</li>
+                    <li>No video is recorded or uploaded</li>
+                    <li>We only store your name + score on leaderboards</li>
+                </ul>
+
+                <p><strong>Granting Camera Permission:</strong></p>
+                <ul>
+                    <li><strong>iOS Safari:</strong> Tap "Allow" when prompted. If denied, tap "AA" → Website Settings →
+                        Enable Camera</li>
+                    <li><strong>Android Chrome:</strong> Tap "Allow" when prompted</li>
+                </ul>
+
+                <h3>❓ TROUBLESHOOTING</h3>
+
+                <p><strong>Game won't start?</strong><br>
+                    → Grant camera permission in browser settings and refresh</p>
+
+                <p><strong>Face not detected?</strong><br>
+                    → Improve lighting, move closer to camera</p>
+
+                <p><strong>Blinks not detected properly?</strong><br>
+                    → Adjust lighting, try recalibrating by restarting the game</p>
+
+                <p><strong>Camera being used by another app?</strong><br>
+                    → Close other apps (Zoom, FaceTime, etc.) and try again</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- First-Time Tutorial Overlay -->
+    <div id="tutorial-overlay" class="tutorial-overlay hidden">
+        <div class="tutorial-content">
+            <div class="tutorial-step" id="tutorial-step-1">
+                <h2 class="glitch" data-text="WELCOME!">WELCOME!</h2>
+                <p class="tutorial-text">Welcome to Blink Stop - the ultimate staring contest!</p>
+                <button class="neon-btn tutorial-next">Next</button>
+                <button class="tutorial-skip">Skip Tutorial</button>
+            </div>
+
+            <div class="tutorial-step hidden" id="tutorial-step-2">
+                <h2 class="glitch" data-text="CAMERA REQUIRED">CAMERA REQUIRED</h2>
+                <p class="tutorial-text">We'll use your camera to detect when you blink.<br><br>Don't worry - everything
+                    is processed locally on your device!</p>
+                <button class="neon-btn tutorial-next">Next</button>
+                <button class="tutorial-skip">Skip Tutorial</button>
+            </div>
+
+            <div class="tutorial-step hidden" id="tutorial-step-3">
+                <h2 class="glitch" data-text="CHOOSE YOUR MODE">CHOOSE YOUR MODE</h2>
+                <p class="tutorial-text">Pick a game mode to start.<br><br>First-timers: try <span
+                        style="color: var(--neon-cyan);">CLASSIC</span>!</p>
+                <button class="neon-btn tutorial-next">Next</button>
+                <button class="tutorial-skip">Skip Tutorial</button>
+            </div>
+
+            <div class="tutorial-step hidden" id="tutorial-step-4">
+                <h2 class="glitch" data-text="READY?">READY?</h2>
+                <p class="tutorial-text">Click any mode and allow camera access when prompted.<br><br>Good luck! 👁️</p>
+                <button class="neon-btn tutorial-finish">Let's Go!</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Footer -->
     <footer class="footer">
         <button class="footer-link" id="privacy-link">Privacy Policy</button>
@@ -249,7 +342,7 @@
         <button class="footer-link" id="tos-link">Terms of Service</button>
     </footer>
 
-    <script type="module" src="src/main.js?v=13"></script>
+    <script type="module" src="src/main.js?v=14"></script>
 </body>
 
 </html>
