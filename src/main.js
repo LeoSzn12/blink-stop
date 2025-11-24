@@ -1,5 +1,6 @@
 import { checkBlink, setBlinkThreshold } from './blinkDetection.js';
 import { audioManager } from './audioManager.js';
+import { GlobalLeaderboard } from './firebase.js';
 
 // DOM Elements
 const videoElement = document.getElementsByClassName('input_video')[0];
@@ -33,6 +34,7 @@ const gameOverTitle = document.getElementById('game-over-title');
 const finalScoreLabel = document.getElementById('final-score-label');
 const finalScoreVal = document.getElementById('final-score-val');
 const leaderboardList = document.getElementById('leaderboard-list');
+const globalLeaderboardList = document.getElementById('global-leaderboard-list');
 const playerNameInput = document.getElementById('player-name-input');
 const saveScoreBtn = document.getElementById('save-score-btn');
 const shareBtn = document.getElementById('share-btn');
@@ -208,18 +210,50 @@ const Leaderboard = {
     }
 };
 
+// Global Leaderboard Render
+async function renderGlobalLeaderboard(mode) {
+    globalLeaderboardList.innerHTML = '<li>Loading...</li>';
+
+    const scores = await GlobalLeaderboard.getTop(mode, 10);
+    globalLeaderboardList.innerHTML = '';
+
+    if (scores.length === 0) {
+        globalLeaderboardList.innerHTML = '<li>No global scores yet</li>';
+        return;
+    }
+
+    scores.forEach((entry, index) => {
+        const li = document.createElement('li');
+        const formattedScore = mode === 'CLASSIC' ? `${entry.score.toFixed(2)}s` : `${entry.score.toFixed(3)}s off`;
+        li.innerHTML = `<span>#${index + 1} ${entry.name}</span><span>${formattedScore}</span>`;
+        globalLeaderboardList.appendChild(li);
+    });
+}
+
 // Save Score Event
-saveScoreBtn.addEventListener('click', () => {
+saveScoreBtn.addEventListener('click', async () => {
     const name = playerNameInput.value.trim().toUpperCase();
     if (!name) return;
 
     if (lastScore === null) return;
 
+    // Save to local leaderboard
     Leaderboard.save(currentMode, lastScore, name);
     Leaderboard.render(currentMode);
 
+    // Save to global Firebase leaderboard
+    saveScoreBtn.innerText = "SAVING...";
+    const saved = await GlobalLeaderboard.save(currentMode, lastScore, name);
+
+    if (saved) {
+        saveScoreBtn.innerText = "SAVED ✓";
+        // Refresh global leaderboard
+        await renderGlobalLeaderboard(currentMode);
+    } else {
+        saveScoreBtn.innerText = "SAVED (LOCAL)";
+    }
+
     saveScoreBtn.disabled = true;
-    saveScoreBtn.innerText = "SAVED";
     playerNameInput.disabled = true;
 });
 
@@ -505,6 +539,7 @@ function endGame(reason = 'BLINK') {
         saveScoreBtn.innerText = "SAVE";
 
         Leaderboard.render(currentMode);
+        renderGlobalLeaderboard(currentMode); // Load global leaderboard
     } catch (err) {
         console.error("Error in endGame:", err);
     }

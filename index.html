@@ -25,8 +25,8 @@
     <!-- MediaPipe Dependencies -->
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
-    <!-- AdSense Script (Placeholder) -->
-    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-YOUR_ID_HERE"
+    <!-- AdSense Script -->
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4512722496678449"
         crossorigin="anonymous"></script>
 </head>
 
@@ -65,10 +65,13 @@
 
                     <p class="loading-text" id="loading-msg">ESTABLISHING NEURAL LINK...</p>
 
-                    <!-- AdSense Banner Placeholder -->
+                    <!-- AdSense Banner -->
                     <div class="ad-banner">
-                        <p>ADVERTISEMENT</p>
-                        <!-- <ins class="adsbygoogle" ...></ins> -->
+                        <ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-4512722496678449"
+                            data-ad-slot="auto" data-ad-format="auto" data-full-width-responsive="true"></ins>
+                        <script>
+                            (adsbygoogle = window.adsbygoogle || []).push({});
+                        </script>
                     </div>
                 </div>
 
@@ -128,9 +131,16 @@
                     </div>
 
                     <div class="leaderboard-container">
-                        <h3>LEADERBOARD</h3>
+                        <h3>LOCAL LEADERBOARD</h3>
                         <ul id="leaderboard-list">
                             <!-- Populated by JS -->
+                        </ul>
+                    </div>
+
+                    <div class="leaderboard-container">
+                        <h3>🌍 GLOBAL TOP 10</h3>
+                        <ul id="global-leaderboard-list">
+                            <li>Loading...</li>
                         </ul>
                     </div>
 
@@ -238,7 +248,7 @@
         <button class="footer-link" id="tos-link">Terms of Service</button>
     </footer>
 
-    <script type="module" src="src/main.js?v=9"></script>
+    <script type="module" src="src/main.js?v=10"></script>
 </body>
 
 </html>
