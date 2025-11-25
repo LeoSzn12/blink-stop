@@ -558,12 +558,29 @@ function onResults(results) {
     canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
     canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
 
-    if (window.faceMissingFrames > 30) { // ~1 second @ 30fps
-        endGame('DISQUALIFIED');
+    if (results.multiFaceLandmarks) {
+        for (const landmarks of results.multiFaceLandmarks) {
+            // Draw landmarks for feedback
+            drawConnectors(canvasCtx, landmarks, FACEMESH_TESSELATION, { color: '#C0C0C070', lineWidth: 1 });
+
+            // Calculate Eye Aspect Ratio (EAR)
+            const leftEye = getEyeEAR(landmarks, LEFT_EYE_INDICES);
+            const rightEye = getEyeEAR(landmarks, RIGHT_EYE_INDICES);
+            const avgEAR = (leftEye + rightEye) / 2;
+
+            // Smooth EAR
+            earHistory.push(avgEAR);
+            if (earHistory.length > 5) earHistory.shift();
+            const smoothedEAR = earHistory.reduce((a, b) => a + b) / earHistory.length;
+
+            if (isCalibrating) {
+                handleCalibration(smoothedEAR);
+            } else if (isPlaying) {
+                handleGameLogic(smoothedEAR);
+            }
+        }
     }
-}
-    }
-canvasCtx.restore();
+    canvasCtx.restore();
 }
 
 function updateGameLoop() {
