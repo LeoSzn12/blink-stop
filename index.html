@@ -101,55 +101,56 @@
                 </div>
 
                 <!-- HUD -->
-                <div class="hud-top-left">
-                    <button id="home-btn" class="menu-btn-hud">MENU</button>
-                </div>
-                <div class="score-container">
-                    <span class="label" id="hud-label">TIME</span>
-                    <span id="score" class="digital-text">0.00s</span>
-                </div>
-                <div class="target-container hidden" id="target-display">
-                    <span class="label">TARGET</span>
-                    <span class="digital-text-sm">10.00s</span>
-                </div>
-            </div>
-
-            <!-- Game Over -->
-            <div id="game-over-screen" class="screen hidden">
-                <h2 class="neon-text-red" id="game-over-title">BLINK DETECTED</h2>
-
-                <div class="final-score">
-                    <span class="label" id="final-score-label">YOU SURVIVED</span>
-                    <span id="final-score-val" class="digital-text-lg">0.00s</span>
+                <div id="game-hud" class="screen hidden">
+                    <div class="hud-top-left">
+                        <button id="home-btn" class="menu-btn-hud">MENU</button>
+                    </div>
+                    <div class="score-container">
+                        <span class="label" id="hud-label">TIME</span>
+                        <span id="score" class="digital-text">0.00s</span>
+                    </div>
+                    <div class="target-container hidden" id="target-display">
+                        <span class="label">TARGET</span>
+                        <span class="digital-text-sm">10.00s</span>
+                    </div>
                 </div>
 
-                <div class="name-entry-container">
-                    <input type="text" id="player-name-input" placeholder="ENTER NAME" maxlength="10">
-                    <button id="save-score-btn" class="neon-btn-small">SAVE</button>
-                </div>
+                <!-- Game Over -->
+                <div id="game-over-screen" class="screen hidden">
+                    <h2 class="neon-text-red" id="game-over-title">BLINK DETECTED</h2>
 
-                <div class="leaderboard-container">
-                    <h3>LOCAL LEADERBOARD</h3>
-                    <ul id="leaderboard-list">
-                        <!-- Populated by JS -->
-                    </ul>
-                </div>
+                    <div class="final-score">
+                        <span class="label" id="final-score-label">YOU SURVIVED</span>
+                        <span id="final-score-val" class="digital-text-lg">0.00s</span>
+                    </div>
 
-                <div class="leaderboard-container">
-                    <h3>🌍 GLOBAL TOP 10</h3>
-                    <ul id="global-leaderboard-list">
-                        <li>Loading...</li>
-                    </ul>
-                </div>
+                    <div class="name-entry-container">
+                        <input type="text" id="player-name-input" placeholder="ENTER NAME" maxlength="10">
+                        <button id="save-score-btn" class="neon-btn-small">SAVE</button>
+                    </div>
 
-                <div class="game-over-btns">
-                    <button id="restart-btn" class="neon-btn">RETRY</button>
-                    <button id="share-btn" class="neon-btn">SHARE</button>
+                    <div class="leaderboard-container">
+                        <h3>LOCAL LEADERBOARD</h3>
+                        <ul id="leaderboard-list">
+                            <!-- Populated by JS -->
+                        </ul>
+                    </div>
+
+                    <div class="leaderboard-container">
+                        <h3>🌍 GLOBAL TOP 10</h3>
+                        <ul id="global-leaderboard-list">
+                            <li>Loading...</li>
+                        </ul>
+                    </div>
+
+                    <div class="game-over-btns">
+                        <button id="restart-btn" class="neon-btn">RETRY</button>
+                        <button id="share-btn" class="neon-btn">SHARE</button>
+                    </div>
+                    <button id="menu-btn" class="neon-btn-small">MENU</button>
                 </div>
-                <button id="menu-btn" class="neon-btn-small">MENU</button>
             </div>
         </div>
-    </div>
     </div>
 
     <!-- Privacy Policy Modal -->
@@ -310,7 +311,7 @@
         <button class="footer-link" id="tos-link">Terms of Service</button>
     </footer>
 
-    <script type="module" src="src/main.js?v=20"></script>
+    <script type="module" src="src/main.js?v=21"></script>
 </body>
 
 </html>
