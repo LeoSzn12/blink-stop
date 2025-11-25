@@ -120,31 +120,12 @@ faceMesh.setOptions({
 
 faceMesh.onResults(onResults);
 
-// Custom Camera Loop with Throttling
+// Custom Camera Loop with Decoupled Detection
 let isProcessing = false;
-let lastProcessTime = 0;
-const FPS_LIMIT = 15; // Limit detection to 15 FPS for mobile stability
-const INTERVAL = 1000 / FPS_LIMIT;
+let detectionInterval = null;
 
 async function startCameraLoop() {
-    const processFrame = async () => {
-        if (videoElement.paused || videoElement.ended) return;
-
-        const now = Date.now();
-        if (!isProcessing && (now - lastProcessTime >= INTERVAL)) {
-            isProcessing = true;
-            try {
-                await faceMesh.send({ image: videoElement });
-                lastProcessTime = now;
-            } catch (error) {
-                console.error("Face Mesh error:", error);
-            } finally {
-                isProcessing = false;
-            }
-        }
-        requestAnimationFrame(processFrame);
-    };
-
+    // 1. Start Video Stream First (Independent of FaceMesh)
     try {
         const stream = await navigator.mediaDevices.getUserMedia({
             video: {
@@ -154,21 +135,52 @@ async function startCameraLoop() {
             }
         });
         videoElement.srcObject = stream;
-        await new Promise(resolve => {
+
+        // Wait for video to actually play
+        await new Promise((resolve) => {
             videoElement.onloadedmetadata = () => {
-                resolve();
+                videoElement.play().then(resolve);
             };
         });
-        await videoElement.play();
-        processFrame();
+
+        // 2. Start Detection Loop (Decoupled)
+        startDetectionLoop();
+
     } catch (err) {
         console.error("Camera init error:", err);
-        alert("Camera access denied or not supported.");
+        throw err; // Propagate to caller
     }
 }
 
-// Replace the old camera.start() calls with startCameraLoop()
-// We'll update the startGame function to use this new method
+function startDetectionLoop() {
+    if (detectionInterval) clearInterval(detectionInterval);
+
+    // Run detection at 10 FPS (sufficient for blinking)
+    // Using setInterval ensures it doesn't block the UI thread like requestAnimationFrame can
+    detectionInterval = setInterval(async () => {
+        if (videoElement.paused || videoElement.ended || isProcessing) return;
+
+        isProcessing = true;
+        try {
+            // Race condition protection: Timeout after 100ms if FaceMesh hangs
+            await Promise.race([
+                faceMesh.send({ image: videoElement }),
+                new Promise((_, reject) => setTimeout(() => reject("Timeout"), 100))
+            ]);
+        } catch (error) {
+            // Ignore timeouts, just skip frame
+            if (error !== "Timeout") console.warn("FaceMesh skipped:", error);
+        } finally {
+            isProcessing = false;
+        }
+    }, 100); // 100ms = 10 FPS
+}
+
+function stopDetectionLoop() {
+    if (detectionInterval) clearInterval(detectionInterval);
+    detectionInterval = null;
+    isProcessing = false;
+}
 
 
 // Initialize
@@ -498,11 +510,27 @@ function updateEnduranceLoop() {
 }
 
 function showMenu() {
-    gameState = 'MENU';
+    stopDetectionLoop(); // Stop face detection
+
+    // Stop video stream to release camera
+    if (videoElement.srcObject) {
+        videoElement.srcObject.getTracks().forEach(track => track.stop());
+        videoElement.srcObject = null;
+    }
+
+    gameHud.classList.add('hidden');
+    gameHud.classList.remove('active');
+
     gameOverScreen.classList.add('hidden');
     gameOverScreen.classList.remove('active');
+
     menuScreen.classList.remove('hidden');
     menuScreen.classList.add('active');
+
+    // Reset state
+    gameState = 'MENU'; // Keep existing gameState reset
+    isPlaying = false;
+    isCalibrating = false;
 
     // Reset UI state
     precisionOptions.classList.add('hidden');

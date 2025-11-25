@@ -585,6 +585,26 @@ h1.glitch {
     font-size: 1.5rem;
 }
 
+.menu-btn-hud {
+    background: rgba(0, 0, 0, 0.5);
+    border: 1px solid var(--neon-cyan);
+    color: var(--neon-cyan);
+    padding: 5px 10px;
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    backdrop-filter: blur(4px);
+    transition: all 0.3s ease;
+}
+
+.menu-btn-hud:hover {
+    background: var(--neon-cyan);
+    color: #000;
+    box-shadow: 0 0 10px var(--neon-cyan);
+}
+
 .close-btn {
     background: none;
     border: none;
