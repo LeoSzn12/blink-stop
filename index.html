@@ -129,14 +129,16 @@
                         <button id="save-score-btn" class="neon-btn-small">SAVE</button>
                     </div>
 
+                    <!-- Leaderboards -->
                     <div class="leaderboard-container">
-                        <h3>LOCAL LEADERBOARD</h3>
+                        <h3>YOUR TOP SCORES</h3>
                         <ul id="leaderboard-list">
                             <!-- Populated by JS -->
                         </ul>
                     </div>
 
-                    <div class="leaderboard-container">
+                    <!-- Global Leaderboard - Hidden -->
+                    <div class="leaderboard-container" style="display: none;">
                         <h3>🌍 GLOBAL TOP 10</h3>
                         <ul id="global-leaderboard-list">
                             <li>Loading...</li>
@@ -285,6 +287,18 @@
                     <li><strong>Android Chrome:</strong> Tap "Allow" when prompted</li>
                 </ul>
 
+                <h3>How do I play?</h3>
+                <p><strong>CLASSIC:</strong> Stare without blinking for as long as possible.<br>
+                    <strong>PRECISION:</strong> Blink at exactly the target time (5s, 10s, or 15s).<br>
+                    <strong>ENDURANCE:</strong> Survive 30 seconds without blinking.
+                </p>
+
+                <h3>Tips for Better Detection</h3>
+                <p><strong>Calibration:</strong> Play a few rounds to help the camera learn your blink pattern.<br>
+                    <strong>Camera Position:</strong> Look directly at the camera, not the screen, while playing.<br>
+                    <strong>Lighting:</strong> Ensure good lighting on your face for best results.
+                </p>
+
                 <h3>❓ TROUBLESHOOTING</h3>
 
                 <p><strong>Game won't start?</strong><br>
@@ -313,7 +327,7 @@
         <button class="footer-link" id="tos-link">Terms of Service</button>
     </footer>
 
-    <script type="module" src="src/main.js?v=52"></script>
+    <script type="module" src="src/main.js?v=53"></script>
 </body>
 
 </html>
