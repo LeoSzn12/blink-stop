@@ -113,7 +113,7 @@ const faceMesh = new FaceMesh({
 
 faceMesh.setOptions({
     maxNumFaces: 1,
-    refineLandmarks: false, // Disable refinement for speed
+    refineLandmarks: true, // Re-enable for accurate eye tracking
     minDetectionConfidence: 0.5,
     minTrackingConfidence: 0.5
 });
@@ -543,36 +543,27 @@ function showMenu() {
 }
 
 function onResults(results) {
+    // Visual Debug: Show if face is detected
+    if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
+        hudLabel.style.color = "var(--neon-cyan)"; // Cyan = Face Detected
+        hudLabel.style.textShadow = "0 0 10px var(--neon-cyan)";
+    } else {
+        hudLabel.style.color = "#555"; // Dim = No Face
+        hudLabel.style.textShadow = "none";
+    }
+
+    if (!isCalibrating && !isPlaying) return;
+
     canvasCtx.save();
     canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
     canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
 
-    if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
-        const landmarks = results.multiFaceLandmarks[0];
-        window.faceMissingFrames = 0; // Reset counter
-
-        const { blinking, ear } = checkBlink(landmarks);
-
-        if (gameState === 'CALIBRATING') {
-            calibrationData.push(ear);
-        } else if (gameState === 'PLAYING' || gameState === 'ENDURANCE') {
-            if (blinking) {
-                endGame();
-            } else {
-                eyeStatusDisplay.innerText = "OPEN";
-                eyeStatusDisplay.style.color = "var(--neon-cyan)";
-            }
-        }
-    } else {
-        // No face detected
-        if (gameState === 'PLAYING' || gameState === 'ENDURANCE') {
-            window.faceMissingFrames = (window.faceMissingFrames || 0) + 1;
-            if (window.faceMissingFrames > 30) { // ~1 second @ 30fps
-                endGame('DISQUALIFIED');
-            }
-        }
+    if (window.faceMissingFrames > 30) { // ~1 second @ 30fps
+        endGame('DISQUALIFIED');
     }
-    canvasCtx.restore();
+}
+    }
+canvasCtx.restore();
 }
 
 function updateGameLoop() {
