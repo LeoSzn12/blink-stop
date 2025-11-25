@@ -113,7 +113,7 @@ const faceMesh = new FaceMesh({
 
 faceMesh.setOptions({
     maxNumFaces: 1,
-    refineLandmarks: true, // Re-enable for accurate eye tracking
+    refineLandmarks: false, // Keep OFF for performance
     minDetectionConfidence: 0.5,
     minTrackingConfidence: 0.5
 });
@@ -155,17 +155,16 @@ async function startCameraLoop() {
 function startDetectionLoop() {
     if (detectionInterval) clearInterval(detectionInterval);
 
-    // Run detection at 10 FPS (sufficient for blinking)
-    // Using setInterval ensures it doesn't block the UI thread like requestAnimationFrame can
+    // Run detection at 20 FPS (good balance between performance and accuracy)
     detectionInterval = setInterval(async () => {
         if (videoElement.paused || videoElement.ended || isProcessing) return;
 
         isProcessing = true;
         try {
-            // Race condition protection: Timeout after 100ms if FaceMesh hangs
+            // Race condition protection: Timeout after 80ms if FaceMesh hangs
             await Promise.race([
                 faceMesh.send({ image: videoElement }),
-                new Promise((_, reject) => setTimeout(() => reject("Timeout"), 100))
+                new Promise((_, reject) => setTimeout(() => reject("Timeout"), 80))
             ]);
         } catch (error) {
             // Ignore timeouts, just skip frame
@@ -173,7 +172,7 @@ function startDetectionLoop() {
         } finally {
             isProcessing = false;
         }
-    }, 100); // 100ms = 10 FPS
+    }, 50); // 50ms = 20 FPS
 }
 
 function stopDetectionLoop() {
