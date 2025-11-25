@@ -41,7 +41,6 @@
             <div class="ui-overlay" id="ui-layer">
                 <!-- Main Menu -->
                 <div id="menu-screen" class="screen active">
-                    <button id="help-btn" class="help-btn" title="Help">?</button>
                     <h1 class="glitch" data-text="BLINK STOP">BLINK STOP</h1>
                     <p class="subtitle">Challenge your reflexes</p>
 
@@ -301,48 +300,16 @@
         </div>
     </div>
 
-    <!-- First-Time Tutorial Overlay -->
-    <div id="tutorial-overlay" class="tutorial-overlay hidden">
-        <div class="tutorial-content">
-            <div class="tutorial-step" id="tutorial-step-1">
-                <h2 class="glitch" data-text="WELCOME!">WELCOME!</h2>
-                <p class="tutorial-text">Welcome to Blink Stop - the ultimate staring contest!</p>
-                <button class="neon-btn tutorial-next">Next</button>
-                <button class="tutorial-skip">Skip Tutorial</button>
-            </div>
-
-            <div class="tutorial-step hidden" id="tutorial-step-2">
-                <h2 class="glitch" data-text="CAMERA REQUIRED">CAMERA REQUIRED</h2>
-                <p class="tutorial-text">We'll use your camera to detect when you blink.<br><br>Don't worry - everything
-                    is processed locally on your device!</p>
-                <button class="neon-btn tutorial-next">Next</button>
-                <button class="tutorial-skip">Skip Tutorial</button>
-            </div>
-
-            <div class="tutorial-step hidden" id="tutorial-step-3">
-                <h2 class="glitch" data-text="CHOOSE YOUR MODE">CHOOSE YOUR MODE</h2>
-                <p class="tutorial-text">Pick a game mode to start.<br><br>First-timers: try <span
-                        style="color: var(--neon-cyan);">CLASSIC</span>!</p>
-                <button class="neon-btn tutorial-next">Next</button>
-                <button class="tutorial-skip">Skip Tutorial</button>
-            </div>
-
-            <div class="tutorial-step hidden" id="tutorial-step-4">
-                <h2 class="glitch" data-text="READY?">READY?</h2>
-                <p class="tutorial-text">Click any mode and allow camera access when prompted.<br><br>Good luck! 👁️</p>
-                <button class="neon-btn tutorial-finish">Let's Go!</button>
-            </div>
-        </div>
-    </div>
-
     <!-- Footer -->
     <footer class="footer">
+        <button class="footer-link" id="help-link">Help & FAQ</button>
+        <span class="footer-separator">|</span>
         <button class="footer-link" id="privacy-link">Privacy Policy</button>
         <span class="footer-separator">|</span>
         <button class="footer-link" id="tos-link">Terms of Service</button>
     </footer>
 
-    <script type="module" src="src/main.js?v=17"></script>
+    <script type="module" src="src/main.js?v=18"></script>
 </body>
 
 </html>

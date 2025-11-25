@@ -113,7 +113,7 @@ const faceMesh = new FaceMesh({
 
 faceMesh.setOptions({
     maxNumFaces: 1,
-    refineLandmarks: true,
+    refineLandmarks: false, // Disable refinement for speed
     minDetectionConfidence: 0.5,
     minTrackingConfidence: 0.5
 });
@@ -127,18 +127,11 @@ const camera = new Camera(videoElement, {
             await faceMesh.send({ image: videoElement });
         } catch (error) {
             console.error("Face Mesh error:", error);
-            // Attempt to recover
-            if (currentMode) {
-                loadingMsg.style.display = 'block';
-                loadingMsg.innerText = "RECOVERING CAMERA...";
-                setTimeout(() => {
-                    loadingMsg.style.display = 'none';
-                }, 1000);
-            }
+            // Silent recovery attempt
         }
     },
-    width: window.innerWidth < 768 ? 480 : 640, // Lower resolution for mobile
-    height: window.innerWidth < 768 ? 360 : 480
+    width: window.innerWidth < 768 ? 320 : 640, // Aggressive reduction for mobile
+    height: window.innerWidth < 768 ? 240 : 480
 });
 
 // Initialize
@@ -172,15 +165,14 @@ optionBtns.forEach(btn => {
     });
 });
 
-// Help & Tutorial Logic
-const helpBtn = document.getElementById('help-btn');
+// Help Logic
+const helpLink = document.getElementById('help-link');
 const helpModal = document.getElementById('help-modal');
 const closeHelpBtn = document.getElementById('close-help');
-const tutorialOverlay = document.getElementById('tutorial-overlay');
 
 // Help Modal
-if (helpBtn) {
-    helpBtn.addEventListener('click', () => {
+if (helpLink) {
+    helpLink.addEventListener('click', () => {
         helpModal.classList.remove('hidden');
         helpModal.classList.add('active');
     });
@@ -199,37 +191,6 @@ window.addEventListener('click', (e) => {
         helpModal.classList.add('hidden');
         helpModal.classList.remove('active');
     }
-});
-
-// Tutorial Logic
-const hasSeenTutorial = localStorage.getItem('blink_tutorial_seen');
-if (!hasSeenTutorial) {
-    setTimeout(() => {
-        tutorialOverlay.classList.remove('hidden');
-        tutorialOverlay.classList.add('active');
-    }, 1000);
-}
-
-// Tutorial Navigation
-const tutorialSteps = document.querySelectorAll('.tutorial-step');
-let currentStep = 0;
-
-document.querySelectorAll('.tutorial-next').forEach(btn => {
-    btn.addEventListener('click', () => {
-        tutorialSteps[currentStep].classList.add('hidden');
-        currentStep++;
-        if (currentStep < tutorialSteps.length) {
-            tutorialSteps[currentStep].classList.remove('hidden');
-        }
-    });
-});
-
-document.querySelectorAll('.tutorial-skip, .tutorial-finish').forEach(btn => {
-    btn.addEventListener('click', () => {
-        tutorialOverlay.classList.add('hidden');
-        tutorialOverlay.classList.remove('active');
-        localStorage.setItem('blink_tutorial_seen', 'true');
-    });
 });
 
 restartBtn.addEventListener('click', () => startGame(currentMode));
