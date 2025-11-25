@@ -123,10 +123,22 @@ faceMesh.onResults(onResults);
 // Camera Setup
 const camera = new Camera(videoElement, {
     onFrame: async () => {
-        await faceMesh.send({ image: videoElement });
+        try {
+            await faceMesh.send({ image: videoElement });
+        } catch (error) {
+            console.error("Face Mesh error:", error);
+            // Attempt to recover
+            if (currentMode) {
+                loadingMsg.style.display = 'block';
+                loadingMsg.innerText = "RECOVERING CAMERA...";
+                setTimeout(() => {
+                    loadingMsg.style.display = 'none';
+                }, 1000);
+            }
+        }
     },
-    width: 640,  // Reduced from 1280 for mobile
-    height: 480  // Reduced from 720 for mobile
+    width: window.innerWidth < 768 ? 480 : 640, // Lower resolution for mobile
+    height: window.innerWidth < 768 ? 360 : 480
 });
 
 // Initialize
