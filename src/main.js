@@ -244,6 +244,12 @@ window.addEventListener('click', (e) => {
 restartBtn.addEventListener('click', () => startGame(currentMode));
 menuBtn.addEventListener('click', showMenu);
 
+// Menu button in footer
+const menuFooterLink = document.getElementById('menu-footer-link');
+if (menuFooterLink) {
+    menuFooterLink.addEventListener('click', showMenu);
+}
+
 // Home button in HUD
 const homeBtnHud = document.getElementById('home-btn-hud');
 if (homeBtnHud) {

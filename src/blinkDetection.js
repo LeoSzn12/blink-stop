@@ -7,7 +7,7 @@ const LEFT_EYE = [33, 160, 158, 133, 153, 144];
 const RIGHT_EYE = [362, 385, 387, 263, 373, 380];
 
 // Thresholds
-let blinkThreshold = 0.25; // Default, will be calibrated
+let blinkThreshold = 0.22; // Sensitive threshold for reliable detection
 
 export function setBlinkThreshold(val) {
     blinkThreshold = val;
