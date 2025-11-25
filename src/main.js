@@ -120,19 +120,56 @@ faceMesh.setOptions({
 
 faceMesh.onResults(onResults);
 
-// Camera Setup
-const camera = new Camera(videoElement, {
-    onFrame: async () => {
-        try {
-            await faceMesh.send({ image: videoElement });
-        } catch (error) {
-            console.error("Face Mesh error:", error);
-            // Silent recovery attempt
+// Custom Camera Loop with Throttling
+let isProcessing = false;
+let lastProcessTime = 0;
+const FPS_LIMIT = 15; // Limit detection to 15 FPS for mobile stability
+const INTERVAL = 1000 / FPS_LIMIT;
+
+async function startCameraLoop() {
+    const processFrame = async () => {
+        if (videoElement.paused || videoElement.ended) return;
+
+        const now = Date.now();
+        if (!isProcessing && (now - lastProcessTime >= INTERVAL)) {
+            isProcessing = true;
+            try {
+                await faceMesh.send({ image: videoElement });
+                lastProcessTime = now;
+            } catch (error) {
+                console.error("Face Mesh error:", error);
+            } finally {
+                isProcessing = false;
+            }
         }
-    },
-    width: window.innerWidth < 768 ? 320 : 640, // Aggressive reduction for mobile
-    height: window.innerWidth < 768 ? 240 : 480
-});
+        requestAnimationFrame(processFrame);
+    };
+
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+                width: { ideal: window.innerWidth < 768 ? 480 : 640 },
+                height: { ideal: window.innerWidth < 768 ? 360 : 480 },
+                facingMode: 'user'
+            }
+        });
+        videoElement.srcObject = stream;
+        await new Promise(resolve => {
+            videoElement.onloadedmetadata = () => {
+                resolve();
+            };
+        });
+        await videoElement.play();
+        processFrame();
+    } catch (err) {
+        console.error("Camera init error:", err);
+        alert("Camera access denied or not supported.");
+    }
+}
+
+// Replace the old camera.start() calls with startCameraLoop()
+// We'll update the startGame function to use this new method
+
 
 // Initialize
 modeBtns.forEach(btn => {
@@ -343,7 +380,7 @@ function startGame(mode) {
         targetDisplay.classList.add('hidden');
     }
 
-    camera.start()
+    startCameraLoop()
         .then(() => {
             loadingMsg.innerText = 'CAMERA READY...';
             setTimeout(() => {
