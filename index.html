@@ -102,24 +102,32 @@
 
                 <!-- HUD -->
                 <div id="game-hud" class="screen hidden">
-                    <div class="hud-top-left">
+                    <div class="hud-left">
                         <button id="home-btn" class="menu-btn-hud">MENU</button>
                     </div>
 
-                    <!-- World Record Display (Classic Mode) -->
-                    <div id="world-record-display" class="world-record-hud hidden">
-                        <span class="label">WORLD RECORD</span>
-                        <span id="wr-value" class="digital-text-sm">--</span>
-                    </div>
+                    <div class="hud-right">
+                        <!-- World Record Display (Classic Mode) -->
+                        <div id="world-record-display" class="world-record-hud hidden">
+                            <span class="label">WORLD RECORD</span>
+                            <span id="wr-value" class="digital-text-sm">--</span>
+                        </div>
 
-                    <div class="score-container">
-                        <span class="label" id="hud-label">TIME</span>
-                        <span id="score" class="digital-text">0.00s</span>
+                        <div class="score-container">
+                            <span class="label" id="hud-label">TIME</span>
+                            <span id="score" class="digital-text">0.00s</span>
+                        </div>
+
+                        <div class="target-container hidden" id="target-display">
+                            <span class="label">TARGET</span>
+                            <span class="digital-text-sm">10.00s</span>
+                        </div>
                     </div>
-                    <div class="target-container hidden" id="target-display">
-                        <span class="label">TARGET</span>
-                        <span class="digital-text-sm">10.00s</span>
-                    </div>
+                </div>
+
+                <!-- Face Tracking Status -->
+                <div id="face-status" class="face-status hidden">
+                    <span id="face-status-text">Tracking face...</span>
                 </div>
 
                 <!-- Game Over -->
@@ -401,7 +409,7 @@
         <button class="footer-link" id="tos-link">Terms of Service</button>
     </footer>
 
-    <script type="module" src="src/main.js?v=61"></script>
+    <script type="module" src="src/main.js?v=62"></script>
 </body>
 
 </html>

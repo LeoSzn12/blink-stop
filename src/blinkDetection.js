@@ -1,17 +1,17 @@
 // Blink Detection Logic using Eye Aspect Ratio (EAR)
 
-// MediaPipe Face Mesh Landmark Indices
-// Left Eye
+// MediaPipe Face Mesh// Eye landmarks (MediaPipe Face Mesh indices)
 const LEFT_EYE = [33, 160, 158, 133, 153, 144];
-// Right Eye
 const RIGHT_EYE = [362, 385, 387, 263, 373, 380];
 
-// Thresholds
-let blinkThreshold = 0.22; // Sensitive threshold for reliable detection
+// Blink Detection Configuration
+// Threshold adjusted to 0.24 for better tolerance with glasses and slight movement
+let blinkThreshold = 0.24;
 
-export function setBlinkThreshold(val) {
-    blinkThreshold = val;
-    console.log("New Blink Threshold:", blinkThreshold);
+// Allow dynamic threshold adjustment
+export function setBlinkThreshold(value) {
+    blinkThreshold = value;
+    console.log(`Blink threshold set to: ${blinkThreshold}`);
 }
 
 export function getBlinkThreshold() {

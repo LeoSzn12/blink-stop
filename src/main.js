@@ -54,6 +54,10 @@ const wrValue = document.getElementById('wr-value');
 const finalScoreSub = document.getElementById('final-score-sub');
 const gameOverWorldRecord = document.getElementById('game-over-world-record');
 
+// Face Tracking Status
+const faceStatus = document.getElementById('face-status');
+const faceStatusText = document.getElementById('face-status-text');
+
 // Game State
 let gameState = 'MENU'; // MENU, PLAYING, GAME_OVER, CALIBRATING, ENDURANCE
 let currentMode = 'CLASSIC'; // CLASSIC, PRECISION, ENDURANCE
@@ -580,15 +584,6 @@ function showMenu() {
 }
 
 function onResults(results) {
-    // Visual Debug: Show if face is detected
-    if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
-        hudLabel.style.color = "var(--neon-cyan)"; // Cyan = Face Detected
-        hudLabel.style.textShadow = "0 0 10px var(--neon-cyan)";
-    } else {
-        hudLabel.style.color = "#555"; // Dim = No Face
-        hudLabel.style.textShadow = "none";
-    }
-
     canvasCtx.save();
     canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
     canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
@@ -596,6 +591,16 @@ function onResults(results) {
     if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
         const landmarks = results.multiFaceLandmarks[0];
         window.faceMissingFrames = 0; // Reset counter
+
+        // Update face tracking status
+        if (gameState === 'PLAYING' || gameState === 'ENDURANCE') { // Changed condition
+            faceStatus.classList.remove('hidden', 'not-detected');
+            faceStatusText.innerText = 'Tracking face...';
+        }
+
+        // Visual Debug: Show if face is detected
+        hudLabel.style.color = "var(--neon-cyan)";
+        hudLabel.style.textShadow = "0 0 10px var(--neon-cyan)";
 
         const { blinking, ear } = checkBlink(landmarks);
 
@@ -608,6 +613,16 @@ function onResults(results) {
         }
     } else {
         // No face detected
+        if (gameState === 'PLAYING' || gameState === 'ENDURANCE') { // Changed condition
+            faceStatus.classList.remove('hidden');
+            faceStatus.classList.add('not-detected');
+            faceStatusText.innerText = 'Face not detected – move closer & improve lighting';
+        }
+
+        // Visual Debug: Dim label when no face
+        hudLabel.style.color = "#555";
+        hudLabel.style.textShadow = "none";
+
         if (gameState === 'PLAYING' || gameState === 'ENDURANCE') {
             window.faceMissingFrames = (window.faceMissingFrames || 0) + 1;
             if (window.faceMissingFrames > 30) { // ~1 second @ 30fps
