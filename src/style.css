@@ -798,42 +798,45 @@ h1.glitch {
 }
 
 /* Ensure main container doesn't overlap content */
+/* Ensure main container doesn't overlap content */
 .container {
     min-height: 100vh;
-    position: fixed;
-    /* Keep game fixed */
-    top: 0;
-    left: 0;
+    position: relative;
+    /* Restored to relative flow */
     width: 100%;
     height: 100vh;
     z-index: 1;
+    overflow: hidden;
+    /* Keep video contained */
 }
 
-/* Adjust video wrapper to not block scrolling */
+/* Adjust video wrapper to sit inside container */
 .video-wrapper {
     position: absolute;
-    /* Changed from fixed */
     top: 0;
     left: 0;
     width: 100%;
-    height: 100vh;
+    height: 100%;
     z-index: 1;
 }
 
-/* Content needs to be on top of video wrapper when scrolled */
+/* Content needs to follow container naturally */
 .content-section {
     position: relative;
-    z-index: 2;
-    /* Lower z-index, below game UI */
-    background: rgba(0, 0, 0, 0.98);
-    /* Higher opacity */
+    z-index: 10;
+    background: #000;
+    border-top: 2px solid var(--neon-cyan);
     margin-top: 0;
-    /* Remove the 100vh margin */
 }
 
-/* Footer adjustment */
+/* Footer adjustment - keep fixed at bottom */
 footer {
     position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
     z-index: 100;
-    /* Keep footer on top */
+    background: rgba(0, 0, 0, 0.8);
+    /* Add background for readability */
+    padding: 1rem;
 }
