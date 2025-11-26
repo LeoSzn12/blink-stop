@@ -624,6 +624,10 @@ function endGame(reason = 'BLINK') {
         let finalScoreText = '';
         let scoreToSave = 0;
 
+        // Reset Sub-details
+        finalScoreSub.classList.add('hidden');
+        gameOverWorldRecord.classList.add('hidden');
+
         if (reason === 'WIN_ENDURANCE') {
             scoreToSave = 30;
             finalScoreText = "30.00s";
@@ -646,11 +650,26 @@ function endGame(reason = 'BLINK') {
             finalScoreText = `${elapsed.toFixed(2)}s`;
             finalScoreLabel.innerText = "YOU SURVIVED";
             gameOverTitle.innerText = "BLINK DETECTED";
+
+            // Show World Record
+            gameOverWorldRecord.classList.remove('hidden');
+            if (window.currentWorldRecord) {
+                gameOverWorldRecord.innerText = `Blink Stop World Record: ${window.currentWorldRecord.toFixed(2)}s`;
+            } else {
+                gameOverWorldRecord.innerText = `Blink Stop World Record: None yet!`;
+            }
+
         } else if (currentMode === 'PRECISION') {
             const diff = Math.abs(precisionTarget - elapsed);
             scoreToSave = diff;
-            finalScoreText = `${diff.toFixed(3)}s`;
-            finalScoreLabel.innerText = "OFF BY";
+
+            // NEW: Show Actual Time as Primary Score
+            finalScoreText = `${elapsed.toFixed(2)}s`;
+            finalScoreLabel.innerText = "YOU BLINKED AT";
+
+            // NEW: Show Target/Off-by as Secondary Detail
+            finalScoreSub.classList.remove('hidden');
+            finalScoreSub.innerText = `Target: ${precisionTarget.toFixed(2)}s (off by ${diff.toFixed(2)}s)`;
 
             if (diff < 0.1) {
                 gameOverTitle.innerText = "PERFECT!";

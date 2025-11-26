@@ -105,6 +105,13 @@
                     <div class="hud-top-left">
                         <button id="home-btn" class="menu-btn-hud">MENU</button>
                     </div>
+
+                    <!-- World Record Display (Classic Mode) -->
+                    <div id="world-record-display" class="world-record-hud hidden">
+                        <span class="label">WORLD RECORD</span>
+                        <span id="wr-value" class="digital-text-sm">--</span>
+                    </div>
+
                     <div class="score-container">
                         <span class="label" id="hud-label">TIME</span>
                         <span id="score" class="digital-text">0.00s</span>
@@ -122,6 +129,10 @@
                     <div class="final-score">
                         <span class="label" id="final-score-label">YOU SURVIVED</span>
                         <span id="final-score-val" class="digital-text-lg">0.00s</span>
+                        <!-- Secondary Detail for Precision Mode -->
+                        <div id="final-score-sub" class="score-sub hidden"></div>
+                        <!-- World Record for Classic Mode -->
+                        <div id="game-over-world-record" class="score-sub hidden"></div>
                     </div>
 
                     <div class="name-entry-container">
@@ -390,7 +401,7 @@
         <button class="footer-link" id="tos-link">Terms of Service</button>
     </footer>
 
-    <script type="module" src="src/main.js?v=57"></script>
+    <script type="module" src="src/main.js?v=58"></script>
 </body>
 
 </html>
