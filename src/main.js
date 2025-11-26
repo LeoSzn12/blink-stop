@@ -251,7 +251,14 @@ window.addEventListener('click', (e) => {
     }
 });
 
-restartBtn.addEventListener('click', () => startGame(currentMode));
+restartBtn.addEventListener('click', () => {
+    // Cancel camera auto-stop timeout (user wants to play again)
+    if (window.cameraTimeoutId) {
+        clearTimeout(window.cameraTimeoutId);
+        window.cameraTimeoutId = null;
+    }
+    startGame(currentMode);
+});
 menuBtn.addEventListener('click', showMenu);
 
 // Menu button in footer
@@ -689,8 +696,16 @@ function endGame(reason = 'BLINK') {
     gameState = 'GAME_OVER';
     cancelAnimationFrame(animationFrameId);
 
-    // Stop camera and detection
-    stopCameraAndDetection();
+    // Don't stop camera immediately - let user retry quickly
+    // Camera will auto-stop after 5 seconds of inactivity on Game Over screen
+    if (window.cameraTimeoutId) {
+        clearTimeout(window.cameraTimeoutId);
+    }
+
+    window.cameraTimeoutId = setTimeout(() => {
+        console.log('Auto-stopping camera after 5s inactivity');
+        stopCameraAndDetection();
+    }, 5000);
 
     // Hide face status
     faceStatus.classList.add('hidden');
