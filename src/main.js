@@ -618,6 +618,32 @@ function onResults(results) {
     canvasCtx.restore();
 }
 
+function updateClassicVisualStage(elapsedSeconds) {
+    // Remove all stage classes first
+    container.classList.remove('classic-stage-shake', 'classic-stage-invert', 'classic-stage-void-plus');
+
+    if (elapsedSeconds < 60) {
+        // Before 60 seconds: Simple pattern
+        if (elapsedSeconds >= 10 && elapsedSeconds < 20) {
+            // Stage B: Shake (10-20s)
+            container.classList.add('classic-stage-shake');
+        } else if (elapsedSeconds >= 30 && elapsedSeconds < 50) {
+            // Stage C: Invert (30-50s)
+            container.classList.add('classic-stage-invert');
+        }
+        // Stage A (Normal): 0-10s, 20-30s, 50-60s - no classes
+    } else {
+        // After 60 seconds: 30-second cycle (20s Void+ / 10s Normal)
+        const cycleTime = (elapsedSeconds - 60) % 30;
+
+        if (cycleTime < 20) {
+            // Stage D: Void+ (20 seconds)
+            container.classList.add('classic-stage-invert', 'classic-stage-shake', 'classic-stage-void-plus');
+        }
+        // Stage A (Normal break): Last 10 seconds of cycle - no classes
+    }
+}
+
 function updateGameLoop() {
     if (gameState === 'PLAYING') {
         const elapsed = (Date.now() - startTime) / 1000;
@@ -631,10 +657,10 @@ function updateGameLoop() {
             window.lastBeat = now;
         }
 
-        // Chaos Visuals
-        if (elapsed > 10) container.classList.add('chaos-shake');
-        if (elapsed > 20) container.classList.add('chaos-glitch');
-        if (elapsed > 30) container.classList.add('chaos-invert');
+        // Visual Stages (Classic Mode only)
+        if (currentMode === 'CLASSIC') {
+            updateClassicVisualStage(elapsed);
+        }
 
         animationFrameId = requestAnimationFrame(updateGameLoop);
     }

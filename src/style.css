@@ -372,7 +372,7 @@ h1.glitch {
     backdrop-filter: blur(5px);
 }
 
-/* Chaos Visuals */
+/* Classic Mode Visual Stages */
 @keyframes shake {
     0% {
         transform: translate(1px, 1px) rotate(0deg);
@@ -419,6 +419,33 @@ h1.glitch {
     }
 }
 
+@keyframes voidPulse {
+    0% {
+        filter: invert(1) hue-rotate(180deg) brightness(0.9);
+    }
+
+    50% {
+        filter: invert(1) hue-rotate(180deg) brightness(1.1);
+    }
+
+    100% {
+        filter: invert(1) hue-rotate(180deg) brightness(0.9);
+    }
+}
+
+.classic-stage-shake {
+    animation: shake 0.5s infinite;
+}
+
+.classic-stage-invert {
+    filter: invert(1) hue-rotate(180deg);
+}
+
+.classic-stage-void-plus {
+    animation: voidPulse 3s ease-in-out infinite;
+}
+
+/* Legacy chaos classes (kept for compatibility) */
 .chaos-shake {
     animation: shake 0.5s infinite;
 }
