@@ -392,9 +392,30 @@ function startGame(mode) {
         hudLabel.innerText = "TIME";
         targetDisplay.classList.remove('hidden');
         targetDisplay.querySelector('.digital-text-sm').innerText = `${precisionTarget.toFixed(2)}s`;
-    } else {
+        worldRecordDisplay.classList.add('hidden');
+    } else if (mode === 'CLASSIC') {
         hudLabel.innerText = "TIME";
         targetDisplay.classList.add('hidden');
+
+        // Show WR in Classic
+        worldRecordDisplay.classList.remove('hidden');
+        wrValue.innerText = "--";
+
+        // Fetch World Record
+        GlobalLeaderboard.getWorldRecord('CLASSIC').then(record => {
+            if (record) {
+                wrValue.innerText = `${record.score.toFixed(2)}s`;
+                window.currentWorldRecord = record.score;
+            } else {
+                wrValue.innerText = "None";
+                window.currentWorldRecord = null;
+            }
+        });
+    } else {
+        // Endurance
+        hudLabel.innerText = "TIME";
+        targetDisplay.classList.add('hidden');
+        worldRecordDisplay.classList.add('hidden');
     }
 
     startCameraLoop()
@@ -475,10 +496,15 @@ function finishCalibration() {
         startEnduranceMode();
     } else {
         gameState = 'PLAYING';
-        startTime = Date.now();
+        startTime = Date.now(); // Ensure this is set right before the loop starts
 
         gameHud.classList.remove('hidden');
         gameHud.classList.add('active');
+
+        // Ensure World Record is visible if in Classic Mode
+        if (currentMode === 'CLASSIC') {
+            worldRecordDisplay.classList.remove('hidden');
+        }
 
         updateGameLoop();
     }
