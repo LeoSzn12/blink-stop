@@ -48,6 +48,12 @@ const tosModal = document.getElementById('tos-modal');
 const tosLink = document.getElementById('tos-link');
 const closeTos = document.getElementById('close-tos');
 
+// UI Elements (New - World Record & Precision)
+const worldRecordDisplay = document.getElementById('world-record-display');
+const wrValue = document.getElementById('wr-value');
+const finalScoreSub = document.getElementById('final-score-sub');
+const gameOverWorldRecord = document.getElementById('game-over-world-record');
+
 // Game State
 let gameState = 'MENU'; // MENU, PLAYING, GAME_OVER, CALIBRATING, ENDURANCE
 let currentMode = 'CLASSIC'; // CLASSIC, PRECISION, ENDURANCE
