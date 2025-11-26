@@ -260,17 +260,32 @@ if (menuFooterLink) {
     menuFooterLink.addEventListener('click', showMenu);
 }
 
-// Home button in HUD
-const homeBtnHud = document.getElementById('home-btn-hud');
-if (homeBtnHud) {
-    homeBtnHud.addEventListener('click', () => {
-        if (confirm('Return to menu? Your current game will end.')) {
-            cancelAnimationFrame(animationFrameId);
-            audioManager.stopDrone();
+// Home button in HUD (MENU button)
+const homeBtn = document.getElementById('home-btn');
+if (homeBtn) {
+    homeBtn.addEventListener('click', () => {
+        if (gameState === 'PLAYING' || gameState === 'ENDURANCE') {
+            if (confirm('Return to menu? Your current game will end.')) {
+                endGame('MENU_EXIT');
+            }
+        } else {
             showMenu();
         }
     });
 }
+
+// Stop camera and detection helper function
+function stopCameraAndDetection() {
+    stopDetectionLoop();
+
+    // Stop video stream to release camera
+    if (videoElement.srcObject) {
+        videoElement.srcObject.getTracks().forEach(track => track.stop());
+        videoElement.srcObject = null;
+        console.log('Camera stopped');
+    }
+}
+
 
 // Leaderboard System
 const Leaderboard = {
@@ -551,13 +566,10 @@ function updateEnduranceLoop() {
 }
 
 function showMenu() {
-    stopDetectionLoop(); // Stop face detection
+    stopCameraAndDetection();
 
-    // Stop video stream to release camera
-    if (videoElement.srcObject) {
-        videoElement.srcObject.getTracks().forEach(track => track.stop());
-        videoElement.srcObject = null;
-    }
+    // Hide face status
+    faceStatus.classList.add('hidden');
 
     gameHud.classList.add('hidden');
     gameHud.classList.remove('active');
@@ -568,14 +580,6 @@ function showMenu() {
     menuScreen.classList.remove('hidden');
     menuScreen.classList.add('active');
 
-    // Reset state
-    gameState = 'MENU'; // Keep existing gameState reset
-    isPlaying = false;
-    isCalibrating = false;
-
-    // Reset UI state
-    precisionOptions.classList.add('hidden');
-    document.querySelector('.mode-selection').classList.remove('hidden');
 
     // Reset Chaos
     container.className = 'container';
@@ -593,9 +597,9 @@ function onResults(results) {
         window.faceMissingFrames = 0; // Reset counter
 
         // Update face tracking status
-        if (gameState === 'PLAYING' || gameState === 'ENDURANCE') { // Changed condition
+        if (gameState === 'PLAYING' || gameState === 'ENDURANCE') {
             faceStatus.classList.remove('hidden', 'not-detected');
-            faceStatusText.innerText = 'Tracking face...';
+            faceStatusText.innerText = 'Tracking eyes...';
         }
 
         // Visual Debug: Show if face is detected
@@ -685,6 +689,12 @@ function endGame(reason = 'BLINK') {
     gameState = 'GAME_OVER';
     cancelAnimationFrame(animationFrameId);
 
+    // Stop camera and detection
+    stopCameraAndDetection();
+
+    // Hide face status
+    faceStatus.classList.add('hidden');
+
     try {
         // Stop/Effect Audio
         audioManager.stopDrone();
@@ -772,6 +782,12 @@ function endGame(reason = 'BLINK') {
         renderGlobalLeaderboard(currentMode); // Load global leaderboard
     } catch (err) {
         console.error("Error in endGame:", err);
+    }
+
+    // If user clicked MENU during game, go straight to menu
+    if (reason === 'MENU_EXIT') {
+        showMenu();
+        return;
     }
 
     // Stop video if in endurance mode
