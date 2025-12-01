@@ -1,4 +1,4 @@
-import { checkBlink, setBlinkThreshold } from './blinkDetection.js';
+import { checkBlink, setBlinkThreshold, resetBlinkState } from './blinkDetection.js';
 import { audioManager } from './audioManager.js';
 import { GlobalLeaderboard } from './firebase.js';
 
@@ -523,6 +523,9 @@ function finishCalibration() {
 
     // Start Audio Drone
     audioManager.startDrone();
+
+    // Reset blink detection state before starting game
+    resetBlinkState();
 
     if (currentMode === 'ENDURANCE') {
         startEnduranceMode();
