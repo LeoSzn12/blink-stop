@@ -1,30 +1,21 @@
 // Blink Detection Logic using Eye Aspect Ratio (EAR)
 
-// MediaPipe Face Mesh eye landmarks
+// MediaPipe Face Mesh Landmark Indices
+// Left Eye
 const LEFT_EYE = [33, 160, 158, 133, 153, 144];
+// Right Eye
 const RIGHT_EYE = [362, 385, 387, 263, 373, 380];
 
-// Blink Detection Configuration
-// Threshold: lower = more sensitive (0.20-0.25 is typical range)
-let blinkThreshold = 0.22; // Lowered for better detection
+// Thresholds
+let blinkThreshold = 0.22; // Sensitive threshold for reliable detection
 
-// Blink state tracking
-let blinkFrameCount = 0;
-const BLINK_FRAMES_REQUIRED = 2; // Must detect blink for 2+ consecutive frames (~66ms at 30fps)
-
-// Allow dynamic threshold adjustment
-export function setBlinkThreshold(value) {
-    blinkThreshold = value;
-    console.log(`Blink threshold set to: ${blinkThreshold}`);
+export function setBlinkThreshold(val) {
+    blinkThreshold = val;
+    console.log("New Blink Threshold:", blinkThreshold);
 }
 
 export function getBlinkThreshold() {
     return blinkThreshold;
-}
-
-// Reset blink detection state
-export function resetBlinkState() {
-    blinkFrameCount = 0;
 }
 
 /**
@@ -58,16 +49,12 @@ function getEAR(landmarks, indices) {
 }
 
 /**
- * Check if user is blinking with debouncing
- * Requires sustained eye closure for multiple frames to avoid false positives
+ * Check if user is blinking
  * @param {Array} landmarks - Array of 468 face landmarks
  * @returns {Object} - { blinking: boolean, ear: number }
  */
 export function checkBlink(landmarks) {
-    if (!landmarks || landmarks.length === 0) {
-        blinkFrameCount = 0;
-        return { blinking: false, ear: 0, minEar: 0 };
-    }
+    if (!landmarks || landmarks.length === 0) return { blinking: false, ear: 0, minEar: 0 };
 
     const leftEAR = getEAR(landmarks, LEFT_EYE);
     const rightEAR = getEAR(landmarks, RIGHT_EYE);
@@ -78,20 +65,8 @@ export function checkBlink(landmarks) {
     // Average EAR for overall metric
     const avgEAR = (leftEAR + rightEAR) / 2.0;
 
-    // Check if eyes are closed
-    const eyesClosed = minEAR < blinkThreshold;
-
-    if (eyesClosed) {
-        blinkFrameCount++;
-    } else {
-        blinkFrameCount = 0; // Reset if eyes open
-    }
-
-    // Only register as blink if sustained for required frames
-    const isBlinking = blinkFrameCount >= BLINK_FRAMES_REQUIRED;
-
     return {
-        blinking: isBlinking,
+        blinking: minEAR < blinkThreshold,
         ear: avgEAR,
         minEar: minEAR
     };
