@@ -1,6 +1,9 @@
-import { checkBlink, setBlinkThreshold, getBlinkThreshold } from './blinkDetection.js';
+import { checkBlink, setBlinkThreshold, resetBlinkState, getBlinkThreshold } from './blinkDetection.js';
 import { audioManager } from './audioManager.js';
 import { GlobalLeaderboard } from './firebase.js';
+import { createFaceLossTracker } from './gameRules.mjs';
+import { createSerializedInference } from './inference.mjs';
+import { appendScore } from './leaderboard.mjs';
 
 // DOM Elements
 const videoElement = document.getElementsByClassName('input_video')[0];
@@ -36,10 +39,21 @@ const finalScoreVal = document.getElementById('final-score-val');
 const leaderboardList = document.getElementById('leaderboard-list');
 const globalLeaderboardList = document.getElementById('global-leaderboard-list');
 const saveScoreBtn = document.getElementById('save-score-btn');
+const playerNameInput = document.getElementById('player-name-input');
 const shareBtn = document.getElementById('share-btn');
 const selfieContainer = document.getElementById('selfie-container');
 const selfiePreview = document.getElementById('selfie-preview');
 const selfieBtn = document.getElementById('selfie-btn');
+
+// UI Elements (New - World Record & Precision)
+const worldRecordDisplay = document.getElementById('world-record-display');
+const wrValue = document.getElementById('wr-value');
+const finalScoreSub = document.getElementById('final-score-sub');
+const gameOverWorldRecord = document.getElementById('game-over-world-record');
+
+// Face Tracking Status
+const faceStatus = document.getElementById('face-status');
+const faceStatusText = document.getElementById('face-status-text');
 
 // Game State
 let gameState = 'MENU'; 
@@ -53,6 +67,7 @@ let lastScore = null;
 let currentEAR = 0.3;
 let baselineEAR = 0.3;
 let minEARValue = 0.3;
+const faceLoss = createFaceLossTracker();
 
 // Service Worker Registration
 if ('serviceWorker' in navigator) {
@@ -85,7 +100,7 @@ faceMesh.setOptions({
 faceMesh.onResults(onResults);
 
 // Custom Camera Loop with Decoupled Detection
-let isProcessing = false;
+const inference = createSerializedInference(image => faceMesh.send({ image }));
 let detectionInterval = null;
 
 async function startCameraLoop() {
@@ -121,20 +136,11 @@ function startDetectionLoop() {
 
     // Run detection at 20 FPS (good balance between performance and accuracy)
     detectionInterval = setInterval(async () => {
-        if (videoElement.paused || videoElement.ended || isProcessing) return;
-
-        isProcessing = true;
+        if (videoElement.paused || videoElement.ended) return;
         try {
-            // Race condition protection: Timeout after 80ms if FaceMesh hangs
-            await Promise.race([
-                faceMesh.send({ image: videoElement }),
-                new Promise((_, reject) => setTimeout(() => reject("Timeout"), 80))
-            ]);
+            await inference.send(videoElement);
         } catch (error) {
-            // Ignore timeouts, just skip frame
-            if (error !== "Timeout") console.warn("FaceMesh skipped:", error);
-        } finally {
-            isProcessing = false;
+            console.warn("FaceMesh skipped:", error);
         }
     }, 50); // 50ms = 20 FPS
 }
@@ -142,7 +148,7 @@ function startDetectionLoop() {
 function stopDetectionLoop() {
     if (detectionInterval) clearInterval(detectionInterval);
     detectionInterval = null;
-    isProcessing = false;
+    // A send already in flight remains locked until it actually settles.
 }
 
 
@@ -179,20 +185,42 @@ optionBtns.forEach(btn => {
     });
 });
 
-restartBtn.addEventListener('click', () => startGame(currentMode));
+restartBtn.addEventListener('click', () => {
+    // Cancel camera auto-stop timeout (user wants to play again)
+    if (window.cameraTimeoutId) {
+        clearTimeout(window.cameraTimeoutId);
+        window.cameraTimeoutId = null;
+    }
+    startGame(currentMode);
+});
 menuBtn.addEventListener('click', showMenu);
 
-// Home button in HUD
-const homeBtnHud = document.getElementById('home-btn-hud');
-if (homeBtnHud) {
-    homeBtnHud.addEventListener('click', () => {
-        if (confirm('Return to menu? Your current game will end.')) {
-            cancelAnimationFrame(animationFrameId);
-            audioManager.stopDrone();
+// Home button in HUD (MENU button)
+const homeBtn = document.getElementById('home-btn');
+if (homeBtn) {
+    homeBtn.addEventListener('click', () => {
+        if (gameState === 'PLAYING' || gameState === 'ENDURANCE') {
+            if (confirm('Return to menu? Your current game will end.')) {
+                endGame('MENU_EXIT');
+            }
+        } else {
             showMenu();
         }
     });
 }
+
+// Stop camera and detection helper function
+function stopCameraAndDetection() {
+    stopDetectionLoop();
+
+    // Stop video stream to release camera
+    if (videoElement.srcObject) {
+        videoElement.srcObject.getTracks().forEach(track => track.stop());
+        videoElement.srcObject = null;
+        console.log('Camera stopped');
+    }
+}
+
 
 // Leaderboard System
 const Leaderboard = {
@@ -233,10 +261,7 @@ const Leaderboard = {
         }
 
         scores.forEach((entry, index) => {
-            const li = document.createElement('li');
-            const formattedScore = mode === 'CLASSIC' ? `${entry.score.toFixed(2)}s` : `${entry.score.toFixed(3)}s off`;
-            li.innerHTML = `<span>#${index + 1} ${entry.name}</span><span>${formattedScore}</span>`;
-            leaderboardList.appendChild(li);
+            appendScore(leaderboardList, entry, index, mode, document);
         });
     }
 };
@@ -254,10 +279,7 @@ async function renderGlobalLeaderboard(mode) {
     }
 
     scores.forEach((entry, index) => {
-        const li = document.createElement('li');
-        const formattedScore = mode === 'CLASSIC' ? `${entry.score.toFixed(2)}s` : `${entry.score.toFixed(3)}s off`;
-        li.innerHTML = `<span>#${index + 1} ${entry.name}</span><span>${formattedScore}</span>`;
-        globalLeaderboardList.appendChild(li);
+        appendScore(globalLeaderboardList, entry, index, mode, document);
     });
 }
 
@@ -333,9 +355,30 @@ function startGame(mode) {
         hudLabel.innerText = "TIME";
         targetDisplay.classList.remove('hidden');
         targetDisplay.querySelector('.digital-text-sm').innerText = `${precisionTarget.toFixed(2)}s`;
-    } else {
+        worldRecordDisplay.classList.add('hidden');
+    } else if (mode === 'CLASSIC') {
         hudLabel.innerText = "TIME";
         targetDisplay.classList.add('hidden');
+
+        // Show WR in Classic
+        worldRecordDisplay.classList.remove('hidden');
+        wrValue.innerText = "--";
+
+        // Fetch World Record
+        GlobalLeaderboard.getWorldRecord('CLASSIC').then(record => {
+            if (record) {
+                wrValue.innerText = `${record.score.toFixed(2)}s`;
+                window.currentWorldRecord = record.score;
+            } else {
+                wrValue.innerText = "None";
+                window.currentWorldRecord = null;
+            }
+        });
+    } else {
+        // Endurance
+        hudLabel.innerText = "TIME";
+        targetDisplay.classList.add('hidden');
+        worldRecordDisplay.classList.add('hidden');
     }
 
     if (mode === 'DAILY') {
@@ -376,6 +419,8 @@ function startGame(mode) {
 
 function startCalibration() {
     gameState = 'CALIBRATING';
+    faceLoss.reset();
+    resetBlinkState();
     calibrationData = [];
     calibrationStartTime = Date.now();
 
@@ -430,14 +475,22 @@ function finishCalibration() {
     // Start Audio Drone
     audioManager.startDrone();
 
+    // Reset blink detection state before starting game
+    resetBlinkState();
+
     if (currentMode === 'ENDURANCE') {
         startEnduranceMode();
     } else {
         gameState = 'PLAYING';
-        startTime = Date.now();
+        startTime = Date.now(); // Ensure this is set right before the loop starts
 
         gameHud.classList.remove('hidden');
         gameHud.classList.add('active');
+
+        // Ensure World Record is visible if in Classic Mode
+        if (currentMode === 'CLASSIC') {
+            worldRecordDisplay.classList.remove('hidden');
+        }
 
         updateGameLoop();
     }
@@ -497,13 +550,12 @@ function updateEnduranceLoop() {
 }
 
 function showMenu() {
-    stopDetectionLoop(); // Stop face detection
+    stopCameraAndDetection();
+    faceLoss.reset();
+    resetBlinkState();
 
-    // Stop video stream to release camera
-    if (videoElement.srcObject) {
-        videoElement.srcObject.getTracks().forEach(track => track.stop());
-        videoElement.srcObject = null;
-    }
+    // Hide face status
+    faceStatus.classList.add('hidden');
 
     gameHud.classList.add('hidden');
     gameHud.classList.remove('active');
@@ -514,14 +566,6 @@ function showMenu() {
     menuScreen.classList.remove('hidden');
     menuScreen.classList.add('active');
 
-    // Reset state
-    gameState = 'MENU'; // Keep existing gameState reset
-    isPlaying = false;
-    isCalibrating = false;
-
-    // Reset UI state
-    precisionOptions.classList.add('hidden');
-    document.querySelector('.mode-selection').classList.remove('hidden');
 
     // Reset Chaos
     container.className = 'container';
@@ -530,24 +574,28 @@ function showMenu() {
 }
 
 function onResults(results) {
-    // Visual Debug: Show if face is detected
-    if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
-        hudLabel.style.color = "var(--neon-cyan)"; // Cyan = Face Detected
-        hudLabel.style.textShadow = "0 0 10px var(--neon-cyan)";
-    } else {
-        hudLabel.style.color = "#555"; // Dim = No Face
-        hudLabel.style.textShadow = "none";
-    }
-
+    // Ignore late callbacks from an in-flight send after the camera is stopped.
+    if (!videoElement.srcObject) return;
+    const now = performance.now();
     canvasCtx.save();
     canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
     canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
 
     if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
         const landmarks = results.multiFaceLandmarks[0];
-        window.faceMissingFrames = 0; // Reset counter
+        faceLoss.observe(true, now);
 
-        const { blinking, ear, minEar } = checkBlink(landmarks);
+        // Update face tracking status
+        if (gameState === 'PLAYING' || gameState === 'ENDURANCE') {
+            faceStatus.classList.remove('hidden', 'not-detected');
+            faceStatusText.innerText = 'Tracking eyes...';
+        }
+
+        // Visual Debug: Show if face is detected
+        hudLabel.style.color = "var(--neon-cyan)";
+        hudLabel.style.textShadow = "0 0 10px var(--neon-cyan)";
+
+        const { blinking, ear, minEar } = checkBlink(landmarks, now);
         currentEAR = ear;
         minEARValue = minEar;
 
@@ -560,14 +608,50 @@ function onResults(results) {
         }
     } else {
         // No face detected
+        resetBlinkState();
+        if (gameState === 'PLAYING' || gameState === 'ENDURANCE') { // Changed condition
+            faceStatus.classList.remove('hidden');
+            faceStatus.classList.add('not-detected');
+            faceStatusText.innerText = 'Face not detected – move closer & improve lighting';
+        }
+
+        // Visual Debug: Dim label when no face
+        hudLabel.style.color = "#555";
+        hudLabel.style.textShadow = "none";
+
         if (gameState === 'PLAYING' || gameState === 'ENDURANCE') {
-            window.faceMissingFrames = (window.faceMissingFrames || 0) + 1;
-            if (window.faceMissingFrames > 30) { // ~1 second @ 30fps
+            if (faceLoss.observe(false, now)) {
                 endGame('DISQUALIFIED');
             }
         }
     }
     canvasCtx.restore();
+}
+
+function updateClassicVisualStage(elapsedSeconds) {
+    // Remove all stage classes first
+    container.classList.remove('classic-stage-shake', 'classic-stage-invert', 'classic-stage-void-plus');
+
+    if (elapsedSeconds < 60) {
+        // Before 60 seconds: Simple pattern
+        if (elapsedSeconds >= 10 && elapsedSeconds < 20) {
+            // Stage B: Shake (10-20s)
+            container.classList.add('classic-stage-shake');
+        } else if (elapsedSeconds >= 30 && elapsedSeconds < 50) {
+            // Stage C: Invert (30-50s)
+            container.classList.add('classic-stage-invert');
+        }
+        // Stage A (Normal): 0-10s, 20-30s, 50-60s - no classes
+    } else {
+        // After 60 seconds: 30-second cycle (20s Void+ / 10s Normal)
+        const cycleTime = (elapsedSeconds - 60) % 30;
+
+        if (cycleTime < 20) {
+            // Stage D: Void+ (20 seconds)
+            container.classList.add('classic-stage-invert', 'classic-stage-shake', 'classic-stage-void-plus');
+        }
+        // Stage A (Normal break): Last 10 seconds of cycle - no classes
+    }
 }
 
 function updateGameLoop() {
@@ -613,8 +697,10 @@ function updateGameLoop() {
             window.lastBeat = now;
         }
 
-        // Chaos Visuals (Skip for daily if already applied early)
-        if (currentMode !== 'DAILY') {
+        // Visual Stages (Classic Mode only)
+        if (currentMode === 'CLASSIC') {
+            updateClassicVisualStage(elapsed);
+        } else if (currentMode !== 'DAILY') {
             if (elapsed > 10) container.classList.add('chaos-shake');
             if (elapsed > 20) container.classList.add('chaos-glitch');
             if (elapsed > 30) container.classList.add('chaos-invert');
@@ -626,7 +712,23 @@ function updateGameLoop() {
 
 function endGame(reason = 'BLINK') {
     gameState = 'GAME_OVER';
+    faceLoss.reset();
+    resetBlinkState();
     cancelAnimationFrame(animationFrameId);
+
+    // Don't stop camera immediately - let user retry quickly
+    // Camera will auto-stop after 5 seconds of inactivity on Game Over screen
+    if (window.cameraTimeoutId) {
+        clearTimeout(window.cameraTimeoutId);
+    }
+
+    window.cameraTimeoutId = setTimeout(() => {
+        console.log('Auto-stopping camera after 5s inactivity');
+        stopCameraAndDetection();
+    }, 5000);
+
+    // Hide face status
+    faceStatus.classList.add('hidden');
 
     try {
         // Stop/Effect Audio
@@ -669,6 +771,10 @@ function endGame(reason = 'BLINK') {
         let finalScoreText = '';
         let scoreToSave = 0;
 
+        // Reset Sub-details
+        finalScoreSub.classList.add('hidden');
+        gameOverWorldRecord.classList.add('hidden');
+
         if (reason === 'WIN_ENDURANCE') {
             scoreToSave = 30;
             finalScoreText = "30.00s";
@@ -691,11 +797,26 @@ function endGame(reason = 'BLINK') {
             finalScoreText = `${elapsed.toFixed(2)}s`;
             finalScoreLabel.innerText = "YOU SURVIVED";
             gameOverTitle.innerText = "BLINK DETECTED";
+
+            // Show World Record
+            gameOverWorldRecord.classList.remove('hidden');
+            if (window.currentWorldRecord) {
+                gameOverWorldRecord.innerText = `Blink Stop World Record: ${window.currentWorldRecord.toFixed(2)}s`;
+            } else {
+                gameOverWorldRecord.innerText = `Blink Stop World Record: None yet!`;
+            }
+
         } else if (currentMode === 'PRECISION') {
             const diff = Math.abs(precisionTarget - elapsed);
             scoreToSave = diff;
-            finalScoreText = `${diff.toFixed(3)}s`;
-            finalScoreLabel.innerText = "OFF BY";
+
+            // NEW: Show Actual Time as Primary Score
+            finalScoreText = `${elapsed.toFixed(2)}s`;
+            finalScoreLabel.innerText = "YOU BLINKED AT";
+
+            // NEW: Show Target/Off-by as Secondary Detail
+            finalScoreSub.classList.remove('hidden');
+            finalScoreSub.innerText = `Target: ${precisionTarget.toFixed(2)}s (off by ${diff.toFixed(2)}s)`;
 
             if (diff < 0.1) {
                 gameOverTitle.innerText = "PERFECT!";
@@ -731,6 +852,12 @@ function endGame(reason = 'BLINK') {
         renderGlobalLeaderboard(currentMode); // Load global leaderboard
     } catch (err) {
         console.error("Error in endGame:", err);
+    }
+
+    // If user clicked MENU during game, go straight to menu
+    if (reason === 'MENU_EXIT') {
+        showMenu();
+        return;
     }
 
     // Stop video if in endurance mode

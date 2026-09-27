@@ -56,6 +56,16 @@ try {
                 console.error('Error fetching global leaderboard:', error);
                 return [];
             }
+        },
+
+        async getWorldRecord(mode) {
+            try {
+                const scores = await this.getTop(mode, 1);
+                return scores.length > 0 ? scores[0] : null;
+            } catch (error) {
+                console.error('Error fetching world record:', error);
+                return null;
+            }
         }
     };
 
@@ -71,6 +81,9 @@ try {
         },
         async getTop() {
             return [];
+        },
+        async getWorldRecord() {
+            return null;
         }
     };
 }

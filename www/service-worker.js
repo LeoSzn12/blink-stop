@@ -1,10 +1,13 @@
-const CACHE_NAME = 'blink-stop-v1';
+const CACHE_NAME = 'blink-stop-v2';
 const ASSETS_TO_CACHE = [
     './',
     './index.html',
     './src/style.css',
     './src/main.js',
     './src/blinkDetection.js',
+    './src/gameRules.mjs',
+    './src/inference.mjs',
+    './src/leaderboard.mjs',
     './manifest.json',
     'https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto+Mono:wght@400;700&display=swap',
     'https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js',

@@ -1,4 +1,5 @@
 // Blink Detection Logic using Eye Aspect Ratio (EAR)
+import { createBlinkDetector } from './gameRules.mjs';
 
 // MediaPipe Face Mesh eye landmarks
 const LEFT_EYE = [33, 160, 158, 133, 153, 144];
@@ -9,12 +10,12 @@ const RIGHT_EYE = [362, 385, 387, 263, 373, 380];
 let blinkThreshold = 0.22; // Lowered for better detection
 
 // Blink state tracking
-let blinkFrameCount = 0;
-const BLINK_FRAMES_REQUIRED = 2; // Must detect blink for 2+ consecutive frames (~66ms at 30fps)
+const detector = createBlinkDetector(blinkThreshold);
 
 // Allow dynamic threshold adjustment
 export function setBlinkThreshold(value) {
     blinkThreshold = value;
+    detector.setThreshold(value);
     console.log(`Blink threshold set to: ${blinkThreshold}`);
 }
 
@@ -24,7 +25,7 @@ export function getBlinkThreshold() {
 
 // Reset blink detection state
 export function resetBlinkState() {
-    blinkFrameCount = 0;
+    detector.reset();
 }
 
 /**
@@ -63,9 +64,9 @@ function getEAR(landmarks, indices) {
  * @param {Array} landmarks - Array of 468 face landmarks
  * @returns {Object} - { blinking: boolean, ear: number }
  */
-export function checkBlink(landmarks) {
+export function checkBlink(landmarks, now = performance.now()) {
     if (!landmarks || landmarks.length === 0) {
-        blinkFrameCount = 0;
+        detector.reset();
         return { blinking: false, ear: 0, minEar: 0 };
     }
 
@@ -78,17 +79,7 @@ export function checkBlink(landmarks) {
     // Average EAR for overall metric
     const avgEAR = (leftEAR + rightEAR) / 2.0;
 
-    // Check if eyes are closed
-    const eyesClosed = minEAR < blinkThreshold;
-
-    if (eyesClosed) {
-        blinkFrameCount++;
-    } else {
-        blinkFrameCount = 0; // Reset if eyes open
-    }
-
-    // Only register as blink if sustained for required frames
-    const isBlinking = blinkFrameCount >= BLINK_FRAMES_REQUIRED;
+    const isBlinking = detector.observe(minEAR, now);
 
     return {
         blinking: isBlinking,

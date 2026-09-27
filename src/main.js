@@ -1,6 +1,9 @@
 import { checkBlink, setBlinkThreshold, resetBlinkState, getBlinkThreshold } from './blinkDetection.js';
 import { audioManager } from './audioManager.js';
 import { GlobalLeaderboard } from './firebase.js';
+import { createFaceLossTracker } from './gameRules.mjs';
+import { createSerializedInference } from './inference.mjs';
+import { appendScore } from './leaderboard.mjs';
 
 // DOM Elements
 const videoElement = document.getElementsByClassName('input_video')[0];
@@ -36,6 +39,7 @@ const finalScoreVal = document.getElementById('final-score-val');
 const leaderboardList = document.getElementById('leaderboard-list');
 const globalLeaderboardList = document.getElementById('global-leaderboard-list');
 const saveScoreBtn = document.getElementById('save-score-btn');
+const playerNameInput = document.getElementById('player-name-input');
 const shareBtn = document.getElementById('share-btn');
 const selfieContainer = document.getElementById('selfie-container');
 const selfiePreview = document.getElementById('selfie-preview');
@@ -63,6 +67,7 @@ let lastScore = null;
 let currentEAR = 0.3;
 let baselineEAR = 0.3;
 let minEARValue = 0.3;
+const faceLoss = createFaceLossTracker();
 
 // Service Worker Registration
 if ('serviceWorker' in navigator) {
@@ -95,7 +100,7 @@ faceMesh.setOptions({
 faceMesh.onResults(onResults);
 
 // Custom Camera Loop with Decoupled Detection
-let isProcessing = false;
+const inference = createSerializedInference(image => faceMesh.send({ image }));
 let detectionInterval = null;
 
 async function startCameraLoop() {
@@ -131,20 +136,11 @@ function startDetectionLoop() {
 
     // Run detection at 20 FPS (good balance between performance and accuracy)
     detectionInterval = setInterval(async () => {
-        if (videoElement.paused || videoElement.ended || isProcessing) return;
-
-        isProcessing = true;
+        if (videoElement.paused || videoElement.ended) return;
         try {
-            // Race condition protection: Timeout after 80ms if FaceMesh hangs
-            await Promise.race([
-                faceMesh.send({ image: videoElement }),
-                new Promise((_, reject) => setTimeout(() => reject("Timeout"), 80))
-            ]);
+            await inference.send(videoElement);
         } catch (error) {
-            // Ignore timeouts, just skip frame
-            if (error !== "Timeout") console.warn("FaceMesh skipped:", error);
-        } finally {
-            isProcessing = false;
+            console.warn("FaceMesh skipped:", error);
         }
     }, 50); // 50ms = 20 FPS
 }
@@ -152,7 +148,7 @@ function startDetectionLoop() {
 function stopDetectionLoop() {
     if (detectionInterval) clearInterval(detectionInterval);
     detectionInterval = null;
-    isProcessing = false;
+    // A send already in flight remains locked until it actually settles.
 }
 
 
@@ -265,10 +261,7 @@ const Leaderboard = {
         }
 
         scores.forEach((entry, index) => {
-            const li = document.createElement('li');
-            const formattedScore = mode === 'CLASSIC' ? `${entry.score.toFixed(2)}s` : `${entry.score.toFixed(3)}s off`;
-            li.innerHTML = `<span>#${index + 1} ${entry.name}</span><span>${formattedScore}</span>`;
-            leaderboardList.appendChild(li);
+            appendScore(leaderboardList, entry, index, mode, document);
         });
     }
 };
@@ -286,10 +279,7 @@ async function renderGlobalLeaderboard(mode) {
     }
 
     scores.forEach((entry, index) => {
-        const li = document.createElement('li');
-        const formattedScore = mode === 'CLASSIC' ? `${entry.score.toFixed(2)}s` : `${entry.score.toFixed(3)}s off`;
-        li.innerHTML = `<span>#${index + 1} ${entry.name}</span><span>${formattedScore}</span>`;
-        globalLeaderboardList.appendChild(li);
+        appendScore(globalLeaderboardList, entry, index, mode, document);
     });
 }
 
@@ -429,6 +419,8 @@ function startGame(mode) {
 
 function startCalibration() {
     gameState = 'CALIBRATING';
+    faceLoss.reset();
+    resetBlinkState();
     calibrationData = [];
     calibrationStartTime = Date.now();
 
@@ -559,6 +551,8 @@ function updateEnduranceLoop() {
 
 function showMenu() {
     stopCameraAndDetection();
+    faceLoss.reset();
+    resetBlinkState();
 
     // Hide face status
     faceStatus.classList.add('hidden');
@@ -580,13 +574,16 @@ function showMenu() {
 }
 
 function onResults(results) {
+    // Ignore late callbacks from an in-flight send after the camera is stopped.
+    if (!videoElement.srcObject) return;
+    const now = performance.now();
     canvasCtx.save();
     canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
     canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
 
     if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
         const landmarks = results.multiFaceLandmarks[0];
-        window.faceMissingFrames = 0; // Reset counter
+        faceLoss.observe(true, now);
 
         // Update face tracking status
         if (gameState === 'PLAYING' || gameState === 'ENDURANCE') {
@@ -598,7 +595,7 @@ function onResults(results) {
         hudLabel.style.color = "var(--neon-cyan)";
         hudLabel.style.textShadow = "0 0 10px var(--neon-cyan)";
 
-        const { blinking, ear, minEar } = checkBlink(landmarks);
+        const { blinking, ear, minEar } = checkBlink(landmarks, now);
         currentEAR = ear;
         minEARValue = minEar;
 
@@ -611,6 +608,7 @@ function onResults(results) {
         }
     } else {
         // No face detected
+        resetBlinkState();
         if (gameState === 'PLAYING' || gameState === 'ENDURANCE') { // Changed condition
             faceStatus.classList.remove('hidden');
             faceStatus.classList.add('not-detected');
@@ -622,8 +620,7 @@ function onResults(results) {
         hudLabel.style.textShadow = "none";
 
         if (gameState === 'PLAYING' || gameState === 'ENDURANCE') {
-            window.faceMissingFrames = (window.faceMissingFrames || 0) + 1;
-            if (window.faceMissingFrames > 30) { // ~1 second @ 30fps
+            if (faceLoss.observe(false, now)) {
                 endGame('DISQUALIFIED');
             }
         }
@@ -708,7 +705,6 @@ function updateGameLoop() {
             if (elapsed > 20) container.classList.add('chaos-glitch');
             if (elapsed > 30) container.classList.add('chaos-invert');
         }
-        }
 
         animationFrameId = requestAnimationFrame(updateGameLoop);
     }
@@ -716,6 +712,8 @@ function updateGameLoop() {
 
 function endGame(reason = 'BLINK') {
     gameState = 'GAME_OVER';
+    faceLoss.reset();
+    resetBlinkState();
     cancelAnimationFrame(animationFrameId);
 
     // Don't stop camera immediately - let user retry quickly

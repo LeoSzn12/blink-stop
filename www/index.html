@@ -108,26 +108,39 @@
 
                 <!-- HUD -->
                 <div id="game-hud" class="screen hidden">
-                    <div class="hud-top-left">
+                    <div class="hud-left">
                         <button id="home-btn" class="menu-btn-hud">MENU</button>
                     </div>
-                    
-                    <!-- New Eye Meter -->
-                    <div class="meter-container">
-                        <span class="label">EYE STABILITY</span>
-                        <div class="meter-bar-bg">
-                            <div class="meter-bar-fill" id="eye-meter-fill" style="width: 100%;"></div>
+                    <div class="hud-right">
+                        <!-- World Record Display (Classic Mode) -->
+                        <div id="world-record-display" class="world-record-hud hidden">
+                            <span class="label">WORLD RECORD</span>
+                            <span id="wr-value" class="digital-text-sm">--</span>
+                        </div>
+
+                        <!-- New Eye Meter -->
+                        <div class="meter-container">
+                            <span class="label">EYE STABILITY</span>
+                            <div class="meter-bar-bg">
+                                <div class="meter-bar-fill" id="eye-meter-fill" style="width: 100%;"></div>
+                            </div>
+                        </div>
+
+                        <div class="score-container">
+                            <span class="label" id="hud-label">TIME</span>
+                            <span id="score" class="digital-text">0.00s</span>
+                        </div>
+
+                        <div class="target-container hidden" id="target-display">
+                            <span class="label">TARGET</span>
+                            <span class="digital-text-sm">10.00s</span>
                         </div>
                     </div>
+                </div>
 
-                    <div class="score-container">
-                        <span class="label" id="hud-label">TIME</span>
-                        <span id="score" class="digital-text">0.00s</span>
-                    </div>
-                    <div class="target-container hidden" id="target-display">
-                        <span class="label">TARGET</span>
-                        <span class="digital-text-sm">10.00s</span>
-                    </div>
+                <!-- Face Tracking Status -->
+                <div id="face-status" class="face-status hidden">
+                    <span id="face-status-text">Tracking face...</span>
                 </div>
 
                 <!-- Game Over -->
@@ -137,6 +150,10 @@
                     <div class="final-score">
                         <span class="label" id="final-score-label">YOU SURVIVED</span>
                         <span id="final-score-val" class="digital-text-lg">0.00s</span>
+                        <!-- Secondary Detail for Precision Mode -->
+                        <div id="final-score-sub" class="score-sub hidden"></div>
+                        <!-- World Record for Classic Mode -->
+                        <div id="game-over-world-record" class="score-sub hidden"></div>
                     </div>
 
                     <div class="name-entry-container">
@@ -176,6 +193,7 @@
         </div>
     </div>
 
+
     <!-- Footer -->
     <footer class="footer">
         <a href="how-to-play.html" class="footer-link">How to Play & FAQ</a>
@@ -185,7 +203,7 @@
         <a href="tos.html" class="footer-link">Terms of Service</a>
     </footer>
 
-    <script type="module" src="src/main.js?v=54"></script>
+    <script type="module" src="src/main.js?v=66"></script>
 </body>
 
 </html>
