@@ -5,17 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Privacy Policy - Blink Stop</title>
     <link rel="stylesheet" href="src/style.css?v=4">
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
+
     <style>
         body { overflow: auto; display: block; padding: 2rem; }
         .content { max-width: 800px; margin: 0 auto; color: #fff; line-height: 1.6; }
-        h1 { color: var(--neon-cyan); font-family: 'Orbitron', sans-serif; margin-bottom: 2rem; }
+        h1 { color: var(--neon-cyan); font-family: system-ui, sans-serif; margin-bottom: 2rem; }
         h2 { color: var(--neon-pink); margin-top: 2rem; margin-bottom: 1rem; }
         ul { margin-left: 2rem; margin-bottom: 1rem; }
         p { margin-bottom: 1rem; }
         a { color: var(--neon-cyan); text-decoration: none; }
         a:hover { color: var(--neon-pink); }
-        .back-link { display: inline-block; margin-bottom: 2rem; font-family: 'Orbitron', sans-serif; font-size: 1.2rem; }
+        .back-link { display: inline-block; margin-bottom: 2rem; font-family: system-ui, sans-serif; font-size: 1.2rem; }
     </style>
 </head>
 <body>
@@ -28,27 +28,26 @@
         <p>Blink Stop requires camera access to detect eye blinks using facial landmark detection, powered by MediaPipe.</p>
 
         <h2>Data Processing</h2>
-        <p><strong>All camera data is processed locally on your device in your web browser.</strong> We do not:</p>
+        <p><strong>Camera frames are processed on your device by the packaged game.</strong> In this candidate we do not:</p>
         <ul>
             <li>Upload or transmit camera footage to any server</li>
-            <li>Store camera images or video recordings</li>
+            <li>Automatically save camera images or video recordings (a temporary selfie preview is created after a round; you can choose to save it)</li>
             <li>Share your camera data with third parties</li>
-            <li>Collect personally identifiable information</li>
+            <li>Send names or scores to a server in this version</li>
         </ul>
 
         <h2>Local Storage</h2>
         <p>We use browser LocalStorage to save:</p>
         <ul>
-            <li>Leaderboard scores (name and time)</li>
-            <li>Unlocked themes and settings</li>
+            <li>Local scores (name and time)</li>
+            <li>Unlocked theme preference</li>
         </ul>
-        <p>This data remains on your device and can be cleared at any time through your browser settings.</p>
+        <p>Your local score and name remain on your device and can be cleared by clearing site/app data. Sharing a score sends only result text (no game link) through your device's share sheet or clipboard; saving a selfie writes an image only when you request it. The save destination depends on your device and browser.</p>
 
         <h2>Third-Party Services</h2>
-        <p>We use MediaPipe Face Mesh (Google) for facial landmark detection. The library runs entirely in your browser.</p>
-        <p>We use Google AdSense to serve advertisements. AdSense uses cookies to serve ads based on your prior visits to our website or other websites. You can opt out of personalized advertising by visiting Ads Settings.</p>
+        <p>We package MediaPipe Face Mesh (Google) for on-device facial landmark detection. No advertising or analytics SDK is enabled in this version. Pages use system fonts; they do not request remote font services. The game may still use the network to load its own assets and policies when visited online.</p>
 
-        <p>Last Updated: March 2026</p>
+        <p>Candidate draft: September 2026; owner approval and a verified public support contact are pending. This page is not yet the policy at the live web URL.</p>
     </div>
 </body>
 </html>

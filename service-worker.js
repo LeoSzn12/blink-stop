@@ -1,17 +1,31 @@
-const CACHE_NAME = 'blink-stop-v2';
+const CACHE_NAME = 'blink-stop-v5';
 const ASSETS_TO_CACHE = [
     './',
     './index.html',
+    './privacy.html',
+    './tos.html',
+    './how-to-play.html',
     './src/style.css',
     './src/main.js',
     './src/blinkDetection.js',
     './src/gameRules.mjs',
     './src/inference.mjs',
     './src/leaderboard.mjs',
-    './manifest.json',
-    'https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto+Mono:wght@400;700&display=swap',
-    'https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js',
-    'https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js'
+    './src/cameraHelp.mjs',
+    './src/roundLifecycle.mjs',
+    './src/share.mjs',
+    './icons/icon-192.png',
+    './icons/icon-512.png',
+    './src/audioManager.js',
+    './vendor/face_mesh/face_mesh.js',
+    './vendor/face_mesh/face_mesh_solution_packed_assets.data',
+    './vendor/face_mesh/face_mesh_solution_packed_assets_loader.js',
+    './vendor/face_mesh/face_mesh_solution_simd_wasm_bin.data',
+    './vendor/face_mesh/face_mesh_solution_simd_wasm_bin.js',
+    './vendor/face_mesh/face_mesh_solution_simd_wasm_bin.wasm',
+    './vendor/face_mesh/face_mesh_solution_wasm_bin.js',
+    './vendor/face_mesh/face_mesh_solution_wasm_bin.wasm',
+    './manifest.json'
 ];
 
 self.addEventListener('install', (event) => {

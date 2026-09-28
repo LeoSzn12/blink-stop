@@ -1,0 +1,2 @@
+# Preserve Windows batch CRLF and do not treat CR as trailing whitespace.
+android/gradlew.bat whitespace=cr-at-eol

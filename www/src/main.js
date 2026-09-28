@@ -1,9 +1,12 @@
 import { checkBlink, setBlinkThreshold, resetBlinkState, getBlinkThreshold } from './blinkDetection.js';
 import { audioManager } from './audioManager.js';
-import { GlobalLeaderboard } from './firebase.js';
-import { createFaceLossTracker } from './gameRules.mjs';
+
+import { createFaceLossTracker, createCalibrationTracker, createTrackingFreshness } from './gameRules.mjs';
 import { createSerializedInference } from './inference.mjs';
 import { appendScore } from './leaderboard.mjs';
+import { cameraErrorMessage } from './cameraHelp.mjs';
+import { createGameOverCameraStop } from './roundLifecycle.mjs';
+import { sharePayload, shareClipboardText } from './share.mjs';
 
 // DOM Elements
 const videoElement = document.getElementsByClassName('input_video')[0];
@@ -17,18 +20,21 @@ const gameHud = document.getElementById('game-hud');
 const gameOverScreen = document.getElementById('game-over-screen');
 const calibrationScreen = document.getElementById('calibration-screen');
 const enduranceScreen = document.getElementById('endurance-screen');
-const adVideo = document.getElementById('ad-video');
+
 const uploadProgress = document.getElementById('upload-progress');
 const calibrationLoader = document.querySelector('.loader-bar');
 const calibrationStatus = document.getElementById('calibration-status');
 
 // UI Elements
 const modeBtns = document.querySelectorAll('.mode-btn');
+const modeSelection = document.querySelector('.mode-selection');
 const optionBtns = document.querySelectorAll('.option-btn');
 const precisionOptions = document.getElementById('precision-options');
+const precisionBackBtn = document.getElementById('precision-back-btn');
 const restartBtn = document.getElementById('restart-btn');
 const menuBtn = document.getElementById('menu-btn');
 const loadingMsg = document.getElementById('loading-msg');
+const cameraError = document.getElementById('camera-error');
 const scoreDisplay = document.getElementById('score');
 const targetDisplay = document.getElementById('target-display');
 const hudLabel = document.getElementById('hud-label');
@@ -37,7 +43,7 @@ const gameOverTitle = document.getElementById('game-over-title');
 const finalScoreLabel = document.getElementById('final-score-label');
 const finalScoreVal = document.getElementById('final-score-val');
 const leaderboardList = document.getElementById('leaderboard-list');
-const globalLeaderboardList = document.getElementById('global-leaderboard-list');
+
 const saveScoreBtn = document.getElementById('save-score-btn');
 const playerNameInput = document.getElementById('player-name-input');
 const shareBtn = document.getElementById('share-btn');
@@ -60,14 +66,17 @@ let gameState = 'MENU';
 let currentMode = 'CLASSIC'; 
 let startTime = 0;
 let animationFrameId;
+let calibrationFrameId;
 let precisionTarget = 10.00; 
-let calibrationData = [];
 let calibrationStartTime = 0;
 let lastScore = null;
 let currentEAR = 0.3;
 let baselineEAR = 0.3;
 let minEARValue = 0.3;
+let cameraSession = 0;
 const faceLoss = createFaceLossTracker();
+const calibration = createCalibrationTracker();
+const tracking = createTrackingFreshness();
 
 // Service Worker Registration
 if ('serviceWorker' in navigator) {
@@ -84,26 +93,42 @@ document.addEventListener('click', () => {
 }, { once: true });
 
 // MediaPipe Setup
-const faceMesh = new FaceMesh({
-    locateFile: (file) => {
-        return `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`;
-    }
-});
+function createSessionFaceMesh(session) {
+    const mesh = new FaceMesh({ locateFile: file => `vendor/face_mesh/${file}` });
+    mesh.setOptions({
+        maxNumFaces: 1,
+        refineLandmarks: false, // Keep OFF for performance
+        minDetectionConfidence: 0.5,
+        minTrackingConfidence: 0.5
+    });
+    // The callback belongs to this instance, not the mutable current mesh.
+    mesh.onResults(results => onResults(results, session));
+    return mesh;
+}
 
-faceMesh.setOptions({
-    maxNumFaces: 1,
-    refineLandmarks: false, // Keep OFF for performance
-    minDetectionConfidence: 0.5,
-    minTrackingConfidence: 0.5
-});
-
-faceMesh.onResults(onResults);
+let faceMesh = null;
+let activeMesh = null;
+function closeFaceMesh(mesh) {
+    Promise.resolve().then(() => mesh.close()).catch(error => console.warn('FaceMesh close failed:', error));
+}
 
 // Custom Camera Loop with Decoupled Detection
-const inference = createSerializedInference(image => faceMesh.send({ image }));
+let resultSession = null;
+const inference = createSerializedInference(async (image, session) => {
+    const mesh = faceMesh;
+    activeMesh = mesh;
+    resultSession = session;
+    try {
+        await mesh.send({ image });
+    } finally {
+        resultSession = null;
+        activeMesh = null;
+        if (mesh !== faceMesh) closeFaceMesh(mesh);
+    }
+});
 let detectionInterval = null;
 
-async function startCameraLoop() {
+async function startCameraLoop(session) {
     // 1. Start Video Stream First (Independent of FaceMesh)
     try {
         const stream = await navigator.mediaDevices.getUserMedia({
@@ -113,17 +138,32 @@ async function startCameraLoop() {
                 facingMode: 'user'
             }
         });
+        if (session !== cameraSession || document.hidden) {
+            stream.getTracks().forEach(track => track.stop());
+            return false;
+        }
         videoElement.srcObject = stream;
+        stream.getTracks().forEach(track => track.addEventListener('ended', () => {
+            if (session !== cameraSession || videoElement.srcObject !== stream) return;
+            showMenu();
+            cameraError.textContent = 'Camera disconnected. Check your camera and try again.';
+            cameraError.classList.remove('hidden');
+        }));
 
         // Wait for video to actually play
-        await new Promise((resolve) => {
-            videoElement.onloadedmetadata = () => {
-                videoElement.play().then(resolve);
-            };
-        });
+        if (videoElement.readyState < 1) {
+            await new Promise((resolve, reject) => {
+                videoElement.onloadedmetadata = resolve;
+                videoElement.onerror = () => reject(new Error('Camera video unavailable'));
+            });
+        }
+        if (session !== cameraSession || document.hidden) return false;
+        await videoElement.play();
+        if (session !== cameraSession || document.hidden) return false;
 
         // 2. Start Detection Loop (Decoupled)
-        startDetectionLoop();
+        startDetectionLoop(session);
+        return true;
 
     } catch (err) {
         console.error("Camera init error:", err);
@@ -131,14 +171,14 @@ async function startCameraLoop() {
     }
 }
 
-function startDetectionLoop() {
+function startDetectionLoop(session) {
     if (detectionInterval) clearInterval(detectionInterval);
 
     // Run detection at 20 FPS (good balance between performance and accuracy)
     detectionInterval = setInterval(async () => {
         if (videoElement.paused || videoElement.ended) return;
         try {
-            await inference.send(videoElement);
+            await inference.send(videoElement, session);
         } catch (error) {
             console.warn("FaceMesh skipped:", error);
         }
@@ -165,10 +205,17 @@ modeBtns.forEach(btn => {
             startGame('DAILY');
         } else {
             // Show options
-            document.querySelector('.mode-selection').classList.add('hidden');
+            modeSelection.classList.add('hidden');
             precisionOptions.classList.remove('hidden');
+            optionBtns[0].focus();
         }
     });
+});
+
+precisionBackBtn.addEventListener('click', () => {
+    precisionOptions.classList.add('hidden');
+    modeSelection.classList.remove('hidden');
+    document.querySelector('[data-mode="PRECISION"]').focus();
 });
 
 optionBtns.forEach(btn => {
@@ -185,14 +232,7 @@ optionBtns.forEach(btn => {
     });
 });
 
-restartBtn.addEventListener('click', () => {
-    // Cancel camera auto-stop timeout (user wants to play again)
-    if (window.cameraTimeoutId) {
-        clearTimeout(window.cameraTimeoutId);
-        window.cameraTimeoutId = null;
-    }
-    startGame(currentMode);
-});
+restartBtn.addEventListener('click', () => startGame(currentMode));
 menuBtn.addEventListener('click', showMenu);
 
 // Home button in HUD (MENU button)
@@ -211,7 +251,12 @@ if (homeBtn) {
 
 // Stop camera and detection helper function
 function stopCameraAndDetection() {
+    cameraSession++;
     stopDetectionLoop();
+    // Retire the instance now, but never close a send still in progress.
+    const mesh = faceMesh;
+    faceMesh = null;
+    if (mesh && mesh !== activeMesh) closeFaceMesh(mesh);
 
     // Stop video stream to release camera
     if (videoElement.srcObject) {
@@ -222,23 +267,28 @@ function stopCameraAndDetection() {
 }
 
 
+const gameOverCameraStop = createGameOverCameraStop(stopCameraAndDetection);
+
 // Leaderboard System
 const Leaderboard = {
     get(mode) {
-        const data = localStorage.getItem(`blink_lb_${mode}`);
-        if (!data) return [];
-
-        let parsed = JSON.parse(data);
-        // Migration: Convert old number scores to objects
-        return parsed.map(item => {
-            if (typeof item === 'number') {
-                return { name: 'ANONYMOUS', score: item };
-            }
-            return item;
-        });
+        try {
+            const data = localStorage.getItem(`blink_lb_${mode}`);
+            if (!data) return [];
+            const parsed = JSON.parse(data);
+            if (!Array.isArray(parsed) || !parsed.every(item =>
+                (typeof item === 'number' && Number.isFinite(item)) ||
+                (item && typeof item === 'object' && typeof item.name === 'string' && typeof item.score === 'number' && Number.isFinite(item.score)))) return null;
+            // Migration: Convert old number scores to objects, without rewriting stored data.
+            return parsed.map(item => typeof item === 'number' ? { name: 'ANONYMOUS', score: item } : item);
+        } catch (err) {
+            console.warn('Local scores unavailable:', err);
+            return null;
+        }
     },
     save(mode, score, name) {
         const scores = this.get(mode);
+        if (scores === null) return false;
         scores.push({ name: name || 'ANONYMOUS', score: score });
 
         // Sort: Classic (Higher is better), Precision (Lower is better)
@@ -249,11 +299,21 @@ const Leaderboard = {
         }
 
         const top5 = scores.slice(0, 5);
-        localStorage.setItem(`blink_lb_${mode}`, JSON.stringify(top5));
+        try {
+            localStorage.setItem(`blink_lb_${mode}`, JSON.stringify(top5));
+            return true;
+        } catch (err) {
+            console.warn('Local score not saved:', err);
+            return false;
+        }
     },
     render(mode) {
         const scores = this.get(mode);
         leaderboardList.innerHTML = '';
+        if (scores === null) {
+            leaderboardList.textContent = 'Local scores unavailable; existing data was not changed';
+            return;
+        }
 
         if (scores.length === 0) {
             leaderboardList.innerHTML = '<li>No scores yet</li>';
@@ -266,45 +326,21 @@ const Leaderboard = {
     }
 };
 
-// Global Leaderboard Render
-async function renderGlobalLeaderboard(mode) {
-    globalLeaderboardList.innerHTML = '<li>Loading...</li>';
-
-    const scores = await GlobalLeaderboard.getTop(mode, 10);
-    globalLeaderboardList.innerHTML = '';
-
-    if (scores.length === 0) {
-        globalLeaderboardList.innerHTML = '<li>No global scores yet</li>';
-        return;
-    }
-
-    scores.forEach((entry, index) => {
-        appendScore(globalLeaderboardList, entry, index, mode, document);
-    });
-}
-
 // Save Score Event
-saveScoreBtn.addEventListener('click', async () => {
+saveScoreBtn.addEventListener('click', () => {
     const name = playerNameInput.value.trim().toUpperCase();
     if (!name) return;
 
     if (lastScore === null) return;
 
-    // Save to local leaderboard
-    Leaderboard.save(currentMode, lastScore, name);
+    // Save to local leaderboard; do not claim success if storage is corrupt or unavailable.
+    if (!Leaderboard.save(currentMode, lastScore, name)) {
+        saveScoreBtn.innerText = 'NOT SAVED — LOCAL STORAGE UNAVAILABLE';
+        return;
+    }
     Leaderboard.render(currentMode);
 
-    // Save to global Firebase leaderboard
-    saveScoreBtn.innerText = "SAVING...";
-    const saved = await GlobalLeaderboard.save(currentMode, lastScore, name);
-
-    if (saved) {
-        saveScoreBtn.innerText = "SAVED ✓";
-        // Refresh global leaderboard
-        await renderGlobalLeaderboard(currentMode);
-    } else {
-        saveScoreBtn.innerText = "SAVED (LOCAL)";
-    }
+    saveScoreBtn.innerText = "SAVED (LOCAL)";
 
     saveScoreBtn.disabled = true;
     playerNameInput.disabled = true;
@@ -314,27 +350,30 @@ saveScoreBtn.addEventListener('click', async () => {
 shareBtn.addEventListener('click', async () => {
     if (lastScore === null) return;
 
-    const text = `👁️ I survived ${lastScore.toFixed(2)}s in the Void! My eyes are made of steel. \n\nCan you beat my high score? Play Blink Stop now! #BlinkStop`;
-
     if (navigator.share) {
         try {
-            await navigator.share({
-                title: 'Blink Stop',
-                text: text,
-                url: window.location.href
-            });
+            await navigator.share(sharePayload(lastScore));
         } catch (err) {
             console.log('Share failed:', err);
         }
     } else {
-        // Fallback to clipboard
-        navigator.clipboard.writeText(text).then(() => {
+        // Fallback to clipboard; keep Share retryable when unavailable or denied.
+        try {
+            if (!navigator.clipboard?.writeText) throw new Error('Clipboard unavailable');
+            await navigator.clipboard.writeText(shareClipboardText(lastScore));
             const originalText = shareBtn.innerText;
             shareBtn.innerText = "COPIED!";
             setTimeout(() => shareBtn.innerText = originalText, 2000);
-        });
+        } catch (err) {
+            shareBtn.innerText = 'CLIPBOARD UNAVAILABLE — COPY SCORE MANUALLY';
+        }
     }
 });
+
+function clearSelfie() {
+    selfiePreview.removeAttribute('src');
+    selfieContainer.classList.add('hidden');
+}
 
 // Save Selfie Logic
 selfieBtn.addEventListener('click', () => {
@@ -346,6 +385,14 @@ selfieBtn.addEventListener('click', () => {
 });
 
 function startGame(mode) {
+    clearSelfie();
+    gameOverCameraStop.cancel();
+    cancelAnimationFrame(calibrationFrameId);
+    // Abandon any previous camera permission prompt or pending startup.
+    stopCameraAndDetection();
+    const session = cameraSession;
+    faceMesh = createSessionFaceMesh(session);
+    cameraError.classList.add('hidden');
     currentMode = mode;
     loadingMsg.style.display = 'block';
     loadingMsg.innerText = 'INITIALIZING BLINK DETECTION...';
@@ -364,16 +411,10 @@ function startGame(mode) {
         worldRecordDisplay.classList.remove('hidden');
         wrValue.innerText = "--";
 
-        // Fetch World Record
-        GlobalLeaderboard.getWorldRecord('CLASSIC').then(record => {
-            if (record) {
-                wrValue.innerText = `${record.score.toFixed(2)}s`;
-                window.currentWorldRecord = record.score;
-            } else {
-                wrValue.innerText = "None";
-                window.currentWorldRecord = null;
-            }
-        });
+        const scores = Leaderboard.get('CLASSIC');
+        const record = scores?.[0];
+        wrValue.innerText = scores === null ? 'Unavailable' : record ? `${record.score.toFixed(2)}s` : 'None';
+        window.currentWorldRecord = record?.score ?? null;
     } else {
         // Endurance
         hudLabel.innerText = "TIME";
@@ -391,38 +432,33 @@ function startGame(mode) {
         }
     }
 
-    startCameraLoop()
-        .then(() => {
+    startCameraLoop(session)
+        .then(started => {
+            if (!started || session !== cameraSession) return;
             loadingMsg.innerText = 'CAMERA READY...';
             setTimeout(() => {
-                startCalibration();
+                if (session === cameraSession && !document.hidden) startCalibration();
             }, 500);
         })
         .catch(err => {
+            if (session !== cameraSession) return;
             console.error("Camera error:", err);
             loadingMsg.style.display = 'none';
 
-            // User-friendly error messages
-            let errorMsg = "Camera access denied.";
-            if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-                errorMsg = "📷 Camera permission denied!\n\nPlease:\n1. Tap the 'AA' or settings icon in Safari\n2. Select 'Website Settings'\n3. Enable Camera access\n4. Refresh the page";
-            } else if (err.name === 'NotFoundError') {
-                errorMsg = "No camera found on this device.";
-            } else if (err.name === 'NotReadableError') {
-                errorMsg = "Camera is being used by another app.\n\nPlease close other apps and try again.";
-            }
-
-            alert(errorMsg);
             showMenu();
+            cameraError.textContent = cameraErrorMessage(err);
+            cameraError.classList.remove('hidden');
         });
 }
 
 function startCalibration() {
+    cancelAnimationFrame(calibrationFrameId);
     gameState = 'CALIBRATING';
     faceLoss.reset();
     resetBlinkState();
-    calibrationData = [];
-    calibrationStartTime = Date.now();
+    calibration.reset();
+    tracking.reset();
+    calibrationStartTime = performance.now();
 
     menuScreen.classList.add('hidden');
     menuScreen.classList.remove('active');
@@ -438,22 +474,29 @@ function startCalibration() {
 
 function updateCalibrationLoop() {
     if (gameState === 'CALIBRATING') {
-        const elapsed = (Date.now() - calibrationStartTime) / 1000;
+        const now = performance.now();
+        const elapsed = (now - calibrationStartTime) / 1000;
         const progress = Math.min((elapsed / 3) * 100, 100);
         const remaining = Math.max(3 - elapsed, 0);
 
         calibrationLoader.style.width = `${progress}%`;
         calibrationStatus.innerText = `${remaining.toFixed(2)}s`;
 
-        if (elapsed >= 3) {
+        if (elapsed >= 3 && calibration.ready(now)) {
             finishCalibration();
         } else {
-            requestAnimationFrame(updateCalibrationLoop);
+            if (elapsed >= 3) {
+                calibration.reset();
+                calibrationStartTime = now;
+                calibrationStatus.innerText = 'LOOK AT CAMERA WITH EYES OPEN';
+            }
+            calibrationFrameId = requestAnimationFrame(updateCalibrationLoop);
         }
     }
 }
 
 function finishCalibration() {
+    const calibrationData = calibration.values();
     if (calibrationData.length > 0) {
         // Sort and trim the top/bottom 10% to remove noise/outliers
         calibrationData.sort((a, b) => a - b);
@@ -477,6 +520,7 @@ function finishCalibration() {
 
     // Reset blink detection state before starting game
     resetBlinkState();
+    tracking.reset(performance.now());
 
     if (currentMode === 'ENDURANCE') {
         startEnduranceMode();
@@ -503,8 +547,7 @@ function startEnduranceMode() {
     enduranceScreen.classList.remove('hidden');
     enduranceScreen.classList.add('active');
 
-    adVideo.currentTime = 0;
-    adVideo.play();
+
     uploadProgress.style.width = '0%';
 
     updateEnduranceLoop();
@@ -512,6 +555,10 @@ function startEnduranceMode() {
 
 function updateEnduranceLoop() {
     if (gameState === 'ENDURANCE') {
+        if (tracking.stale(performance.now())) {
+            endGame('DISQUALIFIED');
+            return;
+        }
         const elapsed = (Date.now() - startTime) / 1000;
         const duration = 30; // 30 seconds
         const progress = Math.min((elapsed / duration) * 100, 100);
@@ -550,7 +597,18 @@ function updateEnduranceLoop() {
 }
 
 function showMenu() {
+    clearSelfie();
+    gameOverCameraStop.cancel();
+    gameState = 'MENU';
+    cancelAnimationFrame(animationFrameId);
+    cancelAnimationFrame(calibrationFrameId);
     stopCameraAndDetection();
+    calibrationScreen.classList.add('hidden');
+    calibrationScreen.classList.remove('active');
+    enduranceScreen.classList.add('hidden');
+    enduranceScreen.classList.remove('active');
+    precisionOptions.classList.add('hidden');
+    document.querySelector('.mode-selection').classList.remove('hidden');
     faceLoss.reset();
     resetBlinkState();
 
@@ -573,16 +631,26 @@ function showMenu() {
     loadingMsg.style.display = 'none';
 }
 
-function onResults(results) {
-    // Ignore late callbacks from an in-flight send after the camera is stopped.
-    if (!videoElement.srcObject) return;
+document.addEventListener('visibilitychange', () => {
+    if (document.hidden && (videoElement.srcObject || gameState !== 'MENU' || loadingMsg.style.display === 'block')) showMenu();
+});
+
+function onResults(results, session) {
+    // A retired instance cannot borrow the current send's identity, even after its send settles.
+    if (session !== resultSession || session !== cameraSession || !videoElement.srcObject) return;
     const now = performance.now();
     canvasCtx.save();
     canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
     canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
 
-    if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
-        const landmarks = results.multiFaceLandmarks[0];
+    const landmarks = results.multiFaceLandmarks?.[0];
+    const eye = landmarks ? checkBlink(landmarks, now) : null;
+    if (eye && Number.isFinite(eye.minEar) && eye.minEar > 0 && eye.minEar <= 1) {
+        if ((gameState === 'PLAYING' || gameState === 'ENDURANCE') && !tracking.observe(now)) {
+            endGame('DISQUALIFIED');
+            canvasCtx.restore();
+            return;
+        }
         faceLoss.observe(true, now);
 
         // Update face tracking status
@@ -595,12 +663,12 @@ function onResults(results) {
         hudLabel.style.color = "var(--neon-cyan)";
         hudLabel.style.textShadow = "0 0 10px var(--neon-cyan)";
 
-        const { blinking, ear, minEar } = checkBlink(landmarks, now);
+        const { blinking, ear, minEar } = eye;
         currentEAR = ear;
         minEARValue = minEar;
 
         if (gameState === 'CALIBRATING') {
-            calibrationData.push(minEar); // Calibrate based on the most sensitive eye
+            calibration.observe(minEar, now); // Only plausible open-eye observations count
         } else if (gameState === 'PLAYING' || gameState === 'ENDURANCE') {
             if (blinking) {
                 endGame();
@@ -656,6 +724,10 @@ function updateClassicVisualStage(elapsedSeconds) {
 
 function updateGameLoop() {
     if (gameState === 'PLAYING') {
+        if (tracking.stale(performance.now())) {
+            endGame('DISQUALIFIED');
+            return;
+        }
         const elapsed = (Date.now() - startTime) / 1000;
         scoreDisplay.innerText = `${elapsed.toFixed(2)}s`;
 
@@ -711,6 +783,11 @@ function updateGameLoop() {
 }
 
 function endGame(reason = 'BLINK') {
+    if (reason === 'MENU_EXIT') {
+        showMenu();
+        return;
+    }
+    clearSelfie();
     gameState = 'GAME_OVER';
     faceLoss.reset();
     resetBlinkState();
@@ -718,14 +795,7 @@ function endGame(reason = 'BLINK') {
 
     // Don't stop camera immediately - let user retry quickly
     // Camera will auto-stop after 5 seconds of inactivity on Game Over screen
-    if (window.cameraTimeoutId) {
-        clearTimeout(window.cameraTimeoutId);
-    }
-
-    window.cameraTimeoutId = setTimeout(() => {
-        console.log('Auto-stopping camera after 5s inactivity');
-        stopCameraAndDetection();
-    }, 5000);
+    gameOverCameraStop.schedule();
 
     // Hide face status
     faceStatus.classList.add('hidden');
@@ -748,13 +818,13 @@ function endGame(reason = 'BLINK') {
             canvasCtx.fillStyle = "rgba(255, 0, 0, 0.4)";
             canvasCtx.fillRect(0, 0, canvasElement.width, canvasElement.height);
             canvasCtx.fillStyle = "#fff";
-            canvasCtx.font = "bold 60px Orbitron";
+            canvasCtx.font = "bold 60px system-ui";
             canvasCtx.textAlign = "center";
             canvasCtx.textBaseline = "middle";
             canvasCtx.shadowColor = "#f00";
             canvasCtx.shadowBlur = 20;
             canvasCtx.fillText("BLINK DETECTED!", canvasElement.width/2, canvasElement.height/2 - 40);
-            canvasCtx.font = "bold 40px Roboto Mono";
+            canvasCtx.font = "bold 40px monospace";
             canvasCtx.fillText(`TIME: ${((Date.now() - startTime) / 1000).toFixed(2)}s`, canvasElement.width/2, canvasElement.height/2 + 40);
             canvasCtx.restore();
             
@@ -785,7 +855,11 @@ function endGame(reason = 'BLINK') {
 
             // Unlock Theme
             document.body.classList.add('theme-purple');
-            localStorage.setItem('blink_theme_purple', 'true');
+            try {
+                localStorage.setItem('blink_theme_purple', 'true');
+            } catch (err) {
+                console.warn('Theme preference not saved:', err);
+            }
         } else if (reason === 'DISQUALIFIED') {
             scoreToSave = 0;
             finalScoreText = "DQ";
@@ -801,9 +875,9 @@ function endGame(reason = 'BLINK') {
             // Show World Record
             gameOverWorldRecord.classList.remove('hidden');
             if (window.currentWorldRecord) {
-                gameOverWorldRecord.innerText = `Blink Stop World Record: ${window.currentWorldRecord.toFixed(2)}s`;
+                gameOverWorldRecord.innerText = `Your Best: ${window.currentWorldRecord.toFixed(2)}s`;
             } else {
-                gameOverWorldRecord.innerText = `Blink Stop World Record: None yet!`;
+                gameOverWorldRecord.innerText = `Your Best: None yet!`;
             }
 
         } else if (currentMode === 'PRECISION') {
@@ -849,20 +923,14 @@ function endGame(reason = 'BLINK') {
         saveScoreBtn.innerText = "SAVE";
 
         Leaderboard.render(currentMode);
-        renderGlobalLeaderboard(currentMode); // Load global leaderboard
+
     } catch (err) {
         console.error("Error in endGame:", err);
     }
 
-    // If user clicked MENU during game, go straight to menu
-    if (reason === 'MENU_EXIT') {
-        showMenu();
-        return;
-    }
-
     // Stop video if in endurance mode
     if (currentMode === 'ENDURANCE') {
-        adVideo.pause();
+
         enduranceScreen.classList.add('hidden');
         enduranceScreen.classList.remove('active');
     }
@@ -881,7 +949,11 @@ videoElement.addEventListener('loadedmetadata', () => {
     canvasElement.height = videoElement.videoHeight;
 });
 
-// Check for unlocked theme on load
-if (localStorage.getItem('blink_theme_purple') === 'true') {
-    document.body.classList.add('theme-purple');
+// Check for unlocked theme on load; storage may be disabled by the browser.
+try {
+    if (localStorage.getItem('blink_theme_purple') === 'true') {
+        document.body.classList.add('theme-purple');
+    }
+} catch (err) {
+    console.warn('Theme preference unavailable:', err);
 }

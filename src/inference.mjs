@@ -4,12 +4,12 @@ export function createSerializedInference(send, warn = console.warn, timeoutMs =
     schedule = setTimeout, cancel = clearTimeout) {
     let busy = false;
     return {
-        send(image) {
+        send(image, session) {
             if (busy) return false;
             busy = true;
             let timer;
             try {
-                const pending = Promise.resolve(send(image));
+                const pending = Promise.resolve(send(image, session));
                 timer = schedule(() => warn(`FaceMesh inference exceeded ${timeoutMs}ms`), timeoutMs);
                 return pending.finally(() => {
                     cancel(timer);

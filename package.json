@@ -4,8 +4,8 @@
   "description": "",
   "main": "service-worker.js",
   "scripts": {
-    "test": "node --test tests/*.test.mjs",
-    "build": "node --check --input-type=module < src/main.js && node --check --input-type=module < src/blinkDetection.js && node --check src/gameRules.mjs && node --check src/inference.mjs && node --check src/leaderboard.mjs"
+    "test": "npm run build && node --test tests/*.test.mjs",
+    "build": "node --check --input-type=module < src/main.js && node --check --input-type=module < src/blinkDetection.js && node --check src/gameRules.mjs && node --check src/inference.mjs && node --check src/leaderboard.mjs && node scripts/build-web.mjs"
   },
   "repository": {
     "type": "git",
@@ -20,10 +20,13 @@
   },
   "homepage": "https://github.com/LeoSzn12/blink-stop#readme",
   "dependencies": {
-    "@capacitor/core": "^8.2.0"
+    "@capacitor/core": "8.5.2",
+    "@mediapipe/face_mesh": "0.4.1633559619"
   },
   "devDependencies": {
-    "@capacitor/cli": "^8.2.0",
-    "@capacitor/ios": "^8.2.0"
+    "@capacitor/android": "8.5.2",
+    "@capacitor/cli": "8.2.0",
+    "@capacitor/ios": "8.5.2",
+    "playwright": "^1.58.2"
   }
 }

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createBlinkDetector, createFaceLossTracker } from '../src/gameRules.mjs';
+import { createBlinkDetector, createFaceLossTracker, createCalibrationTracker, createTrackingFreshness } from '../src/gameRules.mjs';
 import { createSerializedInference } from '../src/inference.mjs';
 import { appendScore } from '../src/leaderboard.mjs';
 
@@ -24,6 +24,32 @@ test('face loss expires by elapsed time and resets on reacquisition or retry', (
     assert.equal(loss.observe(false, 3000), false);
     loss.reset();
     assert.equal(loss.observe(false, 5000), false);
+});
+
+test('calibration refuses no face, invalid or closed eyes, and stale samples', () => {
+    const calibration = createCalibrationTracker();
+    assert.equal(calibration.ready(3000), false);
+    for (let i = 0; i < 10; i++) calibration.observe(i % 2 ? NaN : 0.1, i * 150);
+    assert.equal(calibration.ready(3000), false);
+    for (let i = 0; i < 10; i++) calibration.observe(0.3, 4000 + i * 150);
+    assert.equal(calibration.ready(5400), true);
+    assert.equal(calibration.ready(5900), false);
+    calibration.reset();
+    assert.equal(calibration.ready(5400), false);
+});
+
+test('Endurance tracking expires on stalled inference before a 30-second win', () => {
+    const tracking = createTrackingFreshness();
+    tracking.reset(1000);
+    tracking.observe(1200);
+    assert.equal(tracking.stale(2199), false);
+    assert.equal(tracking.stale(2200), true);
+    assert.equal(tracking.stale(31000), true);
+    assert.equal(tracking.observe(31000), false); // a late face cannot erase a stalled interval
+    assert.equal(tracking.stale(31000), true);
+    tracking.reset(32000);
+    assert.equal(tracking.stale(32000), false);
+    assert.equal(tracking.stale(33000), true);
 });
 
 test('timeout never admits overlapping inference; settling re-enables it', async () => {
