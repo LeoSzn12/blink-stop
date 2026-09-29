@@ -5,6 +5,17 @@ import { readFileSync, existsSync } from 'node:fs';
 const root = new URL('../', import.meta.url);
 const read = path => readFileSync(new URL(path, root), 'utf8');
 
+test('Vercel serves only the built web payload, never the repository root', () => {
+    const config = JSON.parse(read('vercel.json'));
+    assert.equal(config.framework, null);
+    assert.equal(config.installCommand, 'npm ci');
+    assert.equal(config.buildCommand, 'npm run build');
+    assert.equal(config.outputDirectory, 'www');
+    for (const privateFile of ['package.json', 'package-lock.json', 'android/gradlew', 'tests/packaging.test.mjs']) {
+        assert.equal(existsSync(new URL(`www/${privateFile}`, root)), false, privateFile);
+    }
+});
+
 test('native entrypoint loads locally packaged inference, without ad or Firebase scripts', () => {
     const html = read('www/index.html');
     assert.match(html, /src="vendor\/face_mesh\/face_mesh\.js"/);

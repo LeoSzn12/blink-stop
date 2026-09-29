@@ -989,7 +989,7 @@ h1.glitch {
     position: relative;
     min-height: 100dvh;
     height: auto;
-    padding: 1rem 1rem calc(5rem + env(safe-area-inset-bottom, 0px));
+    padding: 1rem 1rem calc(6rem + env(safe-area-inset-bottom, 0px));
 }
 
 /* The in-game HUD remains over the camera, not in the menu's scroll flow. */
