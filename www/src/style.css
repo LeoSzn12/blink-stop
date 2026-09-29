@@ -3,8 +3,8 @@
     --neon-pink: #f0f;
     --neon-red: #f00;
     --glass-bg: rgba(0, 20, 40, 0.7);
-    --font-main: 'Orbitron', sans-serif;
-    --font-mono: 'Roboto Mono', monospace;
+    --font-main: system-ui, -apple-system, sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     --bg-dark: #050505;
     --glass-border: rgba(255, 255, 255, 0.1);
 }
@@ -28,22 +28,21 @@ body.theme-purple {
 body {
     background-color: var(--bg-dark);
     color: white;
-    font-family: 'Roboto Mono', monospace;
-    height: 100vh;
-    overflow: hidden;
-    display: flex;
-    justify-content: center;
-    align-items: center;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+    overflow-y: auto;
+    /* Allow vertical scrolling */
+    /* Removed flex display that was breaking layout */
 }
 
 .container {
     position: relative;
     width: 100%;
-    height: 100%;
-    max-width: 100%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
+    height: 100vh;
+    /* Full viewport height for game */
+    display: block;
+    /* Changed from flex */
 }
 
 .video-wrapper {
@@ -99,6 +98,38 @@ body {
     align-items: center;
     background: radial-gradient(circle, transparent 40%, black 100%);
     /* Vignette */
+    pointer-events: none;
+    /* Allow clicks to pass through */
+}
+
+.ui-overlay>* {
+    pointer-events: auto;
+    /* Re-enable for children */
+}
+
+/* Face Tracking Status */
+.face-status {
+    position: fixed;
+    bottom: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.8);
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    z-index: 100;
+    pointer-events: none;
+}
+
+#face-status-text {
+    color: #0f0;
+    /* Green for tracking */
+}
+
+.face-status.not-detected #face-status-text {
+    color: #f00;
+    /* Red for not detected */
 }
 
 .screen {
@@ -125,7 +156,7 @@ body {
 
 /* Typography & Effects */
 h1.glitch {
-    font-family: 'Orbitron', sans-serif;
+    font-family: system-ui, -apple-system, sans-serif;
     font-size: 4rem;
     font-weight: 700;
     color: var(--neon-cyan);
@@ -149,7 +180,7 @@ h1.glitch {
     color: var(--neon-cyan);
     padding: 1rem 3rem;
     font-size: 1.5rem;
-    font-family: 'Orbitron', sans-serif;
+    font-family: system-ui, -apple-system, sans-serif;
     cursor: pointer;
     transition: all 0.2s;
     text-transform: uppercase;
@@ -170,10 +201,25 @@ h1.glitch {
 
 /* HUD */
 #game-hud {
+    display: flex;
     justify-content: space-between;
-    padding: 2rem;
     align-items: flex-start;
     flex-direction: row;
+    padding: env(safe-area-inset-top, 8px) 1rem 1rem 1rem;
+    pointer-events: auto;
+    z-index: 50;
+}
+
+.hud-left {
+    display: flex;
+    align-items: flex-start;
+}
+
+.hud-right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.5rem;
 }
 
 /* Eye Meter */
@@ -220,13 +266,14 @@ h1.glitch {
 .score-container {
     background: var(--glass-bg);
     backdrop-filter: blur(10px);
-    padding: 1rem 2rem;
+    padding: 1rem 1.5rem;
     border: 1px solid var(--glass-border);
     border-radius: 8px;
+    max-width: min(250px, 45vw);
 }
 
 .digital-text {
-    font-family: 'Orbitron', sans-serif;
+    font-family: system-ui, -apple-system, sans-serif;
     font-size: 3rem;
     color: var(--neon-cyan);
     display: block;
@@ -258,7 +305,7 @@ h1.glitch {
     font-size: 0.7rem;
     margin-top: 0.5rem;
     color: #888;
-    font-family: 'Roboto Mono', monospace;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
 .options-container {
@@ -299,7 +346,7 @@ h1.glitch {
     color: var(--neon-cyan);
     padding: 0.5rem 1.5rem;
     font-size: 1rem;
-    font-family: 'Orbitron', sans-serif;
+    font-family: system-ui, -apple-system, sans-serif;
     cursor: pointer;
     margin-top: 1rem;
     text-transform: uppercase;
@@ -310,6 +357,27 @@ h1.glitch {
 }
 
 /* HUD Updates */
+.world-record-hud {
+    text-align: center;
+    background: rgba(0, 0, 0, 0.5);
+    padding: 0.4rem 0.8rem;
+    border-radius: 20px;
+    border: 1px solid rgba(0, 255, 255, 0.3);
+    margin-bottom: 0.5rem;
+}
+
+.world-record-hud .label {
+    font-size: 0.65rem;
+    color: var(--neon-cyan);
+    margin-bottom: 0;
+}
+
+.world-record-hud .digital-text-sm {
+    font-size: 1rem;
+    color: #fff;
+    text-shadow: 0 0 5px var(--neon-cyan);
+}
+
 .target-container {
     background: rgba(255, 0, 255, 0.1);
     padding: 0.5rem 1rem;
@@ -319,9 +387,20 @@ h1.glitch {
 }
 
 .digital-text-sm {
-    font-family: 'Orbitron', sans-serif;
+    font-family: system-ui, -apple-system, sans-serif;
     font-size: 1.5rem;
     color: var(--neon-pink);
+}
+
+.score-sub {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.9rem;
+    color: #aaa;
+    margin-top: 0.5rem;
+}
+
+#game-over-world-record {
+    color: var(--neon-cyan);
 }
 
 /* Name Entry */
@@ -337,7 +416,7 @@ h1.glitch {
     border: 1px solid var(--neon-cyan);
     color: white;
     padding: 0.5rem 1rem;
-    font-family: 'Orbitron', sans-serif;
+    font-family: system-ui, -apple-system, sans-serif;
     font-size: 1.2rem;
     text-transform: uppercase;
     width: 200px;
@@ -379,7 +458,7 @@ h1.glitch {
     backdrop-filter: blur(5px);
 }
 
-/* Chaos Visuals */
+/* Classic Mode Visual Stages */
 @keyframes shake {
     0% {
         transform: translate(1px, 1px) rotate(0deg);
@@ -426,6 +505,33 @@ h1.glitch {
     }
 }
 
+@keyframes voidPulse {
+    0% {
+        filter: invert(1) hue-rotate(180deg) brightness(0.9);
+    }
+
+    50% {
+        filter: invert(1) hue-rotate(180deg) brightness(1.1);
+    }
+
+    100% {
+        filter: invert(1) hue-rotate(180deg) brightness(0.9);
+    }
+}
+
+.classic-stage-shake {
+    animation: shake 0.5s infinite;
+}
+
+.classic-stage-invert {
+    filter: invert(1) hue-rotate(180deg);
+}
+
+.classic-stage-void-plus {
+    animation: voidPulse 3s ease-in-out infinite;
+}
+
+/* Legacy chaos classes (kept for compatibility) */
 .chaos-shake {
     animation: shake 0.5s infinite;
 }
@@ -474,7 +580,7 @@ h1.glitch {
 
 .leaderboard-container h3 {
     color: var(--neon-cyan);
-    font-family: 'Orbitron', sans-serif;
+    font-family: system-ui, -apple-system, sans-serif;
     margin-bottom: 1rem;
     text-align: center;
     border-bottom: 1px solid var(--glass-border);
@@ -491,7 +597,7 @@ h1.glitch {
     justify-content: space-between;
     padding: 0.5rem 0;
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-    font-family: 'Roboto Mono', monospace;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     color: #ddd;
 }
 
@@ -504,7 +610,7 @@ h1.glitch {
 /* Game Over Updates */
 .neon-text-red {
     color: var(--neon-red);
-    font-family: 'Orbitron', sans-serif;
+    font-family: system-ui, -apple-system, sans-serif;
     font-size: 3.5rem;
     text-shadow: 0 0 20px var(--neon-red);
     margin-bottom: 1rem;
@@ -517,7 +623,7 @@ h1.glitch {
 }
 
 .digital-text-lg {
-    font-family: 'Orbitron', sans-serif;
+    font-family: system-ui, -apple-system, sans-serif;
     font-size: 4rem;
     color: white;
     text-shadow: 0 0 15px white;
@@ -630,7 +736,7 @@ h1.glitch {
     background: rgba(0, 0, 0, 0.5);
     border: 1px solid var(--neon-cyan);
     color: var(--neon-cyan);
-    padding: 5px 10px;
+    padding: 10px 16px;
     font-family: var(--font-mono);
     font-size: 0.8rem;
     cursor: pointer;
@@ -638,6 +744,9 @@ h1.glitch {
     letter-spacing: 1px;
     backdrop-filter: blur(4px);
     transition: all 0.3s ease;
+    min-width: 44px;
+    min-height: 44px;
+    pointer-events: auto;
 }
 
 .menu-btn-hud:hover {
@@ -730,7 +839,7 @@ h1.glitch {
 }
 
 .footer-separator {
-    color: #666;
+    color: #555;
     margin: 0 0.5rem;
 }
 
@@ -769,3 +878,153 @@ h1.glitch {
         font-size: 2.5rem;
     }
 }
+
+/* Content Section for AdSense */
+.content-section {
+    width: 100%;
+    background: #000;
+    padding: 4rem 1rem 6rem 1rem;
+    /* Added bottom padding for footer */
+    position: relative;
+    z-index: 10;
+    border-top: 1px solid var(--neon-cyan);
+    /* margin-top removed as it follows container naturally */
+}
+
+.content-container {
+    max-width: 800px;
+    margin: 0 auto;
+    color: #ccc;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    line-height: 1.6;
+}
+
+.content-container article {
+    margin-bottom: 3rem;
+}
+
+.content-container h2 {
+    font-family: system-ui, -apple-system, sans-serif;
+    font-size: 1.8rem;
+    margin-bottom: 1.5rem;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+}
+
+.content-container h3 {
+    color: #fff;
+    font-size: 1.2rem;
+    margin-bottom: 0.5rem;
+    margin-top: 1.5rem;
+}
+
+.content-container p {
+    margin-bottom: 1rem;
+    font-size: 0.95rem;
+}
+
+.mode-detail {
+    background: rgba(255, 255, 255, 0.05);
+    padding: 1rem;
+    border-left: 3px solid var(--neon-cyan);
+    margin-bottom: 1rem;
+}
+
+.tips-list {
+    list-style-type: none;
+    padding: 0;
+}
+
+.tips-list li {
+    margin-bottom: 0.8rem;
+    padding-left: 1.5rem;
+    position: relative;
+}
+
+.tips-list li::before {
+    content: '>';
+    position: absolute;
+    left: 0;
+    color: var(--neon-pink);
+    font-weight: bold;
+}
+
+.neon-text-cyan {
+    color: var(--neon-cyan);
+    text-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+}
+
+.neon-text-pink {
+    color: var(--neon-pink);
+    text-shadow: 0 0 10px rgba(255, 0, 255, 0.3);
+}
+
+/* Ensure main container doesn't overlap content */
+/* Ensure main container doesn't overlap content */
+.container {
+    min-height: 100dvh;
+    position: relative;
+    width: 100%;
+    height: auto;
+    z-index: 1;
+}
+
+/* Keep the camera behind the UI without clipping a taller menu. */
+.video-wrapper {
+    position: relative;
+    width: 100%;
+    height: auto;
+    min-height: 100dvh;
+    overflow: hidden;
+    z-index: 1;
+}
+
+.ui-overlay {
+    position: relative;
+    min-height: 100dvh;
+    height: auto;
+}
+
+.screen {
+    position: relative;
+    min-height: 100dvh;
+    height: auto;
+    padding: 1rem 1rem calc(6rem + env(safe-area-inset-bottom, 0px));
+}
+
+/* The in-game HUD remains over the camera, not in the menu's scroll flow. */
+#game-hud {
+    position: absolute;
+    min-height: 0;
+    height: 100dvh;
+}
+
+@media (max-width: 768px) {
+    .mode-selection { max-width: 100%; }
+    .mode-btn { max-width: 100%; min-width: 0; }
+    .game-over-btns, .name-entry-container { flex-wrap: wrap; justify-content: center; max-width: 100%; }
+    .game-over-btns .neon-btn { max-width: 100%; }
+}
+
+/* Content needs to follow container naturally */
+.content-section {
+    position: relative;
+    z-index: 10;
+    background: #000;
+    border-top: 2px solid var(--neon-cyan);
+    margin-top: 0;
+}
+
+/* Footer adjustment - keep fixed at bottom */
+footer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    z-index: 100;
+    background: rgba(0, 0, 0, 0.8);
+    /* Add background for readability */
+    padding: 1rem;
+}
+.camera-error { color: #fff; background: #4b101d; border: 1px solid var(--neon-pink); padding: 0.8rem; max-width: 25rem; line-height: 1.5; text-align: center; }
+.endurance-void { color: var(--neon-cyan); font-size: min(40vw, 8rem); text-align: center; text-shadow: 0 0 24px var(--neon-cyan); }

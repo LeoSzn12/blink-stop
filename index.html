@@ -6,11 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Blink Stop - Don't Blink Challenge</title>
     <link rel="stylesheet" href="src/style.css?v=3">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link
-        href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto+Mono:wght@400;700&display=swap"
-        rel="stylesheet">
+
     <link rel="manifest" href="manifest.json">
 
     <!-- Social Sharing Meta Tags -->
@@ -18,16 +14,10 @@
     <meta name="description"
         content="Test your willpower in Blink Stop. Stare into the void without blinking. How long can you last?">
     <meta property="og:type" content="website">
-    <meta property="og:image"
-        content="https://raw.githubusercontent.com/google/mediapipe/master/mediapipe/graphs/face_mesh/data/face_mesh_android_gpu.png">
-    <!-- Placeholder image -->
+    <!-- No social preview image until approved artwork is published at the live URL. -->
 
     <!-- MediaPipe Dependencies -->
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
-    <!-- AdSense Script -->
-    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4512722496678449"
-        crossorigin="anonymous"></script>
+    <script src="vendor/face_mesh/face_mesh.js"></script>
 </head>
 
 <body>
@@ -62,23 +52,18 @@
                             <button class="neon-btn-small option-btn" data-time="10">10s</button>
                             <button class="neon-btn-small option-btn" data-time="15">15s</button>
                         </div>
+                        <button id="precision-back-btn" class="neon-btn-small" type="button">Back</button>
                     </div>
 
                     <!-- SEO About Text -->
                     <div style="max-width: 400px; margin-top: 1.5rem; text-align: center; color: #888; font-size: 0.8rem; line-height: 1.4;">
-                        Blink Stop is a browser-based staring contest game powered by MediaPipe facial landmark detection. Test your endurance, improve your focus, and share your most hilarious failure selfies with friends! All data is processed securely and directly within your browser.
+                        Blink Stop detects blinks on your device. Camera frames stay on your device; scores are saved locally only. A selfie is created only after a round and saved only if you tap Save Selfie.
                     </div>
 
                     <p class="loading-text" id="loading-msg">INITIALIZING BLINK DETECTION...</p>
+                    <p id="camera-error" role="alert" class="camera-error hidden"></p>
 
-                    <!-- AdSense Banner -->
-                    <div class="ad-banner">
-                        <ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-4512722496678449"
-                            data-ad-slot="auto" data-ad-format="auto" data-full-width-responsive="true"></ins>
-                        <script>
-                            (adsbygoogle = window.adsbygoogle || []).push({});
-                        </script>
-                    </div>
+
                 </div>
 
                 <!-- Calibration Screen -->
@@ -95,10 +80,7 @@
                 <div id="endurance-screen" class="screen hidden">
                     <h2 class="glitch" data-text="ENDURANCE TEST">ENDURANCE TEST</h2>
                     <div class="video-container">
-                        <!-- Placeholder Video (Sci-Fi Loop) -->
-                        <video id="ad-video"
-                            src="https://media.istockphoto.com/id/1322205588/video/abstract-digital-technology-background-loop-3d-render.mp4?s=mp4-640x640-is&k=20&c=y-lq7w0q_q_q_q_q_q_q_q_q_q_q_q_q"
-                            loop muted playsinline></video>
+                        <div class="endurance-void" aria-hidden="true">◉</div>
                         <div class="upload-progress-bar">
                             <div class="upload-progress" id="upload-progress"></div>
                         </div>
@@ -114,7 +96,7 @@
                     <div class="hud-right">
                         <!-- World Record Display (Classic Mode) -->
                         <div id="world-record-display" class="world-record-hud hidden">
-                            <span class="label">WORLD RECORD</span>
+                            <span class="label">YOUR BEST</span>
                             <span id="wr-value" class="digital-text-sm">--</span>
                         </div>
 
@@ -134,6 +116,7 @@
                         <div class="target-container hidden" id="target-display">
                             <span class="label">TARGET</span>
                             <span class="digital-text-sm">10.00s</span>
+                        </div>
                     </div>
                 </div>
 
@@ -168,13 +151,7 @@
                         </ul>
                     </div>
 
-                    <!-- Global Leaderboard - Hidden -->
-                    <div class="leaderboard-container" style="display: none;">
-                        <h3>🌍 GLOBAL TOP 10</h3>
-                        <ul id="global-leaderboard-list">
-                            <li>Loading...</li>
-                        </ul>
-                    </div>
+
                     
                     <!-- Selfie Preview -->
                     <div id="selfie-container" class="hidden" style="margin-bottom: 1rem; width: 100%; max-width: 300px; border: 2px solid var(--neon-cyan); border-radius: 8px; overflow: hidden;">
@@ -183,7 +160,7 @@
 
                     <div class="game-over-btns">
                         <button id="restart-btn" class="neon-btn">RETRY</button>
-                        <button id="share-btn" class="neon-btn">SHARE</button>
+                        <button id="share-btn" class="neon-btn" aria-label="Share score only; game link coming soon">SHARE SCORE</button>
                         <button id="selfie-btn" class="neon-btn" style="border-color: var(--neon-pink); color: var(--neon-pink)">SAVE SELFIE</button>
                     </div>
                     <button id="menu-btn" class="neon-btn-small">MENU</button>

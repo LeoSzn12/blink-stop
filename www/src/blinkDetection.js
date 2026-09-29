@@ -1,21 +1,31 @@
 // Blink Detection Logic using Eye Aspect Ratio (EAR)
+import { createBlinkDetector } from './gameRules.mjs';
 
-// MediaPipe Face Mesh Landmark Indices
-// Left Eye
+// MediaPipe Face Mesh eye landmarks
 const LEFT_EYE = [33, 160, 158, 133, 153, 144];
-// Right Eye
 const RIGHT_EYE = [362, 385, 387, 263, 373, 380];
 
-// Thresholds
-let blinkThreshold = 0.22; // Sensitive threshold for reliable detection
+// Blink Detection Configuration
+// Threshold: lower = more sensitive (0.20-0.25 is typical range)
+let blinkThreshold = 0.22; // Lowered for better detection
 
-export function setBlinkThreshold(val) {
-    blinkThreshold = val;
-    console.log("New Blink Threshold:", blinkThreshold);
+// Blink state tracking
+const detector = createBlinkDetector(blinkThreshold);
+
+// Allow dynamic threshold adjustment
+export function setBlinkThreshold(value) {
+    blinkThreshold = value;
+    detector.setThreshold(value);
+    console.log(`Blink threshold set to: ${blinkThreshold}`);
 }
 
 export function getBlinkThreshold() {
     return blinkThreshold;
+}
+
+// Reset blink detection state
+export function resetBlinkState() {
+    detector.reset();
 }
 
 /**
@@ -49,12 +59,16 @@ function getEAR(landmarks, indices) {
 }
 
 /**
- * Check if user is blinking
+ * Check if user is blinking with debouncing
+ * Requires sustained eye closure for multiple frames to avoid false positives
  * @param {Array} landmarks - Array of 468 face landmarks
  * @returns {Object} - { blinking: boolean, ear: number }
  */
-export function checkBlink(landmarks) {
-    if (!landmarks || landmarks.length === 0) return { blinking: false, ear: 0, minEar: 0 };
+export function checkBlink(landmarks, now = performance.now()) {
+    if (!landmarks || landmarks.length === 0) {
+        detector.reset();
+        return { blinking: false, ear: 0, minEar: 0 };
+    }
 
     const leftEAR = getEAR(landmarks, LEFT_EYE);
     const rightEAR = getEAR(landmarks, RIGHT_EYE);
@@ -65,8 +79,10 @@ export function checkBlink(landmarks) {
     // Average EAR for overall metric
     const avgEAR = (leftEAR + rightEAR) / 2.0;
 
+    const isBlinking = detector.observe(minEAR, now);
+
     return {
-        blinking: minEAR < blinkThreshold,
+        blinking: isBlinking,
         ear: avgEAR,
         minEar: minEAR
     };
