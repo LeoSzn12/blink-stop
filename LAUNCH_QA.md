@@ -1,5 +1,12 @@
 # Blink Stop — local release candidate
 
+## October 9, 2026 follow-up
+
+- Service worker v7 includes the MediaPipe graph and handles the versioned script/style URLs. A real-browser offline reload runs the bundled MediaPipe model, responds to Precision navigation, and opens the privacy page without network access.
+- Daily and Endurance now rank longest survival first and display elapsed time; Precision ranks smallest target error first. Disqualified rounds cannot save a zero error or share a score.
+- User interaction resumes the imported audio manager; returning to Menu stops the drone.
+- Public policy operator/support details and physical-device QA remain outstanding. The existing production deployment `dpl_3vMCGMByfsvUy7s3Es3Mkc9t9XkM` is retained as the rollback target.
+
 ## Reproducible build
 
 ```sh

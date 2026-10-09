@@ -89,8 +89,8 @@ if ('serviceWorker' in navigator) {
 
 // Initialize Audio on user interaction
 document.addEventListener('click', () => {
-    if (window.audioManager) window.audioManager.resume();
-}, { once: true });
+    audioManager.resume();
+});
 
 // MediaPipe Setup
 function createSessionFaceMesh(session) {
@@ -292,10 +292,10 @@ const Leaderboard = {
         scores.push({ name: name || 'ANONYMOUS', score: score });
 
         // Sort: Classic (Higher is better), Precision (Lower is better)
-        if (mode === 'CLASSIC') {
-            scores.sort((a, b) => b.score - a.score);
-        } else {
+        if (mode === 'PRECISION') {
             scores.sort((a, b) => a.score - b.score);
+        } else {
+            scores.sort((a, b) => b.score - a.score);
         }
 
         const top5 = scores.slice(0, 5);
@@ -597,6 +597,7 @@ function updateEnduranceLoop() {
 }
 
 function showMenu() {
+    audioManager.stopDrone();
     clearSelfie();
     gameOverCameraStop.cancel();
     gameState = 'MENU';
@@ -914,12 +915,13 @@ function endGame(reason = 'BLINK') {
             gameOverTitle.style.color = "var(--neon-pink)";
         }
 
-        lastScore = scoreToSave;
+        lastScore = reason === 'DISQUALIFIED' ? null : scoreToSave;
         finalScoreVal.innerText = finalScoreText;
 
         playerNameInput.value = '';
         playerNameInput.disabled = false;
-        saveScoreBtn.disabled = false;
+        saveScoreBtn.disabled = lastScore === null;
+        shareBtn.disabled = lastScore === null;
         saveScoreBtn.innerText = "SAVE";
 
         Leaderboard.render(currentMode);

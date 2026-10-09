@@ -41,7 +41,7 @@ function harness(storage = { getItem: () => null, setItem() {} }, clipboard) {
     localStorage: storage,
     setInterval: fn => { const n = ++id; intervals.set(n, fn); return n; }, clearInterval: n => intervals.delete(n), setTimeout: fn => { const n = ++id; timers.set(n, fn); return n; }, clearTimeout: n => timers.delete(n),
     requestAnimationFrame: fn => { const n = ++id; raf.set(n, fn); return n; }, cancelAnimationFrame: n => raf.delete(n), confirm: () => true };
-  vm.runInNewContext(source + '\n globalThis.debug = { startGame, showMenu, startCalibration, endGame, calibration, inference, getState: () => gameState };', context);
+  vm.runInNewContext(source + '\n globalThis.debug = { startGame, showMenu, startCalibration, endGame, calibration, inference, Leaderboard, getState: () => gameState };', context);
   return { debug: context.debug, el, click: key => listeners.get(`${key}:click`)(), jpegCount: () => jpegCount, tracks, meshes, document, visibility: () => documentEvents.get('visibilitychange')(), deferPermission() { let resolve; permission = new Promise(r => { resolve = r; }); return () => resolve(stream()); }, setClock: n => { clock = n; }, deliver: () => pending.shift()(), lateCallback: () => lastDelivered(), pendingSend: () => pending.length, tickInference() { for (const fn of intervals.values()) fn(); }, async settle() { for (let i = 0; i < 10; i++) await Promise.resolve(); }, async timers() { for (const [n,fn] of [...timers]) { timers.delete(n); fn(); } await this.settle(); }, raf() { for (const [n,fn] of [...raf]) { raf.delete(n); fn(); } }, pendingRaf: () => raf.size };
 }
 test('privacy copy names the persisted theme preference and calibration guidance avoids intentional blinking', () => {
@@ -55,6 +55,26 @@ test('blocked theme preference write does not suppress round result', () => {
   h.debug.endGame('WIN_ENDURANCE');
   assert.equal(h.el('final-score-val').innerText, '30.00s');
   assert.equal(h.el('game-over-screen').classList.contains('active'), true);
+});
+test('Daily and Endurance rank longest survival first; Precision ranks smallest error first', () => {
+  for (const mode of ['CLASSIC', 'DAILY', 'ENDURANCE', 'PRECISION']) {
+    let saved;
+    const h = harness({ getItem: () => JSON.stringify([{ name: 'A', score: 10 }, { name: 'B', score: 20 }]),
+      setItem(key, value) { saved = JSON.parse(value); } });
+    h.debug.Leaderboard.save(mode, 15, 'C');
+    assert.deepEqual(saved.map(entry => entry.score), mode === 'PRECISION' ? [10, 15, 20] : [20, 15, 10]);
+  }
+});
+test('disqualified round cannot save a zero as a perfect Precision score or share it', () => {
+  let writes = 0;
+  const h = harness({ getItem: () => null, setItem() { writes++; } });
+  h.debug.startGame('PRECISION');
+  h.debug.endGame('DISQUALIFIED');
+  h.el('player-name-input').value = 'LEO';
+  h.click('save-score-btn');
+  assert.equal(writes, 0);
+  assert.equal(h.el('save-score-btn').disabled, true);
+  assert.equal(h.el('share-btn').disabled, true);
 });
 test('blocked storage reads do not prevent gameplay boot', () => {
   const h = harness({ getItem() { throw new Error('blocked'); }, setItem() { throw new Error('blocked'); } });

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'blink-stop-v6';
+const CACHE_NAME = 'blink-stop-v7';
 const ASSETS_TO_CACHE = [
     './',
     './index.html',
@@ -18,6 +18,7 @@ const ASSETS_TO_CACHE = [
     './icons/icon-512.png',
     './src/audioManager.js',
     './vendor/face_mesh/face_mesh.js',
+    './vendor/face_mesh/face_mesh.binarypb',
     './vendor/face_mesh/face_mesh_solution_packed_assets.data',
     './vendor/face_mesh/face_mesh_solution_packed_assets_loader.js',
     './vendor/face_mesh/face_mesh_solution_simd_wasm_bin.data',
@@ -38,8 +39,9 @@ self.addEventListener('install', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
+    if (event.request.method !== 'GET' || new URL(event.request.url).origin !== self.location.origin) return;
     event.respondWith(
-        caches.match(event.request)
+        caches.open(CACHE_NAME).then(cache => cache.match(event.request, { ignoreSearch: true }))
             .then((response) => {
                 return response || fetch(event.request);
             })

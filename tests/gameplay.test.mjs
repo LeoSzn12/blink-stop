@@ -96,3 +96,12 @@ test('leaderboard player names are text, never HTML', () => {
     assert.equal(children[0].children[1].textContent, '1.25s');
     assert.equal(children[0].innerHTML, undefined);
 });
+
+test('survival scores display elapsed seconds and Precision displays target error', () => {
+    const document = { createElement: () => ({ textContent: '', children: [], append(...nodes) { this.children.push(...nodes); } }) };
+    for (const mode of ['CLASSIC', 'DAILY', 'ENDURANCE', 'PRECISION']) {
+        let row;
+        appendScore({ appendChild(node) { row = node; } }, { name: 'LEO', score: 12.5 }, 0, mode, document);
+        assert.equal(row.children[1].textContent, mode === 'PRECISION' ? '12.500s off' : '12.50s');
+    }
+});
