@@ -20,9 +20,10 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
+      - name: Use the runner's preinstalled Chrome
+        run: command -v google-chrome
       - name: Build and test web/mobile candidate
-        run: CHROME_PATH="$(node -p "require('playwright').chromium.executablePath()")" npm test
+        run: CHROME_PATH="$(command -v google-chrome)" npm test
 
   android:
     needs: test
