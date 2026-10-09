@@ -26,8 +26,9 @@ The existing Vercel project is `blink-stop` in `ankit-patels-projects-7d88a2c4`.
 `www`. Generated `vendor/` assets are packaged during the build and must not be
 omitted. Feature-branch deployments are protected previews.
 
-Before releasing publicly, supply the operator name and a monitored public support
-contact and finalize `privacy.html` and `tos.html`. Smoke-test the exact deployment
+The policy/support pages identify Nova Acquisitions LLC and its public contact.
+See `release/STORE_SUBMISSION.md` for store disclosures and remaining release checks.
+Smoke-test the exact deployment
 with a real camera, then verify the game and both policy pages on each public
 domain. The previous production deployment is
 `dpl_3vMCGMByfsvUy7s3Es3Mkc9t9XkM`; keep it available for rollback.

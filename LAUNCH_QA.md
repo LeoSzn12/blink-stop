@@ -5,7 +5,7 @@
 - Service worker v7 includes the MediaPipe graph and handles the versioned script/style URLs. A real-browser offline reload runs the bundled MediaPipe model, responds to Precision navigation, and opens the privacy page without network access.
 - Daily and Endurance now rank longest survival first and display elapsed time; Precision ranks smallest target error first. Disqualified rounds cannot save a zero error or share a score.
 - User interaction resumes the imported audio manager; returning to Menu stops the drone.
-- Public policy operator/support details and physical-device QA remain outstanding. The existing production deployment `dpl_3vMCGMByfsvUy7s3Es3Mkc9t9XkM` is retained as the rollback target.
+- The operator and public contact were supplied by the owner on October 9; the policy pages now identify Nova Acquisitions LLC, California, USA, and novaacquisitionsllc@gmail.com. Physical-device QA remains outstanding. The existing production deployment `dpl_3vMCGMByfsvUy7s3Es3Mkc9t9XkM` is retained as the rollback target.
 
 ## Reproducible build
 
@@ -18,7 +18,7 @@ npx cap sync android
 
 `www` is Capacitor's payload. `scripts/build-web.mjs` copies root web sources into `www` and packages the pinned MediaPipe Face Mesh JS/WASM/data under `vendor/face_mesh` in both targets. Generated vendor assets are ignored by Git; **run `npm ci && npm run build` before Capacitor sync or web deployment**. Do not sync stale `www`. Firebase writes and AdSense are disabled; all scores are local. Browser web hosting and native must ship the same privacy text. `ads.txt` remains only at web root for legacy hosting; no ads are loaded.
 
-For Android, use JDK 21 and Android SDK 36. On this Mac: `JAVA_HOME=/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home`, `ANDROID_HOME=/opt/homebrew/share/android-commandlinetools`. `cd android && ./gradlew assembleDebug bundleRelease` produces a debug APK and **unsigned** release AAB. Debug APK uses Gradle's local debug key, not a store credential. Never upload either artifact as a release without owner review.
+For Android, use JDK 21 and Android SDK 36. Those tools are not installed on this Mac as of October 9, 2026; GitHub Actions supplies them for candidate compilation. `cd android && ./gradlew assembleDebug bundleRelease` produces a debug APK and **unsigned** release AAB. Debug APK uses Gradle's local debug key, not a store credential. Never upload either artifact as a release without owner review.
 
 For iOS, point `DEVELOPER_DIR` to full Xcode and run `xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath build/ios CODE_SIGNING_ALLOWED=NO build`. This yields an unsigned simulator `.app`, **not** an installable iPhone IPA.
 
@@ -39,6 +39,10 @@ On at least one supported iPhone and Android phone, repeat each item in all four
 
 ## Launch decisions outstanding
 
-Owner must approve final bundle ID/package name (`com.blinkstop.app` currently), store branding/icon/screenshots, support contact and public privacy/terms URL, distribution/account ownership and age rating. Store privacy declarations must match actual shipping SDKs. Apple Developer membership, signing team/certificates/profiles, and Play Console account/upload key are required **only at owner-led release time**; no secrets belong in this repo. Real phone QA and signed release builds remain outstanding. AdSense and the hidden Firebase global board were deliberately removed: restoring either requires consent/privacy review, server-side abuse controls, and end-to-end tests. The simulator build and headless browser cannot establish camera gameplay on a phone.
+Owner supplied Nova Acquisitions LLC, California, USA, and novaacquisitionsllc@gmail.com and selected a free version 1 for ages 13+ with no ads, analytics, purchases, or accounts. Final identifier availability (`com.blinkstop.app` currently), store screenshots, public policy URL readback, signing/account ownership, and store-assigned age rating still need completion. Store privacy declarations must match actual shipping SDKs. Apple Developer membership, signing team/certificates/profiles, and Play Console account/upload key are required **only at owner-led release time**; no secrets belong in this repo. Real phone QA and signed release builds remain outstanding. AdSense and the hidden Firebase global board were deliberately removed: restoring either requires consent/privacy review, server-side abuse controls, and end-to-end tests. The simulator build and headless browser cannot establish camera gameplay on a phone.
 
 **Share/link gate:** Score sharing is text-only (including clipboard), with no game URL until owner approves publication of this matching candidate and its privacy/terms at a verified HTTPS destination. The current `https://blink-stop.vercel.app/` still shows the older global board/AdSense policy. Do not substitute that URL in native share/store forms. After owner-approved deployment, read back the public game and both policy routes, verify the candidate behavior and copy, then add the approved URL with a new failing share test and rebuild/resync native assets. No production deploy, signing, or submission is implied by local sync.
+
+## Native exports and policy package
+
+Official Share and Filesystem plugins export score text and user-selected JPEGs through system sheets. One JPEG is kept in private cache until replacement or cleanup; cancellation attempts to remove it. No broad storage or photo-library permission is used. Support provides confirmed local-data deletion. The iOS app target includes a privacy manifest with FileTimestamp reason C617.1. See `release/STORE_SUBMISSION.md` and `release/DEVICE_TESTS.md`. GitHub Actions produces unsigned simulator/AAB candidates and a debug APK, checks every packaged web file against `www`, and never signs or submits releases.

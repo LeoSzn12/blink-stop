@@ -21,12 +21,15 @@
   "homepage": "https://github.com/LeoSzn12/blink-stop#readme",
   "dependencies": {
     "@capacitor/core": "8.5.2",
+    "@capacitor/filesystem": "8.1.4",
+    "@capacitor/share": "8.0.3",
     "@mediapipe/face_mesh": "0.4.1633559619"
   },
   "devDependencies": {
     "@capacitor/android": "8.5.2",
     "@capacitor/cli": "8.2.0",
     "@capacitor/ios": "8.5.2",
+    "esbuild": "0.28.2",
     "playwright": "^1.58.2"
   }
 }

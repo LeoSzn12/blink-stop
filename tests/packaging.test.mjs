@@ -80,6 +80,7 @@ test('candidate legal and help copy describes local-only scores and no unbuilt t
         const privacy = read(`${prefix}privacy.html`);
         assert.doesNotMatch(privacy, /Google Fonts|Optional web fonts/i);
         assert.match(privacy, /system fonts/i);
-        assert.match(privacy, /owner approval.*pending/i);
+        assert.match(privacy, /Nova Acquisitions LLC/);
+        assert.match(privacy, /novaacquisitionsllc@gmail\.com/);
     }
 });

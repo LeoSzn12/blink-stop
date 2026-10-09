@@ -58,6 +58,21 @@ test('offline reload loads versioned scripts, styles, policies, and the inferenc
         await page.locator('a[href="privacy.html"]').click();
         await page.waitForURL('**/privacy.html');
         assert.equal(await page.locator('h1').innerText(), 'Privacy Policy');
+        await page.getByRole('link', { name: 'Support', exact: true }).click();
+        await page.waitForURL('**/support.html');
+        await page.evaluate(() => {
+            localStorage.setItem('blink_lb_CLASSIC', 'test-only scores');
+            localStorage.setItem('blink_theme_purple', 'true');
+            localStorage.setItem('unrelated-test-key', 'keep');
+        });
+        page.on('dialog', dialog => dialog.accept());
+        await page.locator('#clear-local-data').click();
+        await page.waitForFunction(() => document.getElementById('clear-status').textContent.includes('cleared'));
+        assert.deepEqual(await page.evaluate(() => [localStorage.getItem('blink_lb_CLASSIC'),
+            localStorage.getItem('blink_theme_purple'), localStorage.getItem('unrelated-test-key')]), [null, null, 'keep']);
+        await page.getByRole('link', { name: 'Terms of Use', exact: true }).click();
+        await page.waitForURL('**/tos.html');
+        assert.match(await page.locator('main').innerText(), /Nova Acquisitions LLC/);
         assert.deepEqual(errors, []);
     } finally {
         if (browser) await browser.close();

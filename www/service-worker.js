@@ -1,9 +1,16 @@
-const CACHE_NAME = 'blink-stop-v7';
+const CACHE_NAME = 'blink-stop-v8';
 const ASSETS_TO_CACHE = [
     './',
     './index.html',
     './privacy.html',
     './tos.html',
+    './support.html',
+    './notices.html',
+    './licenses/MediaPipe.txt',
+    './licenses/Capacitor.txt',
+    './licenses/Filesystem.txt',
+    './licenses/Share.txt',
+    './licenses/Synapse.txt',
     './how-to-play.html',
     './src/style.css',
     './src/main.js',
@@ -14,6 +21,10 @@ const ASSETS_TO_CACHE = [
     './src/cameraHelp.mjs',
     './src/roundLifecycle.mjs',
     './src/share.mjs',
+    './src/deviceActions.mjs',
+    './src/clearData.mjs',
+    './src/localData.mjs',
+    './vendor/native.js',
     './icons/icon-192.png',
     './icons/icon-512.png',
     './src/audioManager.js',

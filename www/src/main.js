@@ -350,6 +350,16 @@ saveScoreBtn.addEventListener('click', () => {
 shareBtn.addEventListener('click', async () => {
     if (lastScore === null) return;
 
+    if (window.Capacitor?.isNativePlatform?.()) {
+        try {
+            const { shareNativeScore } = await import('./deviceActions.mjs');
+            await shareNativeScore(sharePayload(lastScore));
+        } catch (error) {
+            console.log('Native share cancelled or unavailable:', error);
+        }
+        return;
+    }
+
     if (navigator.share) {
         try {
             await navigator.share(sharePayload(lastScore));
@@ -376,8 +386,21 @@ function clearSelfie() {
 }
 
 // Save Selfie Logic
-selfieBtn.addEventListener('click', () => {
-    if (!selfiePreview.src) return;
+selfieBtn.addEventListener('click', async () => {
+    if (!selfiePreview.src || selfieBtn.disabled) return;
+    if (window.Capacitor?.isNativePlatform?.()) {
+        selfieBtn.disabled = true;
+        try {
+            const { exportNativeSelfie } = await import('./deviceActions.mjs');
+            await exportNativeSelfie(selfiePreview.src);
+            selfieBtn.innerText = 'SAVE SELFIE';
+        } catch (error) {
+            selfieBtn.innerText = 'SAVE CANCELLED — TRY AGAIN';
+        } finally {
+            selfieBtn.disabled = false;
+        }
+        return;
+    }
     const link = document.createElement('a');
     link.download = `blink-stop-selfie-${Date.now()}.jpg`;
     link.href = selfiePreview.src;
@@ -922,6 +945,7 @@ function endGame(reason = 'BLINK') {
         playerNameInput.disabled = false;
         saveScoreBtn.disabled = lastScore === null;
         shareBtn.disabled = lastScore === null;
+        selfieBtn.innerText = 'SAVE SELFIE';
         saveScoreBtn.innerText = "SAVE";
 
         Leaderboard.render(currentMode);
