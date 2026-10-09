@@ -16,6 +16,11 @@ for filename in sys.argv[1:]:
         with zipfile.ZipFile(target) as archive:
             actual = {n[len(prefix):]: hashlib.sha256(archive.read(n)).digest()
                       for n in archive.namelist() if n.startswith(prefix) and not n.endswith('/')}
+    # With no Cordova plugins, Capacitor adds two empty framework shims.
+    # Verify their contents too, rather than ignoring arbitrary generated code.
+    for shim in ['cordova.js', 'cordova_plugins.js']:
+        if shim in actual:
+            expected[shim] = hashlib.sha256(b'').digest()
     if actual != expected:
         missing = sorted(set(expected) - set(actual))
         extra = sorted(set(actual) - set(expected))
