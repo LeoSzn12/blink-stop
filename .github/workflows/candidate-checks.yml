@@ -1,0 +1,89 @@
+name: Candidate checks
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Use the runner's preinstalled Chrome
+        run: command -v google-chrome
+      - name: Build and test web/mobile candidate
+        run: CHROME_PATH="$(command -v google-chrome)" npm test
+
+  android:
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3
+        with:
+          distribution: temurin
+          java-version: '21'
+      - run: npm ci
+      - run: npm run build
+      - run: npx cap sync android
+      - name: Compile and test Android candidate
+        working-directory: android
+        run: ./gradlew --no-daemon testDebugUnitTest assembleDebug bundleRelease
+      - name: Verify packaged Android web assets
+        run: python3 scripts/verify-native-payload.py android/app/build/outputs/apk/debug/app-debug.apk android/app/build/outputs/bundle/release/app-release.aab
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: android-test-candidate
+          path: |
+            android/app/build/outputs/apk/debug/app-debug.apk
+            android/app/build/outputs/bundle/release/app-release.aab
+          retention-days: 14
+
+  ios:
+    needs: test
+    runs-on: macos-15
+    timeout-minutes: 30
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npx cap sync ios
+      - name: Build unsigned iOS simulator candidate
+        run: xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath build/ios CODE_SIGNING_ALLOWED=NO build
+      - name: Verify iOS resources and privacy manifest
+        run: |
+          test -f build/ios/Build/Products/Debug-iphonesimulator/App.app/PrivacyInfo.xcprivacy
+          plutil -lint build/ios/Build/Products/Debug-iphonesimulator/App.app/PrivacyInfo.xcprivacy
+          python3 scripts/verify-native-payload.py build/ios/Build/Products/Debug-iphonesimulator/App.app
+          ditto -c -k --keepParent build/ios/Build/Products/Debug-iphonesimulator/App.app build/ios-simulator.zip
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: ios-simulator-test-candidate
+          path: build/ios-simulator.zip
+          retention-days: 14

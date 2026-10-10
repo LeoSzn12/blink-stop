@@ -1,54 +1,15 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Privacy Policy - Blink Stop</title>
-    <link rel="stylesheet" href="src/style.css?v=4">
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
-    <style>
-        body { overflow: auto; display: block; padding: 2rem; }
-        .content { max-width: 800px; margin: 0 auto; color: #fff; line-height: 1.6; }
-        h1 { color: var(--neon-cyan); font-family: 'Orbitron', sans-serif; margin-bottom: 2rem; }
-        h2 { color: var(--neon-pink); margin-top: 2rem; margin-bottom: 1rem; }
-        ul { margin-left: 2rem; margin-bottom: 1rem; }
-        p { margin-bottom: 1rem; }
-        a { color: var(--neon-cyan); text-decoration: none; }
-        a:hover { color: var(--neon-pink); }
-        .back-link { display: inline-block; margin-bottom: 2rem; font-family: 'Orbitron', sans-serif; font-size: 1.2rem; }
-    </style>
-</head>
-<body>
-    <div class="content">
-        <a href="index.html" class="back-link">&larr; BACK TO GAME</a>
-        <h1>Privacy Policy</h1>
-        <p>Blink Stop is committed to protecting your privacy. This Privacy Policy explains our practices regarding your data.</p>
-        
-        <h2>Camera Access</h2>
-        <p>Blink Stop requires camera access to detect eye blinks using facial landmark detection, powered by MediaPipe.</p>
-
-        <h2>Data Processing</h2>
-        <p><strong>All camera data is processed locally on your device in your web browser.</strong> We do not:</p>
-        <ul>
-            <li>Upload or transmit camera footage to any server</li>
-            <li>Store camera images or video recordings</li>
-            <li>Share your camera data with third parties</li>
-            <li>Collect personally identifiable information</li>
-        </ul>
-
-        <h2>Local Storage</h2>
-        <p>We use browser LocalStorage to save:</p>
-        <ul>
-            <li>Leaderboard scores (name and time)</li>
-            <li>Unlocked themes and settings</li>
-        </ul>
-        <p>This data remains on your device and can be cleared at any time through your browser settings.</p>
-
-        <h2>Third-Party Services</h2>
-        <p>We use MediaPipe Face Mesh (Google) for facial landmark detection. The library runs entirely in your browser.</p>
-        <p>We use Google AdSense to serve advertisements. AdSense uses cookies to serve ads based on your prior visits to our website or other websites. You can opt out of personalized advertising by visiting Ads Settings.</p>
-
-        <p>Last Updated: March 2026</p>
-    </div>
-</body>
-</html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Privacy Policy - Blink Stop</title><link rel="stylesheet" href="src/style.css?v=4"><style>body { overflow:auto; display:block; padding:2rem 1rem; } .content { max-width:800px; margin:auto; color:#fff; line-height:1.65; } h1 { color:var(--neon-cyan); font-size:2rem; margin:1.5rem 0; } h2 { color:var(--neon-pink); margin:1.5rem 0 .6rem; } p,ul { margin-bottom:1rem; } ul { padding-left:1.5rem; } a { color:var(--neon-cyan); overflow-wrap:anywhere; } nav { display:flex; flex-wrap:wrap; gap:1rem; margin:2rem 0; }</style></head><body><main class="content"><a href="index.html">← Back to Game</a><h1>Privacy Policy</h1><p>Effective October 9, 2026. This policy covers Blink Stop version 1, its iOS and Android apps, and the matching website operated by <strong>Nova Acquisitions LLC, California, USA</strong>. Privacy questions: <a href="mailto:novaacquisitionsllc@gmail.com">novaacquisitionsllc@gmail.com</a>.</p>
+<h2>Camera and facial landmarks</h2><p>When you choose a game mode, we ask for camera permission to detect your face and eye blinks. MediaPipe processes camera frames and temporary facial landmarks on your device. Blink Stop does not upload camera frames, landmarks, or biometric templates to our servers, use them to identify you, or sell them. We do not record video or audio and do not request microphone, contacts, or location access.</p>
+<p>You can deny permission or revoke it in your device or browser settings; camera gameplay will then be unavailable. Returning to Menu or backgrounding the game releases the camera. After a round, it stops after a short delay unless you retry.</p>
+<h2>Scores and theme preference</h2><p>Local scores, the optional name you enter, and your unlocked theme preference are stored in browser/WebView local storage. There is no account or public leaderboard. These records are retained until you clear them or clear site/app data. They are not sent to Nova Acquisitions LLC. Your operating system may include local app data in device backups according to its settings.</p>
+<h2>Selfie preview and exports</h2><p>A temporary selfie preview is created in memory after a round and discarded when you return to Menu or start another round. It is not automatically added to your photos. On the website, Save Selfie downloads a JPEG only when tapped. In the native apps, Save Selfie writes one JPEG to the app's private cache and opens your device's share sheet so you can choose where to save or send it. The cached export is replaced on your next export, may be cleared by the operating system, and is removed when app data is cleared. A cancelled or failed native share attempts to remove that temporary file.</p>
+<p>Saving or sharing a copy puts it under your chosen destination's control; deleting Blink Stop data does not delete copies in Photos, Files, messages, or other apps. Remove those copies in those destinations.</p>
+<h2>Sharing scores</h2><p>Share Score sends only the result text you choose through the system share sheet or your browser's clipboard. You choose the recipient. Blink Stop does not automatically send scores or selfies to anyone. Other apps handle shared content under their own policies.</p>
+<h2>Website hosting and technical requests</h2><p>The native game bundles its gameplay assets and policy pages for local use. The website uses Vercel to deliver its files. Online web requests can expose an IP address, requested URL, browser/device information, and request time to the hosting provider for delivery, security, and operational logging. Hosting records are retained under the provider's configured retention and obligations. We do not use those requests for advertising profiles.</p>
+<p>Pages use system fonts and do not load remote font services. The game uses local storage and, on supported browsers, a service worker cache for offline assets. Version 1 has no advertising or analytics SDK, tracking cookies, purchases, or Firebase connection. MediaPipe and the native Capacitor plugins are packaged dependencies, not remote camera-processing services.</p>
+<h2>Prototype bonus demo</h2><p>The optional bonus-theme preview is a bundled five-second placeholder. It makes no requests to advertising services, transmits no camera or score data, and earns no revenue. Its demo theme is kept only for the current session. Surprise Mode scores use the same local storage as the other game modes.</p>
+<h2>Support messages</h2><p>If you email us, we receive your email address and message, and any attachments you choose to include. We use them to answer your request and address issues, retaining them only as needed for that purpose and applicable obligations. Email providers process messages to deliver them. Please do not send sensitive photos or identity documents when asking for help.</p>
+<h2>Retention, deletion, and your choices</h2><p>Use Clear Local Data on the Support page to remove Blink Stop's saved scores and theme preference. Clearing site/app data also removes local caches. Device or browser settings can revoke camera access. To request deletion of support correspondence or exercise rights available under applicable law, contact <a href="mailto:novaacquisitionsllc@gmail.com">novaacquisitionsllc@gmail.com</a>. We do not sell personal information or share it for cross-context behavioral advertising.</p>
+<h2>Age and security</h2><p>Blink Stop is intended for a general audience age 13 and older and is not directed to children under 13. We do not knowingly request personal information from children under 13. A parent who believes a child sent us personal information can contact us to request deletion. We use on-device processing, platform permissions, private app storage for native exports, and HTTPS for our website. No storage or transmission method provides an absolute security guarantee.</p>
+<h2>Changes and contact</h2><p>We will update this page and its effective date when our practices change. Material changes to camera or data use will be explained before the new use begins. Contact Nova Acquisitions LLC at <a href="mailto:novaacquisitionsllc@gmail.com">novaacquisitionsllc@gmail.com</a>.</p><nav aria-label="Policy and support links"><a href="privacy.html">Privacy Policy</a><a href="tos.html">Terms of Use</a><a href="support.html">Support</a><a href="notices.html">Third-Party Notices</a></nav></main></body></html>

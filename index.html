@@ -5,12 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Blink Stop - Don't Blink Challenge</title>
-    <link rel="stylesheet" href="src/style.css?v=3">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link
-        href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto+Mono:wght@400;700&display=swap"
-        rel="stylesheet">
+    <link rel="stylesheet" href="src/style.css?v=5">
+
     <link rel="manifest" href="manifest.json">
 
     <!-- Social Sharing Meta Tags -->
@@ -18,16 +14,10 @@
     <meta name="description"
         content="Test your willpower in Blink Stop. Stare into the void without blinking. How long can you last?">
     <meta property="og:type" content="website">
-    <meta property="og:image"
-        content="https://raw.githubusercontent.com/google/mediapipe/master/mediapipe/graphs/face_mesh/data/face_mesh_android_gpu.png">
-    <!-- Placeholder image -->
+    <!-- No social preview image until approved artwork is published at the live URL. -->
 
     <!-- MediaPipe Dependencies -->
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
-    <!-- AdSense Script -->
-    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4512722496678449"
-        crossorigin="anonymous"></script>
+    <script src="vendor/face_mesh/face_mesh.js"></script>
 </head>
 
 <body>
@@ -52,6 +42,18 @@
                         <button class="neon-btn mode-btn" data-mode="ENDURANCE">ENDURANCE<span class="btn-sub">30s
                                 Challenge</span></button>
                         <button class="neon-btn mode-btn" data-mode="DAILY" style="border-color: var(--neon-pink); color: var(--neon-pink)">DAILY<span class="btn-sub" style="color: var(--neon-pink)">Mystery Modifiers</span></button>
+                        <button class="neon-btn mode-btn surprise-btn" data-mode="SURPRISE">SURPRISE<span class="btn-sub">30s • Expect the unexpected</span></button>
+                    </div>
+
+                    <div id="surprise-options" class="options-container prototype-options hidden">
+                        <h2>SURPRISE MODE</h2>
+                        <p>A sudden face appears at an unpredictable moment in a 30-second round. This mode can startle you.</p>
+                        <p>Blink normally and stop whenever uncomfortable. No flashing effects.</p>
+                        <label class="sound-choice"><input id="surprise-sound" type="checkbox"> Enable surprise sound</label>
+                        <div class="prototype-actions">
+                            <button id="surprise-start-btn" class="neon-btn-small" type="button">Start 30s round</button>
+                            <button id="surprise-back-btn" class="neon-btn-small" type="button">Back</button>
+                        </div>
                     </div>
 
                     <!-- Precision Options (Hidden by default) -->
@@ -62,23 +64,19 @@
                             <button class="neon-btn-small option-btn" data-time="10">10s</button>
                             <button class="neon-btn-small option-btn" data-time="15">15s</button>
                         </div>
+                        <button id="precision-back-btn" class="neon-btn-small" type="button">Back</button>
                     </div>
 
                     <!-- SEO About Text -->
                     <div style="max-width: 400px; margin-top: 1.5rem; text-align: center; color: #888; font-size: 0.8rem; line-height: 1.4;">
-                        Blink Stop is a browser-based staring contest game powered by MediaPipe facial landmark detection. Test your endurance, improve your focus, and share your most hilarious failure selfies with friends! All data is processed securely and directly within your browser.
+                        Blink Stop detects blinks on your device. Camera frames stay on your device; scores are saved locally only. A selfie preview is created after a round; saving or sharing it is your choice. Ages 13+. Blink normally and stop if uncomfortable.
                     </div>
 
+                    <button id="demo-menu-btn" class="neon-btn-small demo-link" type="button">Preview bonus theme demo</button>
                     <p class="loading-text" id="loading-msg">INITIALIZING BLINK DETECTION...</p>
+                    <p id="camera-error" role="alert" class="camera-error hidden"></p>
 
-                    <!-- AdSense Banner -->
-                    <div class="ad-banner">
-                        <ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-4512722496678449"
-                            data-ad-slot="auto" data-ad-format="auto" data-full-width-responsive="true"></ins>
-                        <script>
-                            (adsbygoogle = window.adsbygoogle || []).push({});
-                        </script>
-                    </div>
+
                 </div>
 
                 <!-- Calibration Screen -->
@@ -95,10 +93,7 @@
                 <div id="endurance-screen" class="screen hidden">
                     <h2 class="glitch" data-text="ENDURANCE TEST">ENDURANCE TEST</h2>
                     <div class="video-container">
-                        <!-- Placeholder Video (Sci-Fi Loop) -->
-                        <video id="ad-video"
-                            src="https://media.istockphoto.com/id/1322205588/video/abstract-digital-technology-background-loop-3d-render.mp4?s=mp4-640x640-is&k=20&c=y-lq7w0q_q_q_q_q_q_q_q_q_q_q_q_q"
-                            loop muted playsinline></video>
+                        <div class="endurance-void" aria-hidden="true">◉</div>
                         <div class="upload-progress-bar">
                             <div class="upload-progress" id="upload-progress"></div>
                         </div>
@@ -114,7 +109,7 @@
                     <div class="hud-right">
                         <!-- World Record Display (Classic Mode) -->
                         <div id="world-record-display" class="world-record-hud hidden">
-                            <span class="label">WORLD RECORD</span>
+                            <span class="label">YOUR BEST</span>
                             <span id="wr-value" class="digital-text-sm">--</span>
                         </div>
 
@@ -134,10 +129,18 @@
                         <div class="target-container hidden" id="target-display">
                             <span class="label">TARGET</span>
                             <span class="digital-text-sm">10.00s</span>
+                        </div>
                     </div>
                 </div>
 
                 <!-- Face Tracking Status -->
+                <div id="surprise-overlay" class="surprise-overlay hidden" aria-hidden="true">
+                    <svg class="surprise-face" viewBox="0 0 200 200" focusable="false">
+                        <path d="M100 12 Q25 15 24 95 L12 180 L50 163 L73 187 L100 168 L130 187 L153 164 L188 180 L176 95 Q175 15 100 12Z" fill="#c5d5d1"/>
+                        <path d="M43 77 L85 89 L74 108 L43 101Z M157 77 L115 89 L126 108 L157 101Z" fill="#091519"/>
+                        <path d="M60 136 Q100 115 140 136 L129 159 L115 142 L100 162 L85 142 L71 159Z" fill="#091519"/>
+                    </svg>
+                </div>
                 <div id="face-status" class="face-status hidden">
                     <span id="face-status-text">Tracking face...</span>
                 </div>
@@ -168,13 +171,7 @@
                         </ul>
                     </div>
 
-                    <!-- Global Leaderboard - Hidden -->
-                    <div class="leaderboard-container" style="display: none;">
-                        <h3>🌍 GLOBAL TOP 10</h3>
-                        <ul id="global-leaderboard-list">
-                            <li>Loading...</li>
-                        </ul>
-                    </div>
+
                     
                     <!-- Selfie Preview -->
                     <div id="selfie-container" class="hidden" style="margin-bottom: 1rem; width: 100%; max-width: 300px; border: 2px solid var(--neon-cyan); border-radius: 8px; overflow: hidden;">
@@ -183,10 +180,24 @@
 
                     <div class="game-over-btns">
                         <button id="restart-btn" class="neon-btn">RETRY</button>
-                        <button id="share-btn" class="neon-btn">SHARE</button>
+                        <button id="share-btn" class="neon-btn" aria-label="Share score only; game link coming soon">SHARE SCORE</button>
                         <button id="selfie-btn" class="neon-btn" style="border-color: var(--neon-pink); color: var(--neon-pink)">SAVE SELFIE</button>
                     </div>
                     <button id="menu-btn" class="neon-btn-small">MENU</button>
+                    <button id="demo-bonus-btn" class="neon-btn-small demo-link" type="button">Preview bonus theme demo</button>
+                </div>
+
+                <div id="demo-ad-screen" class="screen hidden">
+                    <p class="demo-badge">DEMO • NO LIVE ADVERTISING</p>
+                    <h2>BONUS THEME PREVIEW</h2>
+                    <p class="prototype-copy">A five-second placeholder shows how an optional video reward could work. Camera and blink detection are off. No advertiser is contacted and no revenue is earned.</p>
+                    <div class="demo-creative" aria-hidden="true"><span>BLINK STOP</span><span>EXPECT THE UNEXPECTED</span></div>
+                    <p id="demo-countdown" class="digital-text-sm" role="status" aria-live="polite">5 seconds</p>
+                    <p class="prototype-copy">Complete the preview to try an amber theme for this session. Skipping keeps normal gameplay available.</p>
+                    <div class="prototype-actions">
+                        <button id="demo-claim-btn" class="neon-btn-small" type="button" disabled>Apply demo theme</button>
+                        <button id="demo-skip-btn" class="neon-btn-small" type="button">Skip preview</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -200,9 +211,11 @@
         <a href="privacy.html" class="footer-link">Privacy Policy</a>
         <span class="footer-separator">|</span>
         <a href="tos.html" class="footer-link">Terms of Service</a>
+        <span class="footer-separator">|</span>
+        <a href="support.html" class="footer-link">Support</a>
     </footer>
 
-    <script type="module" src="src/main.js?v=66"></script>
+    <script type="module" src="src/main.js?v=67"></script>
 </body>
 
 </html>
