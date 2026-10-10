@@ -1,6 +1,6 @@
 # Blink Stop
 
-A camera-based staring challenge with Classic, Precision, Endurance, and Daily modes.
+A camera-based staring challenge with Classic, Precision, Endurance, Daily, and optional Surprise modes.
 Face landmarks are processed on the device using bundled MediaPipe assets. Scores
 stay in local storage; this candidate has no Firebase, advertising, or analytics.
 
@@ -39,3 +39,7 @@ domain. The previous production deployment is
 See [LAUNCH_QA.md](LAUNCH_QA.md) for device testing, signing, and store requirements.
 Headless browser checks verify loading, inference initialization, and layout;
 they do not establish blink accuracy on physical phones.
+
+## Surprise and monetization prototype
+
+Surprise Mode requires a clear opt-in, lasts up to 30 seconds, and presents one brief illustrated face at a randomized time. Sound is off by default; the mode disables the other animation effects. The optional bonus preview uses a five-second bundled placeholder with the camera stopped and Skip available. Completion applies an amber theme only for the session. No live ad SDK, ad requests, targeting, or revenue is enabled. `tests/prototype-browser.test.mjs` exercises this flow with synthetic camera/landmark input; physical-device testing is still required.

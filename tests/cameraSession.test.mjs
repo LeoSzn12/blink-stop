@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 
 import { createCalibrationTracker, createTrackingFreshness, createFaceLossTracker } from '../src/gameRules.mjs';
 import { createSerializedInference } from '../src/inference.mjs';
+import { createSurpriseRound, createRewardedDemo } from '../src/surprise.mjs';
 
 const source = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8').replace(/^import .*;\s*$/gm, '');
 function harness(storage = { getItem: () => null, setItem() {} }, clipboard) {
@@ -34,14 +35,14 @@ function harness(storage = { getItem: () => null, setItem() {} }, clipboard) {
   class FaceMesh { constructor() { this.closes = 0; meshes.push(this); } onResults(fn) { this.resultHandler = fn; } setOptions() {} send() { return new Promise(resolve => { const emit = () => this.resultHandler({ image: {}, multiFaceLandmarks: [{}] }); pending.push(() => { lastDelivered = emit; emit(); resolve(); }); }); } close() { this.closes++; } }
   const context = { document, window: { innerWidth: 500, addEventListener() {} }, navigator: { clipboard, mediaDevices: { getUserMedia: () => permission || Promise.resolve(stream()) } },
     FaceMesh, console: { log() {}, warn() {}, error() {} }, performance: { now: () => clock }, Date,
-    createCalibrationTracker, createTrackingFreshness, createFaceLossTracker, createSerializedInference,
+    createCalibrationTracker, createTrackingFreshness, createFaceLossTracker, createSerializedInference, createSurpriseRound, createRewardedDemo,
     checkBlink: () => ({ minEar: .3, ear: .3, blinking: false }), setBlinkThreshold() {}, resetBlinkState() {}, getBlinkThreshold: () => .22,
-    audioManager: { startDrone() {}, stopDrone() {}, playGlitch() {}, playWin() {}, playHeartbeat() {} },
+    audioManager: { startDrone() {}, stopDrone() {}, playGlitch() {}, playWin() {}, playHeartbeat() {}, playSurprise() {} },
     appendScore() {}, cameraErrorMessage: () => '', createGameOverCameraStop: fn => ({ cancel() {}, schedule() {} }), sharePayload() {}, shareClipboardText() {},
     localStorage: storage,
     setInterval: fn => { const n = ++id; intervals.set(n, fn); return n; }, clearInterval: n => intervals.delete(n), setTimeout: fn => { const n = ++id; timers.set(n, fn); return n; }, clearTimeout: n => timers.delete(n),
     requestAnimationFrame: fn => { const n = ++id; raf.set(n, fn); return n; }, cancelAnimationFrame: n => raf.delete(n), confirm: () => true };
-  vm.runInNewContext(source + '\n globalThis.debug = { startGame, showMenu, startCalibration, endGame, calibration, inference, Leaderboard, getState: () => gameState };', context);
+  vm.runInNewContext(source + '\n globalThis.debug = { startGame, showMenu, startCalibration, endGame, startDemoAd, finishDemoAd, updateDemoAd, calibration, inference, Leaderboard, getState: () => gameState };', context);
   return { debug: context.debug, el, click: key => listeners.get(`${key}:click`)(), jpegCount: () => jpegCount, tracks, meshes, document, visibility: () => documentEvents.get('visibilitychange')(), deferPermission() { let resolve; permission = new Promise(r => { resolve = r; }); return () => resolve(stream()); }, setClock: n => { clock = n; }, deliver: () => pending.shift()(), lateCallback: () => lastDelivered(), pendingSend: () => pending.length, tickInference() { for (const fn of intervals.values()) fn(); }, async settle() { for (let i = 0; i < 10; i++) await Promise.resolve(); }, async timers() { for (const [n,fn] of [...timers]) { timers.delete(n); fn(); } await this.settle(); }, raf() { for (const [n,fn] of [...raf]) { raf.delete(n); fn(); } }, pendingRaf: () => raf.size };
 }
 test('privacy copy names the persisted theme preference and calibration guidance avoids intentional blinking', () => {
@@ -233,4 +234,55 @@ test('ended camera track during calibration returns to actionable camera error',
   assert.equal(h.pendingRaf(), 0);
   assert.equal(h.el('camera-error').classList.contains('hidden'), false);
   assert.match(h.el('camera-error').textContent, /camera/i);
+});
+
+test('demo from results immediately releases the camera and preserves the unsaved result', async () => {
+  const h = harness();
+  h.debug.startGame('CLASSIC'); await h.settle(); await h.timers();
+  h.debug.endGame('BLINK');
+  const score = h.el('final-score-val').innerText;
+  h.debug.startDemoAd();
+  assert.equal(h.debug.getState(), 'AD_DEMO');
+  assert.equal(h.tracks[0].stops, 1);
+  assert.equal(h.el('input_video').srcObject, null);
+  assert.equal(h.el('demo-claim-btn').disabled, true);
+  h.debug.finishDemoAd(true);
+  assert.equal(h.debug.getState(), 'AD_DEMO', 'early claim must not dismiss the demo');
+  h.debug.finishDemoAd(false);
+  assert.equal(h.debug.getState(), 'GAME_OVER');
+  assert.equal(h.el('final-score-val').innerText, score);
+  assert.equal(h.el('body').classList.contains('theme-demo'), false);
+});
+test('completion awards a session-only demo theme without writing storage', () => {
+  let writes = 0;
+  const h = harness({ getItem: () => null, setItem() { writes++; } });
+  h.debug.startDemoAd();
+  h.setClock(5000); h.debug.updateDemoAd(); h.debug.finishDemoAd(true);
+  assert.equal(h.debug.getState(), 'MENU');
+  assert.equal(h.el('body').classList.contains('theme-demo'), true);
+  assert.equal(writes, 0);
+});
+test('backgrounding a demo abandons it and leaves no reward or scheduled update', () => {
+  const h = harness();
+  h.debug.startDemoAd();
+  h.document.hidden = true; h.visibility();
+  h.setClock(10000); h.debug.finishDemoAd(true);
+  assert.equal(h.debug.getState(), 'MENU');
+  assert.equal(h.el('body').classList.contains('theme-demo'), false);
+  assert.equal(h.pendingRaf(), 0);
+});
+test('pending camera startup is retired before demo, and a late permission grant is stopped', async () => {
+  const h = harness(), grant = h.deferPermission();
+  h.debug.startGame('CLASSIC'); h.debug.startDemoAd();
+  grant(); await h.settle(); await h.timers();
+  assert.equal(h.tracks[0].stops, 1);
+  assert.equal(h.debug.getState(), 'AD_DEMO');
+});
+test('demo cannot interrupt calibration or disqualified results', async () => {
+  const h = harness();
+  h.debug.startGame('CLASSIC'); await h.settle(); await h.timers();
+  h.debug.startDemoAd();
+  assert.equal(h.debug.getState(), 'CALIBRATING');
+  h.debug.endGame('DISQUALIFIED'); h.debug.startDemoAd();
+  assert.equal(h.debug.getState(), 'GAME_OVER');
 });

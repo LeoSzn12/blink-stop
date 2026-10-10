@@ -7,6 +7,7 @@ import { appendScore } from './leaderboard.mjs';
 import { cameraErrorMessage } from './cameraHelp.mjs';
 import { createGameOverCameraStop } from './roundLifecycle.mjs';
 import { sharePayload, shareClipboardText } from './share.mjs';
+import { createSurpriseRound, createRewardedDemo } from './surprise.mjs';
 
 // DOM Elements
 const videoElement = document.getElementsByClassName('input_video')[0];
@@ -31,6 +32,13 @@ const modeSelection = document.querySelector('.mode-selection');
 const optionBtns = document.querySelectorAll('.option-btn');
 const precisionOptions = document.getElementById('precision-options');
 const precisionBackBtn = document.getElementById('precision-back-btn');
+const surpriseOptions = document.getElementById('surprise-options');
+const surpriseSound = document.getElementById('surprise-sound');
+const surpriseOverlay = document.getElementById('surprise-overlay');
+const demoScreen = document.getElementById('demo-ad-screen');
+const demoCountdown = document.getElementById('demo-countdown');
+const demoClaimBtn = document.getElementById('demo-claim-btn');
+const demoBonusBtn = document.getElementById('demo-bonus-btn');
 const restartBtn = document.getElementById('restart-btn');
 const menuBtn = document.getElementById('menu-btn');
 const loadingMsg = document.getElementById('loading-msg');
@@ -74,6 +82,11 @@ let currentEAR = 0.3;
 let baselineEAR = 0.3;
 let minEARValue = 0.3;
 let cameraSession = 0;
+let surpriseRound = null;
+let soundEnabled = true;
+let demoRound = null;
+let demoReturnState = 'MENU';
+let demoFrameId;
 const faceLoss = createFaceLossTracker();
 const calibration = createCalibrationTracker();
 const tracking = createTrackingFreshness();
@@ -203,6 +216,11 @@ modeBtns.forEach(btn => {
             startGame('ENDURANCE');
         } else if (mode === 'DAILY') {
             startGame('DAILY');
+        } else if (mode === 'SURPRISE') {
+            container.classList.add('surprise-mode');
+            modeSelection.classList.add('hidden');
+            surpriseOptions.classList.remove('hidden');
+            document.getElementById('surprise-start-btn').focus();
         } else {
             // Show options
             modeSelection.classList.add('hidden');
@@ -211,6 +229,62 @@ modeBtns.forEach(btn => {
         }
     });
 });
+
+document.getElementById('surprise-start-btn').addEventListener('click', () => startGame('SURPRISE'));
+document.getElementById('surprise-back-btn').addEventListener('click', () => {
+    container.classList.remove('surprise-mode');
+    surpriseOptions.classList.add('hidden');
+    modeSelection.classList.remove('hidden');
+    document.querySelector('[data-mode="SURPRISE"]').focus();
+});
+
+document.getElementById('demo-menu-btn').addEventListener('click', startDemoAd);
+demoBonusBtn.addEventListener('click', startDemoAd);
+document.getElementById('demo-skip-btn').addEventListener('click', () => finishDemoAd(false));
+demoClaimBtn.addEventListener('click', () => finishDemoAd(true));
+
+function startDemoAd() {
+    if (gameState !== 'MENU' && gameState !== 'GAME_OVER') return;
+    if (gameState === 'GAME_OVER' && lastScore === null) return;
+    demoReturnState = gameState;
+    gameOverCameraStop.cancel();
+    stopCameraAndDetection();
+    audioManager.stopDrone();
+    container.classList.add('ad-demo');
+    surpriseOverlay.classList.add('hidden');
+    menuScreen.classList.add('hidden');
+    gameOverScreen.classList.add('hidden');
+    gameState = 'AD_DEMO';
+    demoRound = createRewardedDemo(performance.now());
+    demoClaimBtn.disabled = true;
+    demoScreen.classList.remove('hidden');
+    document.getElementById('demo-skip-btn').focus();
+    updateDemoAd();
+}
+
+function updateDemoAd() {
+    if (gameState !== 'AD_DEMO' || !demoRound) return;
+    const progress = demoRound.observe(performance.now());
+    const message = progress.complete ? 'Preview complete — your demo theme is ready.' : `${Math.ceil(progress.remaining / 1000)} seconds`;
+    if (demoCountdown.textContent !== message) demoCountdown.textContent = message;
+    demoClaimBtn.disabled = !progress.complete;
+    if (!progress.complete) demoFrameId = requestAnimationFrame(updateDemoAd);
+}
+
+function finishDemoAd(claim) {
+    if (gameState !== 'AD_DEMO' || !demoRound) return;
+    if (claim && !demoRound.claim(performance.now())) return;
+    if (claim) document.body.classList.add('theme-demo');
+    demoRound.cancel();
+    demoRound = null;
+    cancelAnimationFrame(demoFrameId);
+    demoScreen.classList.add('hidden');
+    container.classList.remove('ad-demo');
+    gameState = demoReturnState;
+    const screen = gameState === 'GAME_OVER' ? gameOverScreen : menuScreen;
+    screen.classList.remove('hidden');
+    (gameState === 'GAME_OVER' ? demoBonusBtn : document.getElementById('demo-menu-btn')).focus();
+}
 
 precisionBackBtn.addEventListener('click', () => {
     precisionOptions.classList.add('hidden');
@@ -408,6 +482,12 @@ selfieBtn.addEventListener('click', async () => {
 });
 
 function startGame(mode) {
+    if (gameState === 'AD_DEMO') return;
+    container.className = 'container';
+    if (mode === 'SURPRISE') container.classList.add('surprise-mode');
+    surpriseOverlay.classList.add('hidden');
+    surpriseRound = null;
+    soundEnabled = mode !== 'SURPRISE' || surpriseSound.checked;
     clearSelfie();
     gameOverCameraStop.cancel();
     cancelAnimationFrame(calibrationFrameId);
@@ -486,6 +566,7 @@ function startCalibration() {
     menuScreen.classList.add('hidden');
     menuScreen.classList.remove('active');
     precisionOptions.classList.add('hidden');
+    surpriseOptions.classList.add('hidden');
     gameOverScreen.classList.add('hidden');
     gameOverScreen.classList.remove('active');
 
@@ -539,7 +620,7 @@ function finishCalibration() {
     calibrationScreen.classList.remove('active');
 
     // Start Audio Drone
-    audioManager.startDrone();
+    if (soundEnabled) audioManager.startDrone();
 
     // Reset blink detection state before starting game
     resetBlinkState();
@@ -550,6 +631,7 @@ function finishCalibration() {
     } else {
         gameState = 'PLAYING';
         startTime = Date.now(); // Ensure this is set right before the loop starts
+        if (currentMode === 'SURPRISE') surpriseRound = createSurpriseRound();
 
         gameHud.classList.remove('hidden');
         gameHud.classList.add('active');
@@ -620,6 +702,12 @@ function updateEnduranceLoop() {
 }
 
 function showMenu() {
+    demoRound?.cancel();
+    demoRound = null;
+    cancelAnimationFrame(demoFrameId);
+    demoScreen.classList.add('hidden');
+    surpriseRound = null;
+    surpriseOverlay.classList.add('hidden');
     audioManager.stopDrone();
     clearSelfie();
     gameOverCameraStop.cancel();
@@ -632,6 +720,7 @@ function showMenu() {
     enduranceScreen.classList.add('hidden');
     enduranceScreen.classList.remove('active');
     precisionOptions.classList.add('hidden');
+    surpriseOptions.classList.add('hidden');
     document.querySelector('.mode-selection').classList.remove('hidden');
     faceLoss.reset();
     resetBlinkState();
@@ -753,6 +842,15 @@ function updateGameLoop() {
             return;
         }
         const elapsed = (Date.now() - startTime) / 1000;
+        if (currentMode === 'SURPRISE') {
+            const surprise = surpriseRound.observe(elapsed * 1000);
+            surpriseOverlay.classList[surprise.active ? 'remove' : 'add']('hidden');
+            if (surprise.triggered && soundEnabled) audioManager.playSurprise();
+            if (surprise.complete) {
+                endGame('WIN_SURPRISE');
+                return;
+            }
+        }
         scoreDisplay.innerText = `${elapsed.toFixed(2)}s`;
 
         // Update Eye Openness Meter and tension effect
@@ -783,10 +881,10 @@ function updateGameLoop() {
         
         const now = Date.now() / 1000;
         if (!window.lastBeat || now - window.lastBeat > beatInterval) {
-            audioManager.playHeartbeat();
+            if (soundEnabled) audioManager.playHeartbeat();
             
             // Haptic feedback if available (mobile)
-            if (navigator.vibrate) {
+            if (navigator.vibrate && currentMode !== 'SURPRISE') {
                 navigator.vibrate(50);
             }
             
@@ -796,7 +894,7 @@ function updateGameLoop() {
         // Visual Stages (Classic Mode only)
         if (currentMode === 'CLASSIC') {
             updateClassicVisualStage(elapsed);
-        } else if (currentMode !== 'DAILY') {
+        } else if (currentMode !== 'DAILY' && currentMode !== 'SURPRISE') {
             if (elapsed > 10) container.classList.add('chaos-shake');
             if (elapsed > 20) container.classList.add('chaos-glitch');
             if (elapsed > 30) container.classList.add('chaos-invert');
@@ -807,6 +905,8 @@ function updateGameLoop() {
 }
 
 function endGame(reason = 'BLINK') {
+    surpriseRound = null;
+    surpriseOverlay.classList.add('hidden');
     if (reason === 'MENU_EXIT') {
         showMenu();
         return;
@@ -827,14 +927,14 @@ function endGame(reason = 'BLINK') {
     try {
         // Stop/Effect Audio
         audioManager.stopDrone();
-        audioManager.playGlitch();
+        if (soundEnabled) audioManager.playGlitch();
 
         // Reset Chaos and Tension
         container.className = 'container';
         container.classList.remove('tension-active');
 
         // Haptic failure shock
-        if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+        if (navigator.vibrate && currentMode !== 'SURPRISE') navigator.vibrate([200, 100, 200]);
 
         // Draw Game Over Overlay on Canvas for Selfie
         try {
@@ -847,9 +947,10 @@ function endGame(reason = 'BLINK') {
             canvasCtx.textBaseline = "middle";
             canvasCtx.shadowColor = "#f00";
             canvasCtx.shadowBlur = 20;
-            canvasCtx.fillText("BLINK DETECTED!", canvasElement.width/2, canvasElement.height/2 - 40);
+            const won = reason === 'WIN_SURPRISE' || reason === 'WIN_ENDURANCE';
+            canvasCtx.fillText(won ? 'SURVIVED!' : reason === 'DISQUALIFIED' ? 'FACE LOST' : 'BLINK DETECTED!', canvasElement.width/2, canvasElement.height/2 - 40);
             canvasCtx.font = "bold 40px monospace";
-            canvasCtx.fillText(`TIME: ${((Date.now() - startTime) / 1000).toFixed(2)}s`, canvasElement.width/2, canvasElement.height/2 + 40);
+            canvasCtx.fillText(`TIME: ${won ? '30.00' : ((Date.now() - startTime) / 1000).toFixed(2)}s`, canvasElement.width/2, canvasElement.height/2 + 40);
             canvasCtx.restore();
             
             // Output to Selfie Preview
@@ -869,7 +970,14 @@ function endGame(reason = 'BLINK') {
         finalScoreSub.classList.add('hidden');
         gameOverWorldRecord.classList.add('hidden');
 
-        if (reason === 'WIN_ENDURANCE') {
+        if (reason === 'WIN_SURPRISE') {
+            scoreToSave = 30;
+            finalScoreText = '30.00s';
+            finalScoreLabel.innerText = 'SURPRISE SURVIVOR';
+            gameOverTitle.innerText = 'YOU MADE IT';
+            gameOverTitle.style.color = 'var(--neon-cyan)';
+            if (soundEnabled) audioManager.playWin();
+        } else if (reason === 'WIN_ENDURANCE') {
             scoreToSave = 30;
             finalScoreText = "30.00s";
             finalScoreLabel.innerText = "EYES OF STEEL";
@@ -930,10 +1038,10 @@ function endGame(reason = 'BLINK') {
             finalScoreLabel.innerText = "YOUR EYES GAVE UP AT";
             gameOverTitle.innerText = "BLINK DETECTED";
             gameOverTitle.style.color = "var(--neon-red)";
-        } else if (currentMode === 'DAILY') {
+        } else if (currentMode === 'DAILY' || currentMode === 'SURPRISE') {
             scoreToSave = elapsed;
             finalScoreText = `${elapsed.toFixed(2)}s`;
-            finalScoreLabel.innerText = "DAILY SURVIVAL";
+            finalScoreLabel.innerText = currentMode === 'SURPRISE' ? 'SURPRISE SURVIVAL' : 'DAILY SURVIVAL';
             gameOverTitle.innerText = "BLINK DETECTED";
             gameOverTitle.style.color = "var(--neon-pink)";
         }
@@ -945,6 +1053,7 @@ function endGame(reason = 'BLINK') {
         playerNameInput.disabled = false;
         saveScoreBtn.disabled = lastScore === null;
         shareBtn.disabled = lastScore === null;
+        demoBonusBtn.disabled = lastScore === null;
         selfieBtn.innerText = 'SAVE SELFIE';
         saveScoreBtn.innerText = "SAVE";
 

@@ -4,7 +4,7 @@
   "description": "",
   "main": "service-worker.js",
   "scripts": {
-    "test": "npm run build && node --test tests/*.test.mjs",
+    "test": "npm run build && node --test --test-concurrency=1 tests/*.test.mjs",
     "build": "node --check --input-type=module < src/main.js && node --check --input-type=module < src/blinkDetection.js && node --check src/gameRules.mjs && node --check src/inference.mjs && node --check src/leaderboard.mjs && node scripts/build-web.mjs"
   },
   "repository": {

@@ -12,7 +12,7 @@ Tester/date: pending
 | --- | --- | --- |
 | Clean install opens all modes and bundled policies offline | Pending | Pending |
 | Camera allow/deny/revoke/retry gives correct recovery | Pending | Pending |
-| All four modes calibrate with actual open eyes and detect a blink/wink | Pending | Pending |
+| All five modes calibrate with actual open eyes and detect a blink/wink | Pending | Pending |
 | Face loss/stalled inference disqualifies instead of awarding a score | Pending | Pending |
 | Endurance completes at 30 seconds with continuous face tracking | Pending | Pending |
 | Menu, lock, background, interruption, and rapid retry stop old sessions/audio | Pending | Pending |
@@ -29,3 +29,5 @@ Tester/date: pending
 
 Record observed behavior, screenshots when useful, failures, and the exact build
 that fixes each failure. Signed releases must be retested after code or SDK changes.
+
+Surprise prototype: confirm clear opt-in, sound off by default, readable exit, one brief interruption, 30-second cap, blink/DQ handling, and cancellation on background/retry. Confirm demo camera indicator is off, early claim is disabled, Skip preserves the result, completion changes only the session theme, and backgrounding gives no reward. Inspect network to confirm no ad provider is contacted.

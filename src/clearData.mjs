@@ -7,7 +7,7 @@ button.addEventListener('click', async () => {
     button.disabled = true;
     try {
         clearStoredGameData(localStorage);
-        document.body.classList.remove('theme-purple');
+        document.body.classList.remove('theme-purple', 'theme-demo');
         status.textContent = 'Local scores and theme preference cleared.';
         if (window.Capacitor?.isNativePlatform?.()) {
             const { Filesystem, Directory } = await import('../vendor/native.js');
