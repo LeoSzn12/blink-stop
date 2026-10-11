@@ -2,7 +2,11 @@
 
 A camera-based staring challenge with Classic, Precision, Endurance, Daily, and optional Surprise modes.
 Face landmarks are processed on the device using bundled MediaPipe assets. Scores
-stay in local storage; this candidate has no Firebase, advertising, or analytics.
+stay in local storage; the web release has no Firebase, advertising, or analytics.
+
+## Live website
+
+Play at https://www.playblinkstop.com/. The web game and public policy/support pages were launched and read back on October 10, 2026. Friends can share portrait result cards or direct challenge links; opening a link prepares the challenge and requires an explicit Accept tap before camera access. Native store releases remain pending physical-device testing and signing. See [release/WEB_LAUNCH.md](release/WEB_LAUNCH.md) for verification.
 
 ## Run locally
 

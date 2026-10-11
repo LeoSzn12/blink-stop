@@ -1,4 +1,4 @@
-# Blink Stop — local release candidate
+# Blink Stop — web live, native release candidate
 
 ## October 9, 2026 follow-up
 
@@ -41,11 +41,11 @@ On at least one supported iPhone and Android phone, repeat each item in all five
 
 Owner supplied Nova Acquisitions LLC, California, USA, and novaacquisitionsllc@gmail.com and selected a free version 1 for ages 13+ with no ads, analytics, purchases, or accounts. Final identifier availability (`com.blinkstop.app` currently), store screenshots, public policy URL readback, signing/account ownership, and store-assigned age rating still need completion. Store privacy declarations must match actual shipping SDKs. Apple Developer membership, signing team/certificates/profiles, and Play Console account/upload key are required **only at owner-led release time**; no secrets belong in this repo. Real phone QA and signed release builds remain outstanding. AdSense and the hidden Firebase global board were deliberately removed: restoring either requires consent/privacy review, server-side abuse controls, and end-to-end tests. The simulator build and headless browser cannot establish camera gameplay on a phone.
 
-**Share/link gate:** Score sharing is text-only (including clipboard), with no game URL until owner approves publication of this matching candidate and its privacy/terms at a verified HTTPS destination. The current `https://blink-stop.vercel.app/` still shows the older global board/AdSense policy. Do not substitute that URL in native share/store forms. After owner-approved deployment, read back the public game and both policy routes, verify the candidate behavior and copy, then add the approved URL with a new failing share test and rebuild/resync native assets. No production deploy, signing, or submission is implied by local sync.
+**Web launch:** The owner authorized publication on October 10, 2026. https://www.playblinkstop.com/ and its privacy, terms, and support pages are public and match the tested build. Shares include the approved play URL and a challenge fragment; arriving players must tap Accept before camera access. Portrait PNG cards, captions, and same-phone handoff are supported. See release/WEB_LAUNCH.md for the verified commit and live checks. Physical-device accuracy, native sharing destinations, signing, and store submission remain pending.
 
 ## Native exports and policy package
 
-Official Share and Filesystem plugins export score text and user-selected JPEGs through system sheets. One JPEG is kept in private cache until replacement or cleanup; cancellation attempts to remove it. No broad storage or photo-library permission is used. Support provides confirmed local-data deletion. The iOS app target includes a privacy manifest with FileTimestamp reason C617.1. See `release/STORE_SUBMISSION.md` and `release/DEVICE_TESTS.md`. GitHub Actions produces unsigned simulator/AAB candidates and a debug APK, checks every packaged web file against `www`, and never signs or submits releases.
+Official Share and Filesystem plugins export mode-aware challenge text, generated photo-free PNG cards, and user-selected JPEGs through system sheets. One JPEG and one PNG are each kept in private cache until replacement or cleanup; cancellation attempts to remove it. No broad storage or photo-library permission is used. Support provides confirmed local-data deletion. The iOS app target includes a privacy manifest with FileTimestamp reason C617.1. See `release/STORE_SUBMISSION.md` and `release/DEVICE_TESTS.md`. GitHub Actions produces unsigned simulator/AAB candidates and a debug APK, checks every packaged web file against `www`, and never signs or submits releases.
 
 ## October 10 prototype
 

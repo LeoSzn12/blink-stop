@@ -12,15 +12,13 @@ audience decision. Confirm identifier availability in both consoles before signi
 The app bundles privacy.html, tos.html, support.html, and notices.html. They identify
 the operator and contact and describe camera landmarks, local scores, selfie cache,
 user-directed exports, website hosting logs, email support, retention, deletion,
-children, and comfortable gameplay. The proposed public URLs are:
+children, and comfortable gameplay. The verified public URLs are:
 
 - https://www.playblinkstop.com/privacy.html
 - https://www.playblinkstop.com/tos.html
 - https://www.playblinkstop.com/support.html
 
-These are release destinations, not verified candidate URLs yet. The current public
-site runs the older build. Publish the matching policy pages and read them back over
-unauthenticated HTTPS before entering them in either store. Google requires a public
+These pages were launched and read back over unauthenticated HTTPS on October 10, 2026, matching the tested web payload. Recheck them against the final signed app before entering them in either store. Google requires a public
 HTML privacy page rather than a protected preview or PDF.
 
 ## Apple App Privacy working answers
