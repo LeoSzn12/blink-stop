@@ -1,5 +1,6 @@
 """Confirm compiled artifacts contain exactly the freshly built web files."""
 import hashlib
+import re
 import sys
 import zipfile
 from pathlib import Path
@@ -14,6 +15,11 @@ for filename in sys.argv[1:]:
     else:
         prefix = 'base/assets/public/' if target.suffix == '.aab' else 'assets/public/'
         with zipfile.ZipFile(target) as archive:
+            if target.suffix == '.ipa':
+                prefixes = {match[0] for name in archive.namelist() if (match := re.match(r'Payload/[^/]+\.app/public/', name))}
+                if len(prefixes) != 1:
+                    raise SystemExit('IPA must contain exactly one bundled web payload')
+                prefix = prefixes.pop()
             actual = {n[len(prefix):]: hashlib.sha256(archive.read(n)).digest()
                       for n in archive.namelist() if n.startswith(prefix) and not n.endswith('/')}
     # With no Cordova plugins, Capacitor adds two empty framework shims.
