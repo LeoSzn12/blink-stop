@@ -6,6 +6,20 @@ export function createSocialUI(startChallenge) {
     const el = id => document.getElementById(id);
     const panel = el('social-result'), card = el('score-card'), status = el('social-status');
     let result = null, cardUrl = '', cardFile = null, busy = false;
+    // URL fragments stay out of the HTTP request. Never request a camera on arrival.
+    function prepareLinkedChallenge() {
+      if (window.location.hash.startsWith('#challenge=')) {
+        try {
+            const code = decodeURIComponent(window.location.hash.slice(11));
+            const challenge = parseChallenge(code);
+            el('challenge-input').value = code;
+            document.querySelector('.challenge-entry').open = true;
+            el('challenge-status').textContent = `${challenge.mode} friend challenge ready. Tap Accept challenge to play. Camera is off until then.`;
+        } catch (error) { el('challenge-status').textContent = 'Invalid challenge link. Ask your friend for a new code.'; }
+      }
+    }
+    prepareLinkedChallenge();
+    window.addEventListener('hashchange', prepareLinkedChallenge);
     el('challenge-form').addEventListener('submit', event => {
         event.preventDefault();
         try {

@@ -26,7 +26,7 @@ export function drawScoreCard(canvas, result) {
     if (code) {
         text('YOUR TURN', 1390, 35, '#ddc5ff');
         text(code, 1480, 42);
-        text('Open Blink Stop → Got a challenge?', 1570, 28, '#bfc7d5');
+        text('www.playblinkstop.com', 1570, 32, '#bfc7d5');
         text('Paste the code. Play. Send yours back.', 1620, 28, '#bfc7d5');
     } else text('A fresh modifier. Same blink challenge.', 1510, 34, '#bfc7d5');
     text('#BlinkStop', 1735, 40, '#ddc5ff');

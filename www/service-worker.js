@@ -1,4 +1,4 @@
-const CACHE_NAME = 'blink-stop-v10';
+const CACHE_NAME = 'blink-stop-v11';
 const ASSETS_TO_CACHE = [
     './',
     './index.html',

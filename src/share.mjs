@@ -1,5 +1,6 @@
 const modes = { CLASSIC: 'Classic', PRECISION: 'Precision', ENDURANCE: 'Endurance', DAILY: 'Daily', SURPRISE: 'Surprise' };
 const codes = { C: 'CLASSIC', P: 'PRECISION', E: 'ENDURANCE', S: 'SURPRISE' };
+export const PUBLIC_PLAY_URL = 'https://www.playblinkstop.com/';
 
 export function resultDetails(result) {
     if (typeof result === 'number') result = { mode: 'CLASSIC', score: result, elapsed: result };
@@ -25,7 +26,8 @@ export function challengeCode(result) {
 
 export function parseChallenge(text) {
     if (typeof text !== 'string' || text.length > 1000) throw new Error('Paste a Blink Stop challenge code.');
-    const matches = [...text.toUpperCase().matchAll(/\bBS1-([CPES])-(0|5|10|15)-(\d{1,8})\b/g)];
+    const found = [...text.toUpperCase().matchAll(/\bBS1-([CPES])-(0|5|10|15)-(\d{1,8})\b/g)];
+    const matches = [...new Map(found.map(match => [match[0], match])).values()];
     if (matches.length !== 1) throw new Error('Paste one valid Blink Stop challenge code.');
     const [, key, target, value] = matches[0];
     const mode = codes[key], score = Number(value) / 1000;
@@ -44,8 +46,8 @@ export function challengeOutcome(result, challenge) {
 
 export function sharePayload(result) {
     const r = resultDetails(result), code = challengeCode(r);
-    return { title: 'Blink Stop', text: `👁️ Blink Stop · ${r.label}: ${r.metric}. ${r.mode === 'PRECISION' ? r.detail + '. ' : ''}${r.invitation}\n${code ? `Challenge code: ${code}\nOpen Blink Stop → Got a challenge? → paste this code.\n` : 'Try the Daily modifier on your device.\n'}#BlinkStop` };
-    // Add a verified public play URL only after the matching candidate is launched.
+    const url = code ? `${PUBLIC_PLAY_URL}#challenge=${code}` : PUBLIC_PLAY_URL;
+    return { title: 'Blink Stop', url, text: `👁️ Blink Stop · ${r.label}: ${r.metric}. ${r.mode === 'PRECISION' ? r.detail + '. ' : ''}${r.invitation}\n${code ? `Challenge code: ${code}\nTap the link, then Accept challenge. Or paste this code under Got a challenge?\n` : 'Try the Daily modifier on your device.\n'}${url}\n#BlinkStop` };
 }
 
 export function shareClipboardText(result) { return sharePayload(result).text; }

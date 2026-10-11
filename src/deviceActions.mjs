@@ -11,7 +11,7 @@ export async function exportNativeCard(dataUrl, payload, load = loadNative) {
     const file = { path: 'blink-stop-result.png', directory: Directory.Cache };
     const { uri } = await Filesystem.writeFile({ ...file, data: dataUrl.split(',')[1] });
     try {
-        await Share.share({ title: payload.title, text: payload.text, files: [uri], dialogTitle: 'Share your Blink Stop challenge card' });
+        await Share.share({ title: payload.title, text: payload.text, url: payload.url, files: [uri], dialogTitle: 'Share your Blink Stop challenge card' });
     } catch (error) {
         await Filesystem.deleteFile(file).catch(() => {});
         throw error;

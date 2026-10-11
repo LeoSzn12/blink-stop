@@ -2,13 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { sharePayload, shareClipboardText, challengeCode, parseChallenge, challengeOutcome } from '../src/share.mjs';
 
-test('share invitation includes mode and portable challenge but no stale public URL', () => {
+test('share invitation includes mode and portable challenge and the approved public launch URL', () => {
     const payload = sharePayload({ mode: 'CLASSIC', score: 12.34, elapsed: 12.34 });
     assert.equal(payload.title, 'Blink Stop');
     assert.match(payload.text, /Classic: 12\.34s/);
     assert.match(payload.text, /Can you beat my time/);
-    assert.equal('url' in payload, false);
-    assert.doesNotMatch(JSON.stringify(payload), /https?:\/\//);
+    assert.equal(payload.url, 'https://www.playblinkstop.com/#challenge=BS1-C-0-12340');
+    assert.doesNotMatch(JSON.stringify(payload), /vercel\.app|github\.com/);
     assert.equal(parseChallenge(payload.text).score, 12.34);
     assert.match(shareClipboardText(2.5), /2\.50s/);
 });
@@ -29,4 +29,11 @@ test('codes reject invalid targets, over-limit scores, ambiguous and oversized i
     }
     assert.equal(parseChallenge('bs1-c-0-0').score, 0);
     assert.equal(challengeCode({ mode: 'DAILY', score: 12, elapsed: 12 }), null);
+});
+
+test('a repeated code in a caption and link is one challenge, while distinct challenges are rejected', () => {
+    assert.equal(parseChallenge('BS1-C-0-12340 https://www.playblinkstop.com/#challenge=BS1-C-0-12340').score, 12.34);
+    assert.throws(() => parseChallenge('BS1-C-0-12340 https://www.playblinkstop.com/#challenge=BS1-C-0-56780'));
+    const daily = sharePayload({ mode: 'DAILY', score: 5, elapsed: 5 });
+    assert.equal(daily.url, 'https://www.playblinkstop.com/');
 });

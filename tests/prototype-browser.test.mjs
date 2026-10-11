@@ -113,7 +113,14 @@ test('Surprise consent, reward demo, portrait export and friend challenge work t
         await page.locator('#challenge-form button').click();
         assert.match(await page.locator('#challenge-status').innerText(), /Invalid/);
         assert.equal(await page.evaluate(() => document.querySelector('.input_video').srcObject), null);
-        await page.locator('#challenge-input').fill('BS1-P-10-5000');
+        await page.goto(`${server.url}#challenge=garbage`);
+        await page.waitForFunction(() => document.querySelector('#challenge-status').textContent.includes('Invalid challenge link'));
+        assert.match(await page.locator('#challenge-status').innerText(), /Invalid challenge link/);
+        assert.equal(await page.evaluate(() => document.querySelector('.input_video').srcObject), null);
+        await page.goto(`${server.url}#challenge=BS1-P-10-5000`);
+        await page.waitForFunction(() => document.querySelector('#challenge-input').value === 'BS1-P-10-5000');
+        assert.equal(await page.locator('#challenge-input').inputValue(), 'BS1-P-10-5000');
+        assert.equal(await page.evaluate(() => document.querySelector('.input_video').srcObject), null);
         await page.locator('#challenge-form button').click();
         await page.locator('#game-hud').waitFor({ state: 'visible' });
         assert.equal(await page.locator('#target-display .digital-text-sm').innerText(), '10.00s');
