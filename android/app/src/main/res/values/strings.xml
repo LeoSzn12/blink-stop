@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Blink Stop</string>
+    <string name="title_activity_main">Blink Stop</string>
+    <string name="package_name">com.blinkstop.app</string>
+    <string name="custom_url_scheme">com.blinkstop.app</string>
+</resources>
