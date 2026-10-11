@@ -1,0 +1,108 @@
+name: iOS cloud archive and TestFlight
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/ios-cloud.yml'
+      - 'scripts/ios-*'
+      - 'scripts/verify-native-payload.py'
+      - 'tests/test_ios*.py'
+      - 'ios/**'
+      - 'package*.json'
+      - 'src/**'
+  workflow_dispatch:
+    inputs:
+      upload_to_testflight:
+        description: 'Upload the signed build to Apple for TestFlight processing (no store submission)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  device-archive-check:
+    runs-on: macos-15
+    timeout-minutes: 30
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+          cache: npm
+      - run: python3 -m unittest discover -s tests -p 'test_ios*.py'
+      - run: bash -n scripts/ios-cloud-sign.sh
+      - run: npm ci
+      - run: npm run build
+      - run: npx cap sync ios
+      - name: Compile a physical-device archive without credentials
+        run: xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' -archivePath build/ios-device/App.xcarchive CODE_SIGNING_ALLOWED=NO archive
+      - name: Verify device architecture, bundled assets, privacy and upload tooling
+        run: |
+          python3 scripts/verify-native-payload.py build/ios-device/App.xcarchive/Products/Applications/App.app
+          plutil -lint build/ios-device/App.xcarchive/Products/Applications/App.app/PrivacyInfo.xcprivacy
+          lipo -archs build/ios-device/App.xcarchive/Products/Applications/App.app/App | grep -w arm64
+          xcrun altool --help > "$RUNNER_TEMP/altool-help.txt" 2>&1 || true
+          grep -- --apiKey "$RUNNER_TEMP/altool-help.txt"
+          grep -- --apiIssuer "$RUNNER_TEMP/altool-help.txt"
+          ditto -c -k --keepParent build/ios-device/App.xcarchive build/ios-device-archive-unsigned.zip
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: ios-device-archive-unsigned
+          path: build/ios-device-archive-unsigned.zip
+          retention-days: 14
+
+  signed-candidate:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.repository == 'LeoSzn12/blink-stop'
+    needs: device-archive-check
+    environment: ios-signing
+    runs-on: macos-15
+    timeout-minutes: 30
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npx cap sync ios
+      - name: Import signing credentials into a temporary keychain
+        env:
+          APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+          IOS_CERTIFICATE_BASE64: ${{ secrets.IOS_CERTIFICATE_BASE64 }}
+          IOS_CERTIFICATE_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+          IOS_PROFILE_BASE64: ${{ secrets.IOS_PROFILE_BASE64 }}
+        run: bash scripts/ios-cloud-sign.sh install
+      - name: Archive and export the signed candidate
+        run: |
+          bash scripts/ios-cloud-sign.sh archive
+          bash scripts/ios-cloud-sign.sh export
+          python3 scripts/verify-native-payload.py build/ios-signed/App.xcarchive/Products/Applications/App.app build/ios-signed/export/App.ipa
+          codesign --verify --deep --strict build/ios-signed/App.xcarchive/Products/Applications/App.app
+          plutil -lint build/ios-signed/App.xcarchive/Products/Applications/App.app/PrivacyInfo.xcprivacy
+      - name: Upload to Apple only when explicitly selected
+        if: inputs.upload_to_testflight
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_PRIVATE_KEY_BASE64: ${{ secrets.ASC_PRIVATE_KEY_BASE64 }}
+        run: bash scripts/ios-cloud-sign.sh upload
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: ios-signed-candidate
+          path: build/ios-signed/export/App.ipa
+          retention-days: 7
+      - name: Remove runner-local signing materials
+        if: always()
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+        run: bash scripts/ios-cloud-sign.sh cleanup
