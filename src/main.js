@@ -8,6 +8,7 @@ import { cameraErrorMessage } from './cameraHelp.mjs';
 import { createGameOverCameraStop } from './roundLifecycle.mjs';
 import { sharePayload, shareClipboardText } from './share.mjs';
 import { createSurpriseRound, createRewardedDemo } from './surprise.mjs';
+import { createSocialUI } from './social.mjs';
 
 // DOM Elements
 const videoElement = document.getElementsByClassName('input_video')[0];
@@ -78,6 +79,8 @@ let calibrationFrameId;
 let precisionTarget = 10.00; 
 let calibrationStartTime = 0;
 let lastScore = null;
+let lastResult = null;
+let activeChallenge = null;
 let currentEAR = 0.3;
 let baselineEAR = 0.3;
 let minEARValue = 0.3;
@@ -90,6 +93,19 @@ let demoFrameId;
 const faceLoss = createFaceLossTracker();
 const calibration = createCalibrationTracker();
 const tracking = createTrackingFreshness();
+const social = createSocialUI(challenge => {
+    if (!['MENU', 'GAME_OVER'].includes(gameState)) return;
+    showMenu(); // Release the previous player's camera before the handoff.
+    activeChallenge = challenge;
+    precisionTarget = challenge.mode === 'PRECISION' ? challenge.target : precisionTarget;
+    document.getElementById('challenge-status').textContent = `${challenge.mode}: friend's reported result ${challenge.score.toFixed(3)}s${challenge.mode === 'PRECISION' ? ' off target' : ''}.`;
+    if (challenge.mode === 'SURPRISE') {
+        container.classList.add('surprise-mode');
+        modeSelection.classList.add('hidden');
+        surpriseOptions.classList.remove('hidden');
+        document.getElementById('surprise-start-btn').focus();
+    } else startGame(challenge.mode);
+});
 
 // Service Worker Registration
 if ('serviceWorker' in navigator) {
@@ -209,6 +225,7 @@ function stopDetectionLoop() {
 modeBtns.forEach(btn => {
     btn.addEventListener('click', (e) => {
         const mode = e.currentTarget.dataset.mode;
+        activeChallenge = null;
 
         if (mode === 'CLASSIC') {
             startGame('CLASSIC');
@@ -232,6 +249,8 @@ modeBtns.forEach(btn => {
 
 document.getElementById('surprise-start-btn').addEventListener('click', () => startGame('SURPRISE'));
 document.getElementById('surprise-back-btn').addEventListener('click', () => {
+    activeChallenge = null;
+    document.getElementById('challenge-status').textContent = '';
     container.classList.remove('surprise-mode');
     surpriseOptions.classList.add('hidden');
     modeSelection.classList.remove('hidden');
@@ -422,12 +441,13 @@ saveScoreBtn.addEventListener('click', () => {
 
 // Share Logic
 shareBtn.addEventListener('click', async () => {
-    if (lastScore === null) return;
+    if (lastScore === null || !lastResult) return;
+    const payload = sharePayload(lastResult);
 
     if (window.Capacitor?.isNativePlatform?.()) {
         try {
             const { shareNativeScore } = await import('./deviceActions.mjs');
-            await shareNativeScore(sharePayload(lastScore));
+            await shareNativeScore(payload);
         } catch (error) {
             console.log('Native share cancelled or unavailable:', error);
         }
@@ -436,7 +456,7 @@ shareBtn.addEventListener('click', async () => {
 
     if (navigator.share) {
         try {
-            await navigator.share(sharePayload(lastScore));
+            await navigator.share(payload);
         } catch (err) {
             console.log('Share failed:', err);
         }
@@ -444,7 +464,7 @@ shareBtn.addEventListener('click', async () => {
         // Fallback to clipboard; keep Share retryable when unavailable or denied.
         try {
             if (!navigator.clipboard?.writeText) throw new Error('Clipboard unavailable');
-            await navigator.clipboard.writeText(shareClipboardText(lastScore));
+            await navigator.clipboard.writeText(shareClipboardText(lastResult));
             const originalText = shareBtn.innerText;
             shareBtn.innerText = "COPIED!";
             setTimeout(() => shareBtn.innerText = originalText, 2000);
@@ -483,6 +503,8 @@ selfieBtn.addEventListener('click', async () => {
 
 function startGame(mode) {
     if (gameState === 'AD_DEMO') return;
+    social.reset();
+    lastResult = null;
     container.className = 'container';
     if (mode === 'SURPRISE') container.classList.add('surprise-mode');
     surpriseOverlay.classList.add('hidden');
@@ -702,6 +724,11 @@ function updateEnduranceLoop() {
 }
 
 function showMenu() {
+    social.reset();
+    activeChallenge = null;
+    lastResult = null;
+    document.getElementById('challenge-status').textContent = '';
+    document.getElementById('challenge-input').value = '';
     demoRound?.cancel();
     demoRound = null;
     cancelAnimationFrame(demoFrameId);
@@ -1047,6 +1074,9 @@ function endGame(reason = 'BLINK') {
         }
 
         lastScore = reason === 'DISQUALIFIED' ? null : scoreToSave;
+        if (lastScore !== null && ['ENDURANCE', 'SURPRISE'].includes(currentMode)) lastScore = Math.min(30, lastScore);
+        lastResult = lastScore === null ? null : { mode: currentMode, score: lastScore, elapsed, target: precisionTarget };
+        social.render(lastResult, activeChallenge);
         finalScoreVal.innerText = finalScoreText;
 
         playerNameInput.value = '';

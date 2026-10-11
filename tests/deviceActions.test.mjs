@@ -36,3 +36,18 @@ test('clear data removes game-owned keys without deleting unrelated storage', ()
     clearStoredGameData({ removeItem: key => data.delete(key) });
     assert.deepEqual([...data], [['another-app', 'keep']]);
 });
+
+test('native card exports a PNG plus caption and removes cache if sharing fails', async () => {
+    const { exportNativeCard } = await import('../src/deviceActions.mjs');
+    const calls = [];
+    const load = async () => ({ Directory: { Cache: 'CACHE' }, Filesystem: {
+        writeFile: async options => { calls.push(options); return { uri: 'file:///cache/blink-stop-result.png' }; },
+        deleteFile: async options => calls.push(options)
+    }, Share: { share: async options => { calls.push(options); throw new Error('cancelled'); } } });
+    await assert.rejects(exportNativeCard('data:image/png;base64,YWJj', { title: 'Blink Stop', text: 'Precision: .085s off' }, load), /cancelled/);
+    assert.equal(calls[0].path, 'blink-stop-result.png');
+    assert.equal(calls[1].text, 'Precision: .085s off');
+    assert.deepEqual(calls[1].files, ['file:///cache/blink-stop-result.png']);
+    assert.equal(calls[2].path, 'blink-stop-result.png');
+    await assert.rejects(exportNativeCard('data:image/jpeg;base64,YWJj', {}, () => { throw new Error('do not load'); }), /Card unavailable/);
+});

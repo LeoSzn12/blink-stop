@@ -31,3 +31,11 @@ Record observed behavior, screenshots when useful, failures, and the exact build
 that fixes each failure. Signed releases must be retested after code or SDK changes.
 
 Surprise prototype: confirm clear opt-in, sound off by default, readable exit, one brief interruption, 30-second cap, blink/DQ handling, and cancellation on background/retry. Confirm demo camera indicator is off, early claim is disabled, Skip preserves the result, completion changes only the session theme, and backgrounding gives no reward. Inspect network to confirm no ad provider is contacted.
+
+## Social candidate — pending on both physical platforms
+- Export portrait card and caption into actual social apps and save destinations; cancellation and retry.
+- Card contains no camera photo or nickname, and Precision labels error and target correctly.
+- Paste caption/code; match target; win/loss/tie; reject malformed/over-limit code without camera access.
+- Friend’s turn releases prior camera; Surprise shows warning each time.
+- Backgrounding abandons challenge; Menu clears card and selfie.
+- Support Clear Local Data removes both native export cache files where present.

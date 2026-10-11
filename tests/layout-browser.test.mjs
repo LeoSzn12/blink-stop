@@ -30,8 +30,9 @@ test('game-over actions remain reachable on narrow and enlarged-text screens', a
           if (zoom) document.documentElement.style.fontSize = `${zoom * 100}%`;
           document.querySelector('#menu-screen').classList.add('hidden');
           document.querySelector('#game-over-screen').classList.remove('hidden');
+          document.querySelector('#social-result').classList.remove('hidden');
         }, scenario.textZoom || null);
-        for (const selector of ['#restart-btn', '#share-btn', '#selfie-btn', '#menu-btn']) {
+        for (const selector of ['#restart-btn', '#share-btn', '#selfie-btn', '#share-card-btn', '#save-card-btn', '#friend-turn-btn', '#menu-btn']) {
           await page.locator(selector).evaluate(el => scrollBy(0, el.getBoundingClientRect().top - 100));
           const box = await page.locator(selector).boundingBox();
           const footerTop = await page.locator('.footer').evaluate(el => el.getBoundingClientRect().top);

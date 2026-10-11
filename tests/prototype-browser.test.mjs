@@ -1,12 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { chromium } from 'playwright';
 import { serveBuiltWeb } from './helpers/web-server.mjs';
 
 // Synthetic video and landmarks exercise the actual UI/state flow. This does not
 // establish physical-camera accuracy, sound comfort, or human reactions to scares.
-test('Surprise consent, bounded round, scores, and optional reward flow work together', { timeout: 60000 }, async () => {
+test('Surprise consent, reward demo, portrait export and friend challenge work together', { timeout: 60000 }, async () => {
     const server = await serveBuiltWeb();
     let browser;
     try {
@@ -21,6 +21,11 @@ test('Surprise consent, bounded round, scores, and optional reward flow work tog
         await page.addInitScript(() => {
             const dateNow = Date.now.bind(Date);
             window.testTimeOffset = 0;
+            window.testBlink = false;
+            Object.defineProperty(navigator, 'canShare', { configurable: true, value: () => true });
+            Object.defineProperty(navigator, 'share', { configurable: true, value: async payload => {
+                window.lastShare = { text: payload.text, name: payload.files?.[0]?.name, type: payload.files?.[0]?.type, size: payload.files?.[0]?.size };
+            } });
             Date.now = () => dateNow() + window.testTimeOffset;
             Math.random = () => 0;
         });
@@ -31,7 +36,7 @@ test('Surprise consent, bounded round, scores, and optional reward flow work tog
                     const points = Array.from({ length: 468 }, () => ({ x: 0, y: 0, z: 0 }));
                     for (const eye of [[33,160,158,133,153,144], [362,385,387,263,373,380]]) {
                         const coords = [[.3,.3],[.32,.285],[.38,.285],[.4,.3],[.38,.315],[.32,.315]];
-                        eye.forEach((index, i) => { points[index] = { x: coords[i][0], y: coords[i][1], z: 0 }; });
+                        eye.forEach((index, i) => { points[index] = { x: coords[i][0], y: window.testBlink ? .3 + (coords[i][1] - .3) / 3 : coords[i][1], z: 0 }; });
                     }
                     this.result({ image, multiFaceLandmarks: [points] });
                 }
@@ -79,6 +84,53 @@ test('Surprise consent, bounded round, scores, and optional reward flow work tog
         assert.equal(await page.evaluate(() => document.body.classList.contains('theme-demo')), true);
         assert.equal(await page.evaluate(() => localStorage.getItem('blink_theme_demo')), null);
         assert.equal(await page.locator('#final-score-val').innerText(), '30.00s');
+        // Full social loop: card export, friend handoff, malformed input, imported
+        // Precision target, actual blink, and comparison. No remote game backend.
+        assert.equal(await page.locator('#social-result').isVisible(), true);
+        await page.locator('#share-card-btn').click();
+        const shared = await page.evaluate(() => window.lastShare);
+        assert.equal(shared.name, 'blink-stop-challenge.png');
+        assert.equal(shared.type, 'image/png');
+        assert.ok(shared.size > 10000);
+        assert.match(shared.text, /Surprise: 30.00s/);
+        assert.equal(await page.locator('#score-card').evaluate(img => img.naturalWidth), 1080);
+        assert.equal(await page.locator('#score-card').evaluate(img => img.naturalHeight), 1920);
+        const downloadReady = page.waitForEvent('download');
+        await page.locator('#save-card-btn').click();
+        assert.equal((await downloadReady).suggestedFilename(), 'blink-stop-challenge.png');
+        if (process.env.PROTOTYPE_SCREENSHOTS) {
+            const url = await page.locator('#score-card').getAttribute('src');
+            await writeFile(`${process.env.PROTOTYPE_SCREENSHOTS}/challenge-card.png`, Buffer.from(url.split(',')[1], 'base64'));
+            await page.screenshot({ path: `${process.env.PROTOTYPE_SCREENSHOTS}/social-result.png`, fullPage: true });
+        }
+        await page.locator('#friend-turn-btn').click();
+        assert.equal(await page.locator('#surprise-options').isVisible(), true);
+        assert.equal(await page.evaluate(() => document.querySelector('.input_video').srcObject), null);
+        assert.equal(await page.locator('#score-card').getAttribute('src'), null);
+        await page.locator('#surprise-back-btn').click();
+        await page.locator('.challenge-entry summary').click();
+        await page.locator('#challenge-input').fill('BS1-E-0-99999999');
+        await page.locator('#challenge-form button').click();
+        assert.match(await page.locator('#challenge-status').innerText(), /Invalid/);
+        assert.equal(await page.evaluate(() => document.querySelector('.input_video').srcObject), null);
+        await page.locator('#challenge-input').fill('BS1-P-10-5000');
+        await page.locator('#challenge-form button').click();
+        await page.locator('#game-hud').waitFor({ state: 'visible' });
+        assert.equal(await page.locator('#target-display .digital-text-sm').innerText(), '10.00s');
+        await page.evaluate(() => { window.testTimeOffset += 10000; window.testBlink = true; });
+        await page.locator('#game-over-screen').waitFor({ state: 'visible' });
+        assert.match(await page.locator('#challenge-caption').inputValue(), /Precision: .*s off.*Target 10s/);
+        assert.match(await page.locator('#challenge-outcome').innerText(), /CHALLENGE BEATEN/);
+        await page.evaluate(() => { window.testBlink = false; });
+        await page.locator('#friend-turn-btn').click();
+        await page.locator('#game-hud').waitFor({ state: 'visible' });
+        assert.equal(await page.locator('#target-display .digital-text-sm').innerText(), '10.00s');
+        page.once('dialog', dialog => dialog.accept());
+        await page.locator('#home-btn').click();
+        assert.equal(await page.evaluate(() => document.querySelector('.input_video').srcObject), null);
+        assert.equal(await page.locator('#social-result').isVisible(), false);
+        assert.equal(await page.locator('#challenge-caption').inputValue(), '');
+        assert.equal(await page.locator('#challenge-input').inputValue(), '');
         assert.equal(requests.every(url => url.startsWith(server.url)), true, 'prototype must not contact an advertiser');
         assert.deepEqual(errors, []);
     } finally {

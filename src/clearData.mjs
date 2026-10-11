@@ -12,7 +12,7 @@ button.addEventListener('click', async () => {
         if (window.Capacitor?.isNativePlatform?.()) {
             const { Filesystem, Directory } = await import('../vendor/native.js');
             try {
-                await Filesystem.deleteFile({ path: 'blink-stop-selfie.jpg', directory: Directory.Cache });
+                await Promise.all(['blink-stop-selfie.jpg', 'blink-stop-result.png'].map(path => Filesystem.deleteFile({ path, directory: Directory.Cache })));
             } catch (error) {
                 // Absence is normal; let users know cache removal is not guaranteed.
                 status.textContent += ' To remove any remaining cached export, clear the app data in device settings.';

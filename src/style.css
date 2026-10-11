@@ -1013,7 +1013,7 @@ body.theme-demo { --neon-cyan: #e0b36c; --neon-pink: #f5cc8d; }
     position: relative;
     min-height: 100dvh;
     height: auto;
-    padding: 1rem 1rem calc(8rem + env(safe-area-inset-bottom, 0px));
+    padding: 1rem 1rem calc(9rem + env(safe-area-inset-bottom, 0px));
 }
 
 /* The in-game HUD remains over the camera, not in the menu's scroll flow. */
@@ -1052,3 +1052,15 @@ footer {
 }
 .camera-error { color: #fff; background: #4b101d; border: 1px solid var(--neon-pink); padding: 0.8rem; max-width: 25rem; line-height: 1.5; text-align: center; }
 .endurance-void { color: var(--neon-cyan); font-size: min(40vw, 8rem); text-align: center; text-shadow: 0 0 24px var(--neon-cyan); }
+
+.challenge-entry, .social-result { width: min(100%, 400px); margin: 1rem auto; text-align: center; }
+.challenge-entry summary { cursor: pointer; color: var(--neon-cyan); padding: .65rem; }
+.challenge-entry label, .social-result label { display: block; color: #d3dbe5; font-size: .85rem; margin: .6rem 0; }
+.challenge-entry textarea, .social-result textarea { box-sizing: border-box; width: 100%; background: #0b1320; color: #eef7ff; border: 1px solid #556a77; border-radius: 8px; padding: .75rem; font: inherit; font-size: .85rem; resize: vertical; }
+.social-note { font-size: .8rem; color: #bac6d3; line-height: 1.5; margin: .7rem 0; }
+.social-result { border-top: 1px solid #556a77; padding-top: 1rem; }
+.social-result h3 { font-size: .95rem; color: var(--neon-cyan); }
+#score-card { display: block; width: 180px; height: auto; max-width: 100%; margin: 1rem auto; border-radius: 8px; }
+.social-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: .65rem; }
+.challenge-outcome { color: var(--neon-cyan); font-weight: bold; line-height: 1.5; }
+#social-status { color: #d3dbe5; font-size: .85rem; line-height: 1.5; }

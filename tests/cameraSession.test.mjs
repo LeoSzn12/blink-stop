@@ -38,7 +38,7 @@ function harness(storage = { getItem: () => null, setItem() {} }, clipboard) {
     createCalibrationTracker, createTrackingFreshness, createFaceLossTracker, createSerializedInference, createSurpriseRound, createRewardedDemo,
     checkBlink: () => ({ minEar: .3, ear: .3, blinking: false }), setBlinkThreshold() {}, resetBlinkState() {}, getBlinkThreshold: () => .22,
     audioManager: { startDrone() {}, stopDrone() {}, playGlitch() {}, playWin() {}, playHeartbeat() {}, playSurprise() {} },
-    appendScore() {}, cameraErrorMessage: () => '', createGameOverCameraStop: fn => ({ cancel() {}, schedule() {} }), sharePayload() {}, shareClipboardText() {},
+    appendScore() {}, cameraErrorMessage: () => '', createGameOverCameraStop: fn => ({ cancel() {}, schedule() {} }), sharePayload() {}, shareClipboardText() {}, createSocialUI: () => ({ reset() {}, render() {} }),
     localStorage: storage,
     setInterval: fn => { const n = ++id; intervals.set(n, fn); return n; }, clearInterval: n => intervals.delete(n), setTimeout: fn => { const n = ++id; timers.set(n, fn); return n; }, clearTimeout: n => timers.delete(n),
     requestAnimationFrame: fn => { const n = ++id; raf.set(n, fn); return n; }, cancelAnimationFrame: n => raf.delete(n), confirm: () => true };

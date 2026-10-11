@@ -5,6 +5,20 @@ export async function shareNativeScore(payload, load = loadNative) {
     await Share.share({ ...payload, dialogTitle: 'Share your Blink Stop score' });
 }
 
+export async function exportNativeCard(dataUrl, payload, load = loadNative) {
+    if (!/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(dataUrl)) throw new Error('Card unavailable');
+    const { Filesystem, Directory, Share } = await load();
+    const file = { path: 'blink-stop-result.png', directory: Directory.Cache };
+    const { uri } = await Filesystem.writeFile({ ...file, data: dataUrl.split(',')[1] });
+    try {
+        await Share.share({ title: payload.title, text: payload.text, files: [uri], dialogTitle: 'Share your Blink Stop challenge card' });
+    } catch (error) {
+        await Filesystem.deleteFile(file).catch(() => {});
+        throw error;
+    }
+    // One replaceable result card, retained for the receiving app just like selfies.
+}
+
 export async function exportNativeSelfie(dataUrl, load = loadNative) {
     if (!/^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(dataUrl)) throw new Error('Selfie unavailable');
     const { Filesystem, Directory, Share } = await load();

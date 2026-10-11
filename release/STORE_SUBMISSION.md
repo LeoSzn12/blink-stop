@@ -27,7 +27,7 @@ HTML privacy page rather than a protected preview or PDF.
 
 Camera frames, landmarks, local scores, entered nicknames, theme preference, and
 selfie previews are processed locally. There is no identification, face-template
-database, tracking, or automated upload. Native score/selfie sharing is initiated by
+database, tracking, or automated upload. Native score/card/selfie sharing is initiated by
 the user and handed to a destination they select.
 
 The proposed standalone-native answer is **Data Not Collected**, subject to checking
@@ -65,7 +65,7 @@ the camera/local-data explanation, choose Classic, and allow front-camera access
 Keep your face visible and eyes open for calibration, then blink to finish. Precision
 offers 5/10/15-second targets; Endurance lasts up to 30 seconds; Daily changes visuals. Optional Surprise Mode adds a sudden illustrated face during a 30-second round after a clear opt-in screen; sound is off by default. Reassess fear/horror content answers for the final store rating.
 Menu/backgrounding releases the camera. Face loss invalidates a round. Scores stay
-on the device. Save Selfie opens a system export sheet, and Share Score shares text.
+on the device. Save Selfie opens a system export sheet, and Share Challenge shares mode-aware text and a friend code. Share Card exports a photo-free PNG. Codes contain a mode, target and reported score, without names or images. There is no authenticated ranking, contacts access or auto-posting.
 Support provides local-data deletion, troubleshooting, and policy/license links.
 Blink comfortably; this is entertainment, not a health or vision-improvement tool.
 
