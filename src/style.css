@@ -7,6 +7,10 @@
     --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     --bg-dark: #050505;
     --glass-border: rgba(255, 255, 255, 0.1);
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-left: env(safe-area-inset-left, 0px);
+    --safe-right: env(safe-area-inset-right, 0px);
 }
 
 /* Theme: Neon Purple (Unlockable) */
@@ -454,7 +458,7 @@ body.theme-demo { --neon-cyan: #e0b36c; --neon-pink: #f5cc8d; }
 
 /* Calibration */
 .calibration-loader {
-    width: 300px;
+    width: min(300px, 100%);
     height: 10px;
     background: rgba(255, 255, 255, 0.1);
     border-radius: 5px;
@@ -1013,15 +1017,24 @@ body.theme-demo { --neon-cyan: #e0b36c; --neon-pink: #f5cc8d; }
     position: relative;
     min-height: 100dvh;
     height: auto;
-    padding: 1rem 1rem calc(9rem + env(safe-area-inset-bottom, 0px));
+    padding: calc(1.25rem + var(--safe-top)) calc(1rem + var(--safe-right)) calc(9rem + var(--safe-bottom)) calc(1rem + var(--safe-left));
 }
+
+#menu-screen { justify-content: flex-start; }
+#menu-screen h1 { font-size: clamp(2rem, 10vw, 4rem); line-height: 1.15; max-width: 100%; }
+.subtitle { max-width: 100%; text-align: center; overflow-wrap: break-word; }
+.calibration-hint { max-width: 28rem; text-align: center; line-height: 1.5; color: #d3dbe5; }
+#calibration-status { max-width: 100%; text-align: center; font-size: clamp(1rem, 4vw, 1.5rem); }
 
 /* The in-game HUD remains over the camera, not in the menu's scroll flow. */
 #game-hud {
     position: absolute;
     min-height: 0;
     height: 100dvh;
+    padding: calc(1rem + var(--safe-top)) calc(1rem + var(--safe-right)) calc(1rem + var(--safe-bottom)) calc(1rem + var(--safe-left));
 }
+
+.footer { padding: .8rem calc(.8rem + var(--safe-right)) calc(.8rem + var(--safe-bottom)) calc(.8rem + var(--safe-left)); }
 
 @media (max-width: 768px) {
     .mode-selection { max-width: 100%; }

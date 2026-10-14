@@ -10,7 +10,7 @@ import { createSurpriseRound, createRewardedDemo } from '../src/surprise.mjs';
 const source = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8').replace(/^import .*;\s*$/gm, '');
 function harness(storage = { getItem: () => null, setItem() {} }, clipboard) {
   const els = new Map(), raf = new Map(), timers = new Map(), intervals = new Map(), listeners = new Map();
-  let clock = 0, id = 0, lastDelivered, jpegCount = 0;
+  let clock = 0, id = 0, lastDelivered, jpegCount = 0, eyeValue = .3, threshold = .22;
   const pending = [], tracks = [], meshes = [], documentEvents = new Map();
   let permission;
   function stream() {
@@ -36,15 +36,53 @@ function harness(storage = { getItem: () => null, setItem() {} }, clipboard) {
   const context = { document, window: { innerWidth: 500, addEventListener() {} }, navigator: { clipboard, mediaDevices: { getUserMedia: () => permission || Promise.resolve(stream()) } },
     FaceMesh, console: { log() {}, warn() {}, error() {} }, performance: { now: () => clock }, Date,
     createCalibrationTracker, createTrackingFreshness, createFaceLossTracker, createSerializedInference, createSurpriseRound, createRewardedDemo,
-    checkBlink: () => ({ minEar: .3, ear: .3, blinking: false }), setBlinkThreshold() {}, resetBlinkState() {}, getBlinkThreshold: () => .22,
+    checkBlink: () => eyeValue === null ? null : ({ minEar: eyeValue, ear: eyeValue, blinking: false }), setBlinkThreshold(value) { threshold = value; }, resetBlinkState() {}, getBlinkThreshold: () => threshold,
     audioManager: { startDrone() {}, stopDrone() {}, playGlitch() {}, playWin() {}, playHeartbeat() {}, playSurprise() {} },
     appendScore() {}, cameraErrorMessage: () => '', createGameOverCameraStop: fn => ({ cancel() {}, schedule() {} }), sharePayload() {}, shareClipboardText() {}, createSocialUI: () => ({ reset() {}, render() {} }),
     localStorage: storage,
     setInterval: fn => { const n = ++id; intervals.set(n, fn); return n; }, clearInterval: n => intervals.delete(n), setTimeout: fn => { const n = ++id; timers.set(n, fn); return n; }, clearTimeout: n => timers.delete(n),
     requestAnimationFrame: fn => { const n = ++id; raf.set(n, fn); return n; }, cancelAnimationFrame: n => raf.delete(n), confirm: () => true };
   vm.runInNewContext(source + '\n globalThis.debug = { startGame, showMenu, startCalibration, endGame, startDemoAd, finishDemoAd, updateDemoAd, calibration, inference, Leaderboard, getState: () => gameState };', context);
-  return { debug: context.debug, el, click: key => listeners.get(`${key}:click`)(), jpegCount: () => jpegCount, tracks, meshes, document, visibility: () => documentEvents.get('visibilitychange')(), deferPermission() { let resolve; permission = new Promise(r => { resolve = r; }); return () => resolve(stream()); }, setClock: n => { clock = n; }, deliver: () => pending.shift()(), lateCallback: () => lastDelivered(), pendingSend: () => pending.length, tickInference() { for (const fn of intervals.values()) fn(); }, async settle() { for (let i = 0; i < 10; i++) await Promise.resolve(); }, async timers() { for (const [n,fn] of [...timers]) { timers.delete(n); fn(); } await this.settle(); }, raf() { for (const [n,fn] of [...raf]) { raf.delete(n); fn(); } }, pendingRaf: () => raf.size };
+  return { debug: context.debug, el, setEye: value => { eyeValue = value; }, threshold: () => threshold, click: key => listeners.get(`${key}:click`)(), jpegCount: () => jpegCount, tracks, meshes, document, visibility: () => documentEvents.get('visibilitychange')(), deferPermission() { let resolve; permission = new Promise(r => { resolve = r; }); return () => resolve(stream()); }, setClock: n => { clock = n; }, deliver: () => pending.shift()(), lateCallback: () => lastDelivered(), pendingSend: () => pending.length, tickInference() { for (const fn of intervals.values()) fn(); }, async settle() { for (let i = 0; i < 10; i++) await Promise.resolve(); }, async timers() { for (const [n,fn] of [...timers]) { timers.delete(n); fn(); } await this.settle(); }, raf() { for (const [n,fn] of [...raf]) { raf.delete(n); fn(); } }, pendingRaf: () => raf.size };
 }
+
+test('slow iPhone calibration keeps progress past three seconds and fits the eye baseline', async () => {
+  const h = harness();
+  h.setEye(.16);
+  h.debug.startGame('CLASSIC'); await h.settle(); await h.timers();
+  for(let i=0;i<10;i++) {
+    h.setClock(i*400); h.tickInference(); h.deliver(); await h.settle(); h.raf();
+  }
+  assert.equal(h.debug.getState(),'PLAYING');
+  assert.ok(h.threshold() < .16, 'blink threshold must stay below open-eye baseline');
+});
+
+test('missing face gives guidance, times out, and releases the camera instead of looping forever', async () => {
+  const h = harness();
+  h.setEye(null);
+  h.debug.startGame('CLASSIC'); await h.settle(); await h.timers();
+  h.setClock(5000); h.tickInference(); h.deliver(); await h.settle(); h.raf();
+  assert.match(h.el('calibration-status').innerText,/FACE NOT FOUND.*LIGHT/);
+  h.setClock(15000); h.tickInference(); h.deliver(); await h.settle(); h.raf();
+  assert.equal(h.debug.getState(),'MENU');
+  assert.equal(h.tracks[0].stops,1);
+  assert.equal(h.pendingRaf(),0);
+  assert.match(h.el('camera-error').textContent,/light.*eye level/i);
+});
+
+test('stalled inference exits calibration with a camera restart action; cancel also releases the camera', async () => {
+  const h = harness();
+  h.debug.startGame('CLASSIC'); await h.settle(); await h.timers();
+  h.setClock(15000); h.raf();
+  assert.equal(h.debug.getState(),'MENU');
+  assert.match(h.el('camera-error').textContent,/restart.*camera/i);
+  assert.equal(h.el('restart-camera-btn').classList.contains('hidden'),false);
+  h.debug.startGame('CLASSIC'); await h.settle(); await h.timers();
+  assert.equal(h.el('restart-camera-btn').classList.contains('hidden'),true);
+  h.click('calibration-cancel-btn');
+  assert.equal(h.debug.getState(),'MENU');
+  assert.equal(h.tracks[1].stops,1);
+});
 test('privacy copy names the persisted theme preference and calibration guidance avoids intentional blinking', () => {
   const privacy = readFileSync(new URL('../privacy.html', import.meta.url), 'utf8');
   const howTo = readFileSync(new URL('../how-to-play.html', import.meta.url), 'utf8');

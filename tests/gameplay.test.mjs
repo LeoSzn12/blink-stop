@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createBlinkDetector, createFaceLossTracker, createCalibrationTracker, createTrackingFreshness } from '../src/gameRules.mjs';
+import { createBlinkDetector, createFaceLossTracker, createCalibrationTracker, createTrackingFreshness, measureEyeOpenness } from '../src/gameRules.mjs';
 import { createSerializedInference } from '../src/inference.mjs';
 import { appendScore } from '../src/leaderboard.mjs';
 
@@ -36,6 +36,45 @@ test('calibration refuses no face, invalid or closed eyes, and stale samples', (
     assert.equal(calibration.ready(5900), false);
     calibration.reset();
     assert.equal(calibration.ready(5400), false);
+});
+
+test('eye measurements are invariant to portrait/landscape image normalization', () => {
+    function face(width, height, opening = 12) {
+        const points = [];
+        for (const indices of [[33,160,158,133,153,144],[362,385,387,263,373,380]]) {
+            const coordinates = [[100,100],[110,100-opening/2],[130,100-opening/2],[140,100],[130,100+opening/2],[110,100+opening/2]];
+            indices.forEach((index,i) => { points[index] = {x:coordinates[i][0]/width,y:coordinates[i][1]/height,z:i*0.02}; });
+        }
+        return points;
+    }
+    for (const [width,height] of [[640,480],[480,640],[1280,720]]) {
+        const result = measureEyeOpenness(face(width,height),width,height);
+        assert.ok(Math.abs(result.minEar - 0.3) < 1e-10);
+        const closed = measureEyeOpenness(face(width,height,2),width,height);
+        assert.ok(closed.minEar < 0.06);
+    }
+    assert.equal(measureEyeOpenness([],480,640),null);
+    const collapsed = face(480,640); collapsed[133] = collapsed[33];
+    assert.equal(measureEyeOpenness(collapsed,480,640),null);
+});
+
+test('calibration supports slower frames and narrower open eyes without accepting closed eyes', () => {
+    const calibration = createCalibrationTracker();
+    for (let i=0;i<10;i++) calibration.observe(0.16,i*400);
+    assert.equal(calibration.ready(3600),true);
+    assert.equal(calibration.progress(3600),1);
+    calibration.observe(.05,3700);
+    assert.equal(calibration.ready(3700),false,'do not start while the current eyes are closed');
+    calibration.observe(.16,3800);
+    assert.equal(calibration.ready(3800),true,'a normal blink does not throw away all progress');
+    // A later tracking interruption must not reuse the previous player's samples.
+    calibration.observe(0.16,5000);
+    assert.equal(calibration.ready(5000),false);
+    assert.equal(calibration.values().length,1);
+    calibration.reset();
+    for (let i=0;i<30;i++) calibration.observe(0.06,i*100);
+    assert.equal(calibration.ready(3000),false);
+    assert.equal(calibration.progress(3000),0);
 });
 
 test('Endurance tracking expires on stalled inference before a 30-second win', () => {

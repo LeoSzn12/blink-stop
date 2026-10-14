@@ -3,9 +3,9 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Blink Stop - Don't Blink Challenge</title>
-    <link rel="stylesheet" href="src/style.css?v=6">
+    <link rel="stylesheet" href="src/style.css?v=7">
 
     <link rel="manifest" href="manifest.json">
 
@@ -24,7 +24,7 @@
     <div class="container">
         <!-- Video Feed & Canvas Overlay -->
         <div class="video-wrapper">
-            <video class="input_video" playsinline></video>
+            <video class="input_video" playsinline muted></video>
             <canvas class="output_canvas"></canvas>
 
             <!-- Game Overlay UI -->
@@ -86,6 +86,7 @@
                     <button id="demo-menu-btn" class="neon-btn-small demo-link" type="button">Preview bonus theme demo</button>
                     <p class="loading-text" id="loading-msg" style="display:none">INITIALIZING BLINK DETECTION...</p>
                     <p id="camera-error" role="alert" class="camera-error hidden"></p>
+                    <button id="restart-camera-btn" class="neon-btn-small hidden" type="button">Restart camera</button>
 
 
                 </div>
@@ -94,10 +95,12 @@
                 <div id="calibration-screen" class="screen hidden">
                     <h2 class="glitch" data-text="CALIBRATING">CALIBRATING</h2>
                     <p class="subtitle">Keep your eyes open normally</p>
+                    <p id="calibration-hint" class="calibration-hint">Face the camera with a light in front of you.</p>
                     <div class="calibration-loader">
                         <div class="loader-bar"></div>
                     </div>
-                    <p id="calibration-status" class="digital-text-sm">3.00s</p>
+                    <p id="calibration-status" class="digital-text-sm" role="status" aria-live="polite">FINDING YOUR EYES</p>
+                    <button id="calibration-cancel-btn" class="neon-btn-small" type="button">Back to menu</button>
                 </div>
 
                 <!-- Endurance Mode Screen (Video Player) -->
@@ -241,7 +244,7 @@
         <a href="support.html" class="footer-link">Support</a>
     </footer>
 
-    <script type="module" src="src/main.js?v=69"></script>
+    <script type="module" src="src/main.js?v=70"></script>
 </body>
 
 </html>

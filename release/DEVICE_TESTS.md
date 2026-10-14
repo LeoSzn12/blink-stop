@@ -1,7 +1,21 @@
 # Physical device acceptance record
 
-No physical-device results have been recorded for this candidate. Fill one record
-for each actual device and signed build. An unchecked item is not a pass.
+The owner tested the first iPhone beta and reported the failures below. Full
+acceptance testing remains incomplete. Fill one record for each actual device
+and signed build. An unchecked item is not a pass.
+
+## Owner feedback — October 14, 2026
+
+- Device: iPhone 14. Exact iOS version not provided. First TestFlight candidate:
+  version 1.0 (2.1); no other candidate had been distributed at this point.
+- Calibration repeatedly tried to detect the owner's eyes and never started the
+  game. Lighting was possibly dark; brighter-light behavior is unconfirmed.
+- The home page title was cut off at the top of the phone screen.
+- A corrected candidate must be retested on this phone in ordinary and dim
+  lighting, portrait/landscape, and after returning to the menu. These failures
+  are not cleared by synthetic camera or browser layout tests alone.
+
+## Full acceptance record
 
 Commit/build identifier: pending
 iPhone model/iOS version/TestFlight build: pending
