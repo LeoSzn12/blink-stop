@@ -1,13 +1,14 @@
 # Physical device acceptance record
 
-The owner tested the first iPhone beta and reported the failures below. Full
+The owner tested on an iPhone and reported the failures below. Full
 acceptance testing remains incomplete. Fill one record for each actual device
 and signed build. An unchecked item is not a pass.
 
 ## Owner feedback — October 14, 2026
 
-- Device: iPhone 14. Exact iOS version not provided. First TestFlight candidate:
-  version 1.0 (2.1); no other candidate had been distributed at this point.
+- Device: iPhone 14. Exact iOS version not provided. The available TestFlight
+  candidate is version 1.0 (2.1), but the owner has not yet confirmed whether the
+  report came from that installed build or the mobile website.
 - Calibration repeatedly tried to detect the owner's eyes and never started the
   game. Lighting was possibly dark; brighter-light behavior is unconfirmed.
 - The home page title was cut off at the top of the phone screen.
