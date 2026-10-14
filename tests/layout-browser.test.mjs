@@ -13,6 +13,8 @@ const output = process.env.LAYOUT_SCREENSHOTS;
 
 const cases = [
   { name: 'mobile portrait', width: 390, height: 844 },
+  { name: 'iPhone 14 safe areas', width: 390, height: 844, safeTop: 47, safeBottom: 34 },
+  { name: 'iPhone landscape safe areas', width: 844, height: 390, safeTop: 0, safeBottom: 21, safeSide: 47 },
   { name: 'narrow portrait', width: 320, height: 568 },
   { name: 'short landscape', width: 667, height: 375 },
   { name: '200% text', width: 390, height: 844, textZoom: 2 },
@@ -21,17 +23,20 @@ const cases = [
 test('game-over actions remain reachable on narrow and enlarged-text screens', async () => {
   const browser = await chromium.launch({ executablePath: chrome, headless: true });
   try {
-    for (const scenario of [cases[1], cases[3]]) {
+    for (const scenario of cases.filter(c => c.name === 'narrow portrait' || c.textZoom)) {
       const page = await browser.newPage({ viewport: { width: scenario.width, height: scenario.height } });
       try {
         await page.route(/\.js(?:\?|$)/, route => route.abort());
         await page.goto(url, { waitUntil: 'domcontentloaded' });
-        await page.evaluate(zoom => {
-          if (zoom) document.documentElement.style.fontSize = `${zoom * 100}%`;
+        await page.evaluate(scenario => {
+          if (scenario.textZoom) document.documentElement.style.fontSize = `${scenario.textZoom * 100}%`;
+          for (const [side,value] of Object.entries({top:scenario.safeTop,bottom:scenario.safeBottom,left:scenario.safeSide,right:scenario.safeSide})) {
+            if(value !== undefined) document.documentElement.style.setProperty(`--safe-${side}`,`${value}px`);
+          }
           document.querySelector('#menu-screen').classList.add('hidden');
           document.querySelector('#game-over-screen').classList.remove('hidden');
           document.querySelector('#social-result').classList.remove('hidden');
-        }, scenario.textZoom || null);
+        }, scenario);
         for (const selector of ['#restart-btn', '#share-btn', '#selfie-btn', '#share-card-btn', '#save-card-btn', '#friend-turn-btn', '#menu-btn']) {
           await page.locator(selector).evaluate(el => scrollBy(0, el.getBoundingClientRect().top - 100));
           const box = await page.locator(selector).boundingBox();
@@ -57,13 +62,16 @@ test('camera permission error and menu controls remain readable above footer', a
         // DOM state main.js uses when getUserMedia rejects with NotAllowedError.
         await page.route(/\.js(?:\?|$)/, route => route.abort());
         await page.goto(url, { waitUntil: 'domcontentloaded' });
-        await page.evaluate(zoom => {
-          if (zoom) document.documentElement.style.fontSize = `${zoom * 100}%`;
+        await page.evaluate(scenario => {
+          if (scenario.textZoom) document.documentElement.style.fontSize = `${scenario.textZoom * 100}%`;
+          for (const [side,value] of Object.entries({top:scenario.safeTop,bottom:scenario.safeBottom,left:scenario.safeSide,right:scenario.safeSide})) {
+            if(value !== undefined) document.documentElement.style.setProperty(`--safe-${side}`,`${value}px`);
+          }
           const error = document.querySelector('#camera-error');
           error.textContent = 'Camera access was denied. Allow camera access in your browser settings, then reload to play. Your video stays on this device.';
           error.classList.remove('hidden');
           document.querySelector('#loading-msg').classList.add('hidden');
-        }, scenario.textZoom || null);
+        }, scenario);
         const initialTitleTop = await page.locator('#menu-screen h1').evaluate(el => el.getBoundingClientRect().top);
         await page.evaluate(() => scrollTo(0, document.documentElement.scrollHeight));
         const geometry = await page.evaluate(() => {
@@ -86,7 +94,7 @@ test('camera permission error and menu controls remain readable above footer', a
           await page.screenshot({ path: path.join(output, `${scenario.name.replaceAll(' ', '-')}.png`), fullPage: true });
         }
         const label = `${scenario.name}: ${JSON.stringify(geometry)}`;
-        assert.ok(initialTitleTop >= 0, `title clipped initially: ${label}`);
+        assert.ok(initialTitleTop >= (scenario.safeTop || 0) + 16, `title clipped by safe area: ${label}`);
         assert.ok(geometry.error.top >= 0 && geometry.error.bottom + 8 <= geometry.footer.top, `error/footer overlap: ${label}`);
         assert.ok(geometry.scrollWidth <= geometry.viewportWidth + 1, `horizontal overflow: ${label}`);
         for (const button of await page.locator('.mode-btn').all()) {

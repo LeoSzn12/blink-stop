@@ -26,6 +26,8 @@ const enduranceScreen = document.getElementById('endurance-screen');
 const uploadProgress = document.getElementById('upload-progress');
 const calibrationLoader = document.querySelector('.loader-bar');
 const calibrationStatus = document.getElementById('calibration-status');
+const calibrationHint = document.getElementById('calibration-hint');
+const restartCameraBtn = document.getElementById('restart-camera-btn');
 
 // UI Elements
 const modeBtns = document.querySelectorAll('.mode-btn');
@@ -78,6 +80,8 @@ let animationFrameId;
 let calibrationFrameId;
 let precisionTarget = 10.00; 
 let calibrationStartTime = 0;
+let calibrationLastFrame = null;
+let calibrationLastEye = null;
 let lastScore = null;
 let lastResult = null;
 let activeChallenge = null;
@@ -248,6 +252,8 @@ modeBtns.forEach(btn => {
 });
 
 document.getElementById('surprise-start-btn').addEventListener('click', () => startGame('SURPRISE'));
+document.getElementById('calibration-cancel-btn').addEventListener('click', showMenu);
+restartCameraBtn.addEventListener('click', () => window.location.reload());
 document.getElementById('surprise-back-btn').addEventListener('click', () => {
     activeChallenge = null;
     document.getElementById('challenge-status').textContent = '';
@@ -518,6 +524,7 @@ function startGame(mode) {
     const session = cameraSession;
     faceMesh = createSessionFaceMesh(session);
     cameraError.classList.add('hidden');
+    restartCameraBtn.classList.add('hidden');
     currentMode = mode;
     loadingMsg.style.display = 'block';
     loadingMsg.innerText = 'INITIALIZING BLINK DETECTION...';
@@ -584,6 +591,11 @@ function startCalibration() {
     calibration.reset();
     tracking.reset();
     calibrationStartTime = performance.now();
+    calibrationLastFrame = null;
+    calibrationLastEye = null;
+    calibrationStatus.innerText = 'FINDING YOUR EYES';
+    calibrationHint.innerText = 'Face the camera with your eyes comfortably open. Put a light in front of you, not behind you.';
+    calibrationLoader.style.width = '0%';
 
     menuScreen.classList.add('hidden');
     menuScreen.classList.remove('active');
@@ -601,21 +613,32 @@ function startCalibration() {
 function updateCalibrationLoop() {
     if (gameState === 'CALIBRATING') {
         const now = performance.now();
-        const elapsed = (now - calibrationStartTime) / 1000;
-        const progress = Math.min((elapsed / 3) * 100, 100);
-        const remaining = Math.max(3 - elapsed, 0);
+        const elapsed = now - calibrationStartTime;
+        const progress = calibration.progress(now);
+        calibrationLoader.style.width = `${progress * 100}%`;
 
-        calibrationLoader.style.width = `${progress}%`;
-        calibrationStatus.innerText = `${remaining.toFixed(2)}s`;
-
-        if (elapsed >= 3 && calibration.ready(now)) {
+        if (elapsed >= 3000 && calibration.ready(now)) {
             finishCalibration();
         } else {
-            if (elapsed >= 3) {
-                calibration.reset();
-                calibrationStartTime = now;
-                calibrationStatus.innerText = 'LOOK AT CAMERA WITH EYES OPEN';
+            if (elapsed >= 15000) {
+                const stalled = calibrationLastFrame === null || now - calibrationLastFrame >= 2000;
+                showMenu();
+                cameraError.textContent = stalled
+                    ? 'Eye tracking could not start. Restart the camera below and try again in a well-lit room.'
+                    : 'Could not get a clear view of your eyes. Face a light, hold the phone at eye level, and try a mode again. You do not need to force your eyes wide open.';
+                cameraError.classList.remove('hidden');
+                restartCameraBtn.classList[stalled ? 'remove' : 'add']('hidden');
+                return;
             }
+            let message = 'FINDING YOUR EYES';
+            if (calibrationLastFrame !== null && now - calibrationLastFrame < 1000) {
+                message = calibrationLastEye === null ? 'FACE NOT FOUND — TRY MORE LIGHT'
+                    : calibrationLastEye >= .14 && calibrationLastEye <= .6 && progress > 0
+                        ? 'EYES FOUND — HOLD STEADY' : 'LOOK FORWARD, EYES OPEN NORMALLY';
+            } else if (elapsed >= 4000) message = 'WAITING FOR EYE TRACKING';
+            if (calibrationStatus.innerText !== message) calibrationStatus.innerText = message;
+            // Keep valid samples across the three-second warm-up. Slower cameras
+            // must be able to reach the required sample count without restarting.
             calibrationFrameId = requestAnimationFrame(updateCalibrationLoop);
         }
     }
@@ -633,8 +656,9 @@ function finishCalibration() {
         const avg = sum / (validData.length > 0 ? validData.length : calibrationData.length);
         
         baselineEAR = avg;
-        // More sensitive threshold! (0.85 of baseline instead of 0.8)
-        const newThreshold = Math.max(0.18, Math.min(avg * 0.85, 0.35));
+        // A fixed 0.18 floor could exceed a person's open-eye baseline and
+        // immediately end a round. Keep the threshold relative to their eyes.
+        const newThreshold = Math.min(avg * 0.75, 0.35);
         setBlinkThreshold(newThreshold);
     }
 
@@ -784,7 +808,12 @@ function onResults(results, session) {
     canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
 
     const landmarks = results.multiFaceLandmarks?.[0];
-    const eye = landmarks ? checkBlink(landmarks, now) : null;
+    const eye = landmarks ? checkBlink(landmarks, now, videoElement.videoWidth, videoElement.videoHeight) : null;
+    if (gameState === 'CALIBRATING') {
+        calibrationLastFrame = now;
+        calibrationLastEye = eye && Number.isFinite(eye.minEar) && eye.minEar > 0 ? eye.minEar : null;
+        calibration.observe(calibrationLastEye ?? NaN, now);
+    }
     if (eye && Number.isFinite(eye.minEar) && eye.minEar > 0 && eye.minEar <= 1) {
         if ((gameState === 'PLAYING' || gameState === 'ENDURANCE') && !tracking.observe(now)) {
             endGame('DISQUALIFIED');
@@ -807,9 +836,7 @@ function onResults(results, session) {
         currentEAR = ear;
         minEARValue = minEar;
 
-        if (gameState === 'CALIBRATING') {
-            calibration.observe(minEar, now); // Only plausible open-eye observations count
-        } else if (gameState === 'PLAYING' || gameState === 'ENDURANCE') {
+        if (gameState === 'PLAYING' || gameState === 'ENDURANCE') {
             if (blinking) {
                 endGame();
             }

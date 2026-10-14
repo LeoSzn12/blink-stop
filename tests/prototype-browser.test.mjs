@@ -15,7 +15,8 @@ test('Surprise consent, reward demo, portrait export and friend challenge work t
         const context = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block' });
         const page = await context.newPage();
         page.setDefaultTimeout(10000);
-        const errors = [], requests = [];
+        const errors = [], requests = [], warnings = [];
+        page.on('console', message => { if (message.type() === 'warning') warnings.push(message.text()); });
         page.on('pageerror', error => errors.push(error.message));
         page.on('request', request => requests.push(request.url()));
         await page.addInitScript(() => {
@@ -54,7 +55,16 @@ test('Surprise consent, reward demo, portrait export and friend challenge work t
         }
         await page.locator('#surprise-start-btn').click();
         console.log('Prototype: opt-in/start clicked');
-        await page.locator('#game-hud').waitFor({ state: 'visible', timeout: 10000 });
+        try {
+            await page.locator('#game-hud').waitFor({ state: 'visible', timeout: 10000 });
+        } catch (error) {
+            console.log('Calibration failure:', await page.evaluate(() => ({
+                width:document.querySelector('video').videoWidth,height:document.querySelector('video').videoHeight,
+                status:document.querySelector('#calibration-status').textContent,
+                cameraError:document.querySelector('#camera-error').textContent,
+            })), errors, warnings.slice(-5));
+            throw error;
+        }
         console.log('Prototype: calibrated with synthetic input');
         await page.evaluate(() => { window.testTimeOffset = 15000; });
         await page.locator('#surprise-overlay').waitFor({ state: 'visible' });
