@@ -39,6 +39,11 @@ content-rating reasoning and DEVICE_TESTS.md for the phone checks.
 
 ## Listing copy
 
+Build 1.0 (8.1) has the menu as shown under GAME MODES. Leave out the BLINK
+OLYMPICS section for that build. For a build with the new home screen (Endurance,
+Precision, Blink Olympics), rename Classic to Endurance, Endurance to 30 Seconds,
+add the BLINK OLYMPICS section, and say "choose Endurance" in the review notes.
+
 - **Name (30):** Blink Stop
 - **Subtitle (30):** Staring contest party game
 - **Promotional text (170):** New for the holidays: Thanksgiving, Christmas and Party skins put a hat on your head while you play, then frame the moment you blinked for the group chat.
@@ -76,6 +81,14 @@ GAME MODES
 • Daily: a new twist every day
 • Surprise: an optional 30-second round with a sudden face (it can startle you)
 
+BLINK OLYMPICS
+• Balloon Pop: blink to pop balloons as they float through the zone
+• Stare-down: two faces, one phone, first to blink loses
+• Party tournament: 2 to 8 players pass the phone, the top two meet in a final, and the champion gets a crown
+• Blink Reel: everyone's caught-blinking photos in one picture
+• Dares for whoever blinks first, themed for each holiday
+• Distraction: the phone tells jokes while you try not to blink
+
 CHALLENGE FRIENDS
 Share a challenge card or code. Friends play the same mode and target on their
 own phone, or hand yours over with Friend's Turn.
@@ -96,7 +109,9 @@ open while it calibrates, then blink to end the round. The hat is drawn on the
 device over the camera preview; detection reads the camera frames, not the
 drawings. Share Photo opens the system share sheet with a framed JPEG; Share Card
 exports a photo-free PNG. Surprise Mode is opt-in, shows a warning first, and has
-sound off by default. Camera frames, landmarks and scores never leave the device.
+sound off by default. Head-to-head needs two people in front of the front
+camera; Party mode keeps typed names and round photos in memory only and
+discards them when the party ends. Camera frames, landmarks and scores never leave the device.
 
 ## App Privacy answers
 

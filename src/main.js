@@ -6,10 +6,14 @@ import { createSerializedInference } from './inference.mjs';
 import { appendScore } from './leaderboard.mjs';
 import { cameraErrorMessage } from './cameraHelp.mjs';
 import { createGameOverCameraStop } from './roundLifecycle.mjs';
-import { sharePayload, shareClipboardText } from './share.mjs';
+import { sharePayload, shareClipboardText, formatScore, inviteLine } from './share.mjs';
 import { createSurpriseRound, createRewardedDemo } from './surprise.mjs';
 import { createSocialUI } from './social.mjs';
 import { SKINS, SKIN_STORAGE_KEY, resolveSkin, storedSkinValue, drawSkinOverlay, composeSelfie, selfieCaption } from './skins.mjs';
+import { createVersusMatch, largestFace } from './versus.mjs';
+import { parseNames, createParty, createDeck, forfeitCards, jokeCards } from './party.mjs';
+import { drawReel } from './reel.mjs';
+import { createBalloonRound, drawBalloons, BALLOON_MISSES } from './balloons.mjs';
 
 // DOM Elements
 const videoElement = document.getElementsByClassName('input_video')[0];
@@ -83,6 +87,36 @@ try { applySkin(resolveSkin(localStorage.getItem(SKIN_STORAGE_KEY))); }
 catch (err) { applySkin(resolveSkin(null)); }
 skinBtns.forEach(btn => btn.addEventListener('click', () => applySkin(btn.dataset.skin, true)));
 
+// Party features: head-to-head, party tournament, blink reel, forfeits, distraction jokes.
+const partyOptions = document.getElementById('party-options');
+const partyScreen = document.getElementById('party-screen');
+const partyTitle = document.getElementById('party-title');
+const partyMessage = document.getElementById('party-message');
+const partyStandings = document.getElementById('party-standings');
+const partyDareBox = document.getElementById('party-dare-box');
+const partyDare = document.getElementById('party-dare');
+const partyGoBtn = document.getElementById('party-go-btn');
+const partySkipBtn = document.getElementById('party-skip-btn');
+const partyReelBtn = document.getElementById('party-reel-btn');
+const partyReelStatus = document.getElementById('party-reel-status');
+const partyNextBtn = document.getElementById('party-next-btn');
+const dareBox = document.getElementById('dare-box');
+const dareText = document.getElementById('dare-text');
+const jokeCard = document.getElementById('joke-card');
+const olympicsOptions = document.getElementById('olympics-options');
+const balloonLayer = document.getElementById('balloon-layer');
+const balloonCtx = balloonLayer.getContext('2d');
+let balloonRound = null, balloonEyeClosed = false, balloonFrameId = null, balloonEnd = null;
+let shareLine = 'Think you can beat me?'; // invite text that travels with a shared photo
+let party = null;            // active party tournament, in memory only
+let partyStage = null;       // NEXT_TURN | FINAL | CHAMPION
+let partyTurn = false;       // the current round is a party turn
+let partyReel = [];          // [{ url, name }] framed photos from this party only
+let reelUrl = '', reelFile = null;
+let versusMatch = null, versusEvent = null, versusLastFrame = null, versusStartedAt = 0;
+let versusNames = null;      // [left, right] names for a party final
+let dareDeck = null, dareTarget = '', jokeDeck = null, jokeShownAt = -Infinity;
+
 // UI Elements (New - World Record & Precision)
 const worldRecordDisplay = document.getElementById('world-record-display');
 const wrValue = document.getElementById('wr-value');
@@ -123,7 +157,7 @@ const social = createSocialUI(challenge => {
     showMenu(); // Release the previous player's camera before the handoff.
     activeChallenge = challenge;
     precisionTarget = challenge.mode === 'PRECISION' ? challenge.target : precisionTarget;
-    document.getElementById('challenge-status').textContent = `${challenge.mode}: friend's reported result ${challenge.score.toFixed(3)}s${challenge.mode === 'PRECISION' ? ' off target' : ''}.`;
+    document.getElementById('challenge-status').textContent = `${challenge.mode}: friend's reported result ${formatScore(challenge.mode, challenge.score)}${challenge.mode === 'PRECISION' ? ' target' : ''}.`;
     if (challenge.mode === 'SURPRISE') {
         container.classList.add('surprise-mode');
         modeSelection.classList.add('hidden');
@@ -147,10 +181,10 @@ document.addEventListener('click', () => {
 });
 
 // MediaPipe Setup
-function createSessionFaceMesh(session) {
+function createSessionFaceMesh(session, maxNumFaces = 1) {
     const mesh = new FaceMesh({ locateFile: file => `vendor/face_mesh/${file}` });
     mesh.setOptions({
-        maxNumFaces: 1,
+        maxNumFaces,
         refineLandmarks: false, // Keep OFF for performance
         minDetectionConfidence: 0.5,
         minTrackingConfidence: 0.5
@@ -258,6 +292,21 @@ modeBtns.forEach(btn => {
             startGame('ENDURANCE');
         } else if (mode === 'DAILY') {
             startGame('DAILY');
+        } else if (mode === 'VERSUS') {
+            versusNames = null;
+            startGame('VERSUS');
+        } else if (mode === 'DISTRACT') {
+            startGame('DISTRACT');
+        } else if (mode === 'BALLOON') {
+            startGame('BALLOON');
+        } else if (mode === 'OLYMPICS') {
+            modeSelection.classList.add('hidden');
+            olympicsOptions.classList.remove('hidden');
+            olympicsOptions.querySelector('[data-mode="BALLOON"]').focus();
+        } else if (mode === 'PARTY') {
+            olympicsOptions.classList.add('hidden');
+            partyOptions.classList.remove('hidden');
+            document.getElementById('party-names').focus();
         } else if (mode === 'SURPRISE') {
             container.classList.add('surprise-mode');
             modeSelection.classList.add('hidden');
@@ -273,7 +322,7 @@ modeBtns.forEach(btn => {
 });
 
 document.getElementById('surprise-start-btn').addEventListener('click', () => startGame('SURPRISE'));
-document.getElementById('calibration-cancel-btn').addEventListener('click', showMenu);
+document.getElementById('calibration-cancel-btn').addEventListener('click', () => (party ? returnToParty() : showMenu()));
 restartCameraBtn.addEventListener('click', () => window.location.reload());
 document.getElementById('surprise-back-btn').addEventListener('click', () => {
     activeChallenge = null;
@@ -353,16 +402,19 @@ optionBtns.forEach(btn => {
 });
 
 restartBtn.addEventListener('click', () => startGame(currentMode));
-menuBtn.addEventListener('click', showMenu);
+menuBtn.addEventListener('click', () => (party ? returnToParty() : showMenu()));
 
 // Home button in HUD (MENU button)
 const homeBtn = document.getElementById('home-btn');
 if (homeBtn) {
     homeBtn.addEventListener('click', () => {
-        if (gameState === 'PLAYING' || gameState === 'ENDURANCE') {
-            if (confirm('Return to menu? Your current game will end.')) {
-                endGame('MENU_EXIT');
+        if (['PLAYING', 'ENDURANCE', 'VERSUS', 'BALLOON'].includes(gameState)) {
+            if (confirm(party ? 'Stop this round? The turn will start over.' : 'Return to menu? Your current game will end.')) {
+                if (party) returnToParty();
+                else endGame('MENU_EXIT');
             }
+        } else if (party) {
+            returnToParty();
         } else {
             showMenu();
         }
@@ -523,20 +575,482 @@ selfieBtn.addEventListener('click', async () => {
         }
         return;
     }
-    const file = selfieFile;
+    await shareJpegOnWeb(selfiePreview.src, selfieFile, 'blink-stop-photo');
+});
+
+// Web: share sheet with the prepared file where supported, otherwise a download.
+async function shareJpegOnWeb(dataUrl, file, baseName) {
     if (file && navigator.share && navigator.canShare?.({ files: [file] })) {
         try {
-            await navigator.share({ files: [file], title: 'Blink Stop', text: 'Think you can beat me? https://www.playblinkstop.com/ #BlinkStop' });
-            return;
+            await navigator.share({ files: [file], title: 'Blink Stop', text: `${shareLine} Play free: https://www.playblinkstop.com/ #BlinkStop` });
+            return 'shared';
         } catch (error) {
-            if (error?.name === 'AbortError') return; // Cancelled; the photo stays here.
+            if (error?.name === 'AbortError') return 'cancelled'; // The photo stays here.
         }
     }
     const link = document.createElement('a');
-    link.download = `blink-stop-photo-${Date.now()}.jpg`;
-    link.href = selfiePreview.src;
+    link.download = `${baseName}-${Date.now()}.jpg`;
+    link.href = dataUrl;
     link.click();
+    return 'downloaded';
+}
+
+function jpegFile(dataUrl, name) {
+    if (typeof File !== 'function' || typeof atob !== 'function') return null;
+    // Prepare bytes before the tap so the browser keeps share activation.
+    const bytes = Uint8Array.from(atob(dataUrl.split(',')[1]), ch => ch.charCodeAt(0));
+    return new File([bytes], name, { type: 'image/jpeg' });
+}
+
+// Framed result photo from the frozen camera frame (hats included).
+function makeSelfie(caption) {
+    try {
+        const dataUrl = composeSelfie(canvasElement, currentSkin, caption, document);
+        selfiePreview.src = dataUrl;
+        selfieContainer.classList.remove('hidden');
+        selfieFile = jpegFile(dataUrl, 'blink-stop-photo.jpg');
+        return dataUrl;
+    } catch (e) {
+        console.error("Selfie capture failed", e);
+        selfieContainer.classList.add('hidden');
+        return null;
+    }
+}
+
+function showDare(box, textEl, target) {
+    if (!dareDeck) dareDeck = createDeck(forfeitCards(currentSkin));
+    dareTarget = target;
+    textEl.textContent = `Dare for ${target}: ${dareDeck.next()}`;
+    box.classList.remove('hidden');
+}
+document.getElementById('new-dare-btn').addEventListener('click', () => { if (dareTarget) showDare(dareBox, dareText, dareTarget); });
+document.getElementById('party-new-dare-btn').addEventListener('click', () => { if (dareTarget) showDare(partyDareBox, partyDare, dareTarget); });
+
+function stopBalloons() {
+    cancelAnimationFrame(balloonFrameId);
+    balloonRound = null;
+    balloonEyeClosed = false;
+    balloonCtx.clearRect(0, 0, balloonLayer.width, balloonLayer.height);
+    balloonLayer.classList.add('hidden');
+}
+
+function hideJoke() {
+    stopBalloons();
+    jokeCard.classList.add('hidden');
+    jokeCard.textContent = '';
+    jokeShownAt = -Infinity;
+}
+// Distraction round: a new joke every 4 seconds, starting 1.5 seconds in.
+function updateJokes(elapsedSeconds) {
+    if (elapsedSeconds < 1.5 || elapsedSeconds - jokeShownAt < 4) return;
+    if (!jokeDeck) jokeDeck = createDeck(jokeCards(currentSkin));
+    jokeShownAt = elapsedSeconds;
+    jokeCard.textContent = jokeDeck.next();
+    jokeCard.classList.remove('hidden');
+}
+
+// ---------- Balloon Pop ----------
+function sizeBalloonLayer() {
+    const ratio = Math.min(window.devicePixelRatio || 1, 2);
+    const width = Math.round((balloonLayer.clientWidth || window.innerWidth || 360) * ratio);
+    const height = Math.round((balloonLayer.clientHeight || window.innerHeight || 640) * ratio);
+    if (balloonLayer.width !== width || balloonLayer.height !== height) {
+        balloonLayer.width = width;
+        balloonLayer.height = height;
+    }
+}
+
+function balloonLives() {
+    const left = balloonRound ? balloonRound.livesLeft() : BALLOON_MISSES;
+    return `${'●'.repeat(left)}${'○'.repeat(BALLOON_MISSES - left)}`;
+}
+
+function startBalloonRound() {
+    gameState = 'BALLOON';
+    balloonRound = createBalloonRound();
+    balloonEyeClosed = false;
+    balloonEnd = null;
+    startTime = Date.now();
+    balloonLayer.classList.remove('hidden');
+    sizeBalloonLayer();
+    hudLabel.innerText = 'POPPED';
+    scoreDisplay.innerText = '0';
+    gameHud.classList.remove('hidden');
+    gameHud.classList.add('active');
+    faceStatus.classList.remove('hidden', 'not-detected');
+    faceStatusText.innerText = `Blink when a balloon is in the zone ${balloonLives()}`;
+    updateBalloonLoop();
+}
+
+function updateBalloonLoop() {
+    if (gameState !== 'BALLOON' || !balloonRound) return;
+    const now = performance.now();
+    if (tracking.stale(now)) return endBalloon(true);
+    if (balloonRound.update(now).length) {
+        if (navigator.vibrate) navigator.vibrate(60);
+        faceStatusText.innerText = `One got away! ${balloonLives()}`;
+    }
+    sizeBalloonLayer();
+    drawBalloons(balloonCtx, balloonRound, currentSkin, balloonLayer.width, balloonLayer.height, now);
+    if (balloonRound.over) return endBalloon(false);
+    balloonFrameId = requestAnimationFrame(updateBalloonLoop);
+}
+
+// A pop is the moment the eyes close; holding them shut does not pop again.
+function handleBalloonEye(eye, now) {
+    if (!balloonRound) return;
+    if (eye && Number.isFinite(eye.minEar) && eye.minEar > 0 && eye.minEar <= 1) {
+        if (!tracking.observe(now)) return endBalloon(true);
+        faceLoss.observe(true, now);
+        faceStatus.classList.remove('not-detected');
+        currentEAR = eye.ear;
+        minEARValue = eye.minEar;
+        if (eye.blinking && !balloonEyeClosed) {
+            const result = balloonRound.blink(now);
+            if (result?.hit) {
+                scoreDisplay.innerText = String(result.score);
+                faceStatusText.innerText = `POP! ${balloonLives()}`;
+                if (navigator.vibrate) navigator.vibrate(25);
+            } else if (result) {
+                faceStatusText.innerText = `Too early! ${balloonLives()}`;
+                if (navigator.vibrate) navigator.vibrate(60);
+            }
+            if (balloonRound.over) return endBalloon(false);
+        }
+        balloonEyeClosed = !!eye.blinking;
+    } else {
+        resetBlinkState();
+        balloonEyeClosed = false;
+        faceStatus.classList.add('not-detected');
+        faceStatusText.innerText = 'Face not detected – move closer & improve lighting';
+        if (faceLoss.observe(false, now)) endBalloon(true);
+    }
+}
+
+function endBalloon(faceLost) {
+    if (gameState !== 'BALLOON' || !balloonRound) return;
+    balloonEnd = { score: balloonRound.score, elapsed: balloonRound.elapsed(performance.now()), faceLost };
+    endGame('BALLOON_OVER');
+}
+
+// ---------- Party tournament ----------
+document.getElementById('party-back-btn').addEventListener('click', () => {
+    partyOptions.classList.add('hidden');
+    olympicsOptions.classList.remove('hidden');
+    olympicsOptions.querySelector('[data-mode="PARTY"]').focus();
 });
+document.getElementById('olympics-back-btn').addEventListener('click', () => {
+    olympicsOptions.classList.add('hidden');
+    modeSelection.classList.remove('hidden');
+    document.querySelector('[data-mode="OLYMPICS"]').focus();
+});
+document.getElementById('party-start-btn').addEventListener('click', () => {
+    const status = document.getElementById('party-setup-status');
+    try {
+        party = createParty(parseNames(document.getElementById('party-names').value));
+    } catch (error) {
+        status.textContent = error.message;
+        return;
+    }
+    status.textContent = '';
+    partyReel = [];
+    reelUrl = ''; reelFile = null;
+    dareDeck = null;
+    showPartyScreen('NEXT_TURN');
+});
+partyGoBtn.addEventListener('click', () => {
+    if (!party) return;
+    if (partyStage === 'NEXT_TURN') {
+        partyTurn = true;
+        versusNames = null;
+        startGame('CLASSIC');
+    } else if (partyStage === 'FINAL') {
+        partyTurn = false;
+        versusNames = party.finalists();
+        startGame('VERSUS');
+    } else if (partyStage === 'CHAMPION') {
+        const names = party.players.join('\n');
+        endParty();
+        showMenu();
+        modeSelection.classList.add('hidden');
+        partyOptions.classList.remove('hidden');
+        document.getElementById('party-names').value = names;
+    }
+});
+partySkipBtn.addEventListener('click', () => {
+    if (!party || partyStage !== 'FINAL') return;
+    party.skipFinal();
+    showPartyScreen('CHAMPION');
+});
+document.getElementById('party-end-btn').addEventListener('click', () => { endParty(); showMenu(); });
+partyNextBtn.addEventListener('click', () => { if (party) returnToParty(); });
+partyReelBtn.addEventListener('click', async () => {
+    if (!reelUrl || partyReelBtn.disabled) return;
+    if (window.Capacitor?.isNativePlatform?.()) {
+        partyReelBtn.disabled = true;
+        try {
+            const { exportNativeSelfie } = await import('./deviceActions.mjs');
+            await exportNativeSelfie(reelUrl);
+        } catch (error) {
+            partyReelStatus.textContent = 'Sharing cancelled. Your reel is still here.';
+        } finally { partyReelBtn.disabled = false; }
+        return;
+    }
+    const result = await shareJpegOnWeb(reelUrl, reelFile, 'blink-stop-reel');
+    if (result === 'cancelled') partyReelStatus.textContent = 'Sharing cancelled. Your reel is still here.';
+});
+
+function endParty() {
+    party = null; partyStage = null; partyTurn = false; versusNames = null;
+    partyReel = []; reelUrl = ''; reelFile = null; dareTarget = '';
+}
+
+// From a finished round (or a cancelled one) back to the party's next step.
+function returnToParty() {
+    if (!party) return showMenu();
+    gameOverCameraStop.cancel();
+    cancelAnimationFrame(animationFrameId);
+    cancelAnimationFrame(calibrationFrameId);
+    stopCameraAndDetection();
+    audioManager.stopDrone();
+    hideJoke();
+    clearSelfie();
+    faceLoss.reset();
+    resetBlinkState();
+    versusMatch = null;
+    loadingMsg.style.display = 'none';
+    gameOverScreen.classList.remove('versus-result', 'party-turn');
+    partyNextBtn.classList.add('hidden');
+    dareBox.classList.add('hidden');
+    if (party.champion()) showPartyScreen('CHAMPION');
+    else if (party.turnsDone()) showPartyScreen('FINAL');
+    else showPartyScreen('NEXT_TURN');
+}
+
+function renderStandings() {
+    partyStandings.innerHTML = '';
+    party.standings().forEach((entry, index) => {
+        const li = document.createElement('li');
+        const name = document.createElement('span');
+        const score = document.createElement('span');
+        name.textContent = `${index + 1}. ${entry.name}`;
+        score.textContent = `${entry.score.toFixed(2)}s`;
+        li.append(name, score);
+        partyStandings.appendChild(li);
+    });
+}
+
+function showPartyScreen(stage) {
+    partyStage = stage;
+    gameState = 'PARTY';
+    partyTurn = false;
+    [menuScreen, gameOverScreen, calibrationScreen, gameHud, enduranceScreen].forEach(el => { el.classList.add('hidden'); el.classList.remove('active'); });
+    faceStatus.classList.add('hidden');
+    partyOptions.classList.add('hidden');
+    container.className = 'container';
+    partyDareBox.classList.add('hidden');
+    partySkipBtn.classList.add('hidden');
+    partyReelBtn.classList.add('hidden');
+    partyReelStatus.textContent = '';
+    renderStandings();
+    if (stage === 'NEXT_TURN') {
+        partyTitle.textContent = 'PASS THE PHONE';
+        partyMessage.textContent = `Turn ${party.turnNumber()} of ${party.players.length}: ${party.current()}, you're up. Eyes open, no do-overs.`;
+        partyGoBtn.textContent = `START ${party.current().toUpperCase()}'S TURN`;
+    } else if (stage === 'FINAL') {
+        const [left, right] = party.finalists();
+        partyTitle.textContent = 'THE FINAL';
+        partyMessage.textContent = `${left} vs ${right}, head-to-head. Sit side by side with a light in front of you: ${left} on the left, ${right} on the right. First to blink loses.`;
+        partyGoBtn.textContent = 'START THE FINAL';
+        partySkipBtn.classList.remove('hidden');
+    } else {
+        const champion = party.champion();
+        partyTitle.textContent = `👑 ${champion.toUpperCase()} WINS!`;
+        partyMessage.textContent = party.finalPlayed() ? `${champion} won the final.` : `${champion} had the longest stare.`;
+        partyGoBtn.textContent = 'NEW PARTY';
+        const last = party.lastPlace();
+        if (last && last !== champion) showDare(partyDareBox, partyDare, last);
+        if (partyReel.length) {
+            partyReelBtn.classList.remove('hidden');
+            buildReel(champion);
+        }
+    }
+    partyScreen.classList.remove('hidden');
+    partyScreen.classList.add('active');
+    partyGoBtn.focus();
+}
+
+function addToReel(url, name) {
+    if (party && url) partyReel.push({ url, name });
+}
+
+async function buildReel(champion) {
+    partyReelBtn.disabled = true;
+    partyReelStatus.textContent = 'Making your Blink Reel...';
+    const reelParty = party;
+    try {
+        const photos = await Promise.all(partyReel.slice(-9).map(({ url, name }) => new Promise(resolve => {
+            const image = new Image();
+            image.onload = () => resolve({ image, name });
+            image.onerror = () => resolve({ image: null, name });
+            image.src = url;
+        })));
+        if (party !== reelParty) return;
+        reelUrl = drawReel(photos, currentSkin, { champion, doc: document });
+        shareLine = `Our Blink Stop party reel 🎉 ${champion} took the crown!`;
+        reelFile = jpegFile(reelUrl, 'blink-stop-reel.jpg');
+        partyReelStatus.textContent = `${photos.length} caught-blinking photo${photos.length === 1 ? '' : 's'} in one picture.`;
+    } catch (error) {
+        console.warn('Reel failed:', error);
+        partyReelStatus.textContent = 'The reel could not be made on this device.';
+    } finally { partyReelBtn.disabled = false; }
+}
+
+// ---------- Head-to-head ----------
+function versusName(side) {
+    return versusNames ? versusNames[side === 'LEFT' ? 0 : 1] : side === 'LEFT' ? 'Left player' : 'Right player';
+}
+
+function startVersusCalibration() {
+    cancelAnimationFrame(calibrationFrameId);
+    gameState = 'VERSUS_CALIBRATING';
+    versusMatch = createVersusMatch();
+    versusEvent = null;
+    versusLastFrame = null;
+    calibrationStartTime = performance.now();
+    calibrationStatus.innerText = 'FINDING BOTH FACES';
+    calibrationHint.innerText = versusNames
+        ? `${versusNames[0]} on the left, ${versusNames[1]} on the right, cheek to cheek. Light in front of you, eyes open normally.`
+        : 'Two players side by side, both faces in view. Light in front of you, eyes open normally.';
+    calibrationLoader.style.width = '0%';
+    [menuScreen, gameOverScreen, partyScreen].forEach(el => { el.classList.add('hidden'); el.classList.remove('active'); });
+    calibrationScreen.classList.remove('hidden');
+    calibrationScreen.classList.add('active');
+    updateVersusLoop();
+}
+
+function handleVersusFrame(faces, now) {
+    if (!versusMatch) return;
+    versusLastFrame = now;
+    versusEvent = versusMatch.observe(faces, now, videoElement.videoWidth, videoElement.videoHeight);
+    if (versusEvent.started && gameState === 'VERSUS_CALIBRATING') beginVersusPlay();
+    else if (versusMatch.phase === 'DONE' && gameState === 'VERSUS') endVersus(versusMatch.outcome);
+}
+
+function beginVersusPlay() {
+    gameState = 'VERSUS';
+    calibrationScreen.classList.add('hidden');
+    calibrationScreen.classList.remove('active');
+    startTime = Date.now();
+    versusStartedAt = performance.now();
+    if (soundEnabled) audioManager.startDrone();
+    gameHud.classList.remove('hidden');
+    gameHud.classList.add('active');
+    faceStatus.classList.remove('hidden', 'not-detected');
+    faceStatusText.innerText = `${versusName('LEFT')} vs ${versusName('RIGHT')}`;
+}
+
+function updateVersusLoop() {
+    const now = performance.now();
+    if (gameState === 'VERSUS_CALIBRATING') {
+        const elapsed = now - calibrationStartTime;
+        calibrationLoader.style.width = `${(versusEvent?.progress || 0) * 100}%`;
+        if (elapsed >= 20000) {
+            const back = party ? returnToParty : showMenu;
+            back();
+            const message = 'Could not see both faces clearly. Sit side by side, cheek to cheek, with a light in front of you, and hold the phone at eye level.';
+            if (party) partyMessage.textContent = message;
+            else { cameraError.textContent = message; cameraError.classList.remove('hidden'); }
+            return;
+        }
+        const stale = versusLastFrame === null || now - versusLastFrame >= 1000;
+        const message = stale ? (elapsed >= 4000 ? 'WAITING FOR EYE TRACKING' : 'FINDING BOTH FACES')
+            : versusEvent?.status === 'NEED_TWO' ? `${versusEvent.faces === 1 ? 'ONE FACE FOUND' : 'NO FACES FOUND'}: BOTH OF YOU IN VIEW`
+            : versusEvent?.status === 'EYES' ? 'LOOK FORWARD, EYES OPEN NORMALLY' : 'BOTH FACES FOUND: HOLD STEADY';
+        if (calibrationStatus.innerText !== message) calibrationStatus.innerText = message;
+        calibrationFrameId = requestAnimationFrame(updateVersusLoop);
+    } else if (gameState === 'VERSUS') {
+        if (versusLastFrame === null || now - versusLastFrame >= 1000) {
+            endVersus(versusMatch.stall(now));
+            return;
+        }
+        scoreDisplay.innerText = `${((Date.now() - startTime) / 1000).toFixed(2)}s`;
+        const lost = versusEvent && versusEvent.faces !== undefined && versusEvent.faces < 2;
+        faceStatus.classList[lost ? 'add' : 'remove']('not-detected');
+        faceStatusText.innerText = lost ? 'Both faces in view, please!' : `${versusName('LEFT')} vs ${versusName('RIGHT')}`;
+        const meterFill = document.getElementById('eye-meter-fill');
+        if (meterFill && versusEvent?.openness) meterFill.style.width = `${Math.min(versusEvent.openness.LEFT, versusEvent.openness.RIGHT) * 100}%`;
+        animationFrameId = requestAnimationFrame(updateVersusLoop);
+    }
+}
+
+function endVersus(outcome) {
+    if (gameState !== 'VERSUS') return;
+    gameState = 'GAME_OVER';
+    cancelAnimationFrame(animationFrameId);
+    gameOverCameraStop.schedule();
+    audioManager.stopDrone();
+    faceStatus.classList.add('hidden');
+    gameHud.classList.add('hidden');
+    gameHud.classList.remove('active');
+    container.className = 'container';
+    clearSelfie();
+    social.render(null);
+    lastResult = null;
+    lastScore = null;
+    saveScoreBtn.disabled = true;
+    shareBtn.disabled = true;
+    demoBonusBtn.disabled = true;
+    finalScoreSub.classList.add('hidden');
+    gameOverWorldRecord.classList.add('hidden');
+    dareBox.classList.add('hidden');
+    gameOverScreen.classList.add('versus-result');
+    gameOverScreen.classList.remove('party-turn');
+    const time = `${(outcome?.elapsed ?? 0).toFixed(2)}s`;
+    let headline, detail;
+    if (outcome?.result === 'WIN') {
+        const winner = versusName(outcome.winner), loser = versusName(outcome.loser);
+        headline = `${winner.toUpperCase()} WINS!`;
+        detail = `${loser} blinked first after ${time}`;
+        gameOverTitle.style.color = 'var(--neon-cyan)';
+        if (soundEnabled) audioManager.playWin();
+        showDare(dareBox, dareText, loser);
+        if (party && versusNames) {
+            party.recordFinal(winner);
+            gameOverScreen.classList.add('party-turn'); // The final is decided: no rematch button.
+        }
+    } else if (outcome?.result === 'TIE') {
+        headline = 'DEAD HEAT!';
+        detail = `You both blinked at ${time}`;
+        gameOverTitle.style.color = 'var(--neon-pink)';
+        showDare(dareBox, dareText, `${versusName('LEFT')} and ${versusName('RIGHT')}`);
+    } else {
+        headline = 'FACE LEFT THE FRAME';
+        detail = 'Both faces need to stay in view. Rematch?';
+        gameOverTitle.style.color = 'var(--neon-red)';
+    }
+    gameOverTitle.innerText = headline;
+    finalScoreLabel.innerText = 'THE STARE-DOWN LASTED';
+    finalScoreVal.innerText = outcome?.result === 'VOID' ? '--' : time;
+    finalScoreSub.innerText = detail;
+    finalScoreSub.classList.remove('hidden');
+    restartBtn.innerText = 'REMATCH';
+    shareLine = outcome?.result === 'WIN' ? `${versusName(outcome.winner)} won our Blink Stop stare-down 👀 Who's next?` : 'Blink Stop stare-down 👀 Who can beat us?';
+    const photo = makeSelfie({ headline, detail });
+    if (party && versusNames) {
+        if (outcome?.result === 'WIN') addToReel(photo, versusName(outcome.winner));
+        partyNextBtn.textContent = party.champion() ? 'CROWN THE CHAMPION' : 'BACK TO THE PARTY';
+        partyNextBtn.classList.remove('hidden');
+    } else partyNextBtn.classList.add('hidden');
+    try {
+        canvasCtx.save();
+        canvasCtx.fillStyle = "rgba(255, 0, 0, 0.4)";
+        canvasCtx.fillRect(0, 0, canvasElement.width, canvasElement.height);
+        canvasCtx.restore();
+    } catch (e) { /* display only */ }
+    gameOverScreen.classList.remove('hidden');
+    gameOverScreen.classList.add('active');
+}
 
 function startGame(mode) {
     if (gameState === 'AD_DEMO') return;
@@ -548,12 +1062,22 @@ function startGame(mode) {
     surpriseRound = null;
     soundEnabled = mode !== 'SURPRISE' || surpriseSound.checked;
     clearSelfie();
+    hideJoke();
+    jokeDeck = null;
+    dareBox.classList.add('hidden');
+    partyNextBtn.classList.add('hidden');
+    gameOverScreen.classList.remove('versus-result', 'party-turn');
+    restartBtn.innerText = 'RETRY';
+    partyScreen.classList.add('hidden');
+    partyScreen.classList.remove('active');
+    if (mode !== 'CLASSIC') partyTurn = false;
     gameOverCameraStop.cancel();
     cancelAnimationFrame(calibrationFrameId);
+    cancelAnimationFrame(animationFrameId);
     // Abandon any previous camera permission prompt or pending startup.
     stopCameraAndDetection();
     const session = cameraSession;
-    faceMesh = createSessionFaceMesh(session);
+    faceMesh = createSessionFaceMesh(session, 2); // Two faces: Stare-down needs both; solo keeps the closest player.
     cameraError.classList.add('hidden');
     restartCameraBtn.classList.add('hidden');
     currentMode = mode;
@@ -579,8 +1103,8 @@ function startGame(mode) {
         wrValue.innerText = scores === null ? 'Unavailable' : record ? `${record.score.toFixed(2)}s` : 'None';
         window.currentWorldRecord = record?.score ?? null;
     } else {
-        // Endurance
-        hudLabel.innerText = "TIME";
+        // Endurance, Daily, Surprise, Distraction and Head-to-head
+        hudLabel.innerText = mode === 'VERSUS' ? 'STARE-DOWN' : "TIME";
         targetDisplay.classList.add('hidden');
         worldRecordDisplay.classList.add('hidden');
     }
@@ -600,7 +1124,7 @@ function startGame(mode) {
             if (!started || session !== cameraSession) return;
             loadingMsg.innerText = 'CAMERA READY...';
             setTimeout(() => {
-                if (session === cameraSession && !document.hidden) startCalibration();
+                if (session === cameraSession && !document.hidden) (mode === 'VERSUS' ? startVersusCalibration : startCalibration)();
             }, 500);
         })
         .catch(err => {
@@ -608,6 +1132,7 @@ function startGame(mode) {
             console.error("Camera error:", err);
             loadingMsg.style.display = 'none';
 
+            if (party) endParty();
             showMenu();
             cameraError.textContent = cameraErrorMessage(err);
             cameraError.classList.remove('hidden');
@@ -653,6 +1178,11 @@ function updateCalibrationLoop() {
         } else {
             if (elapsed >= 15000) {
                 const stalled = calibrationLastFrame === null || now - calibrationLastFrame >= 2000;
+                if (party) {
+                    returnToParty();
+                    partyMessage.textContent = `Couldn't get a clear view of ${party.current()}'s eyes. Face a light, hold the phone at eye level, and try again.`;
+                    return;
+                }
                 showMenu();
                 cameraError.textContent = stalled
                     ? 'Eye tracking could not start. Restart the camera below and try again in a well-lit room.'
@@ -703,7 +1233,9 @@ function finishCalibration() {
     resetBlinkState();
     tracking.reset(performance.now());
 
-    if (currentMode === 'ENDURANCE') {
+    if (currentMode === 'BALLOON') {
+        startBalloonRound();
+    } else if (currentMode === 'ENDURANCE') {
         startEnduranceMode();
     } else {
         gameState = 'PLAYING';
@@ -792,6 +1324,17 @@ function showMenu() {
     surpriseOverlay.classList.add('hidden');
     audioManager.stopDrone();
     clearSelfie();
+    endParty();
+    hideJoke();
+    versusMatch = null;
+    partyScreen.classList.add('hidden');
+    partyScreen.classList.remove('active');
+    partyOptions.classList.add('hidden');
+    olympicsOptions.classList.add('hidden');
+    dareBox.classList.add('hidden');
+    partyNextBtn.classList.add('hidden');
+    gameOverScreen.classList.remove('versus-result', 'party-turn');
+    restartBtn.innerText = 'RETRY';
     gameOverCameraStop.cancel();
     gameState = 'MENU';
     cancelAnimationFrame(animationFrameId);
@@ -827,7 +1370,10 @@ function showMenu() {
 }
 
 document.addEventListener('visibilitychange', () => {
-    if (document.hidden && (videoElement.srcObject || gameState !== 'MENU' || loadingMsg.style.display === 'block')) showMenu();
+    if (!document.hidden) return;
+    // Mid-party, backgrounding releases the camera but keeps the party and its scores.
+    if (party) { if (videoElement.srcObject || gameState !== 'PARTY' || loadingMsg.style.display === 'block') returnToParty(); }
+    else if (videoElement.srcObject || gameState !== 'MENU' || loadingMsg.style.display === 'block') showMenu();
 });
 
 function onResults(results, session) {
@@ -838,11 +1384,21 @@ function onResults(results, session) {
     canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
     canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
 
-    const landmarks = results.multiFaceLandmarks?.[0];
+    const landmarks = largestFace(results.multiFaceLandmarks);
     // Display canvas only; detection reads the video element, never these drawings.
-    try { drawSkinOverlay(canvasCtx, currentSkin, landmarks, canvasElement.width, canvasElement.height, now); }
+    try { drawSkinOverlay(canvasCtx, currentSkin, results.multiFaceLandmarks, canvasElement.width, canvasElement.height, now); }
     catch (err) { console.warn('Skin overlay skipped:', err); }
+    if (gameState === 'VERSUS_CALIBRATING' || gameState === 'VERSUS') {
+        handleVersusFrame(results.multiFaceLandmarks || [], now);
+        canvasCtx.restore();
+        return;
+    }
     const eye = landmarks ? checkBlink(landmarks, now, videoElement.videoWidth, videoElement.videoHeight) : null;
+    if (gameState === 'BALLOON') {
+        handleBalloonEye(eye, now);
+        canvasCtx.restore();
+        return;
+    }
     if (gameState === 'CALIBRATING') {
         calibrationLastFrame = now;
         calibrationLastEye = eye && Number.isFinite(eye.minEar) && eye.minEar > 0 ? eye.minEar : null;
@@ -940,6 +1496,7 @@ function updateGameLoop() {
             }
         }
         scoreDisplay.innerText = `${elapsed.toFixed(2)}s`;
+        if (currentMode === 'DISTRACT') updateJokes(elapsed);
 
         // Update Eye Openness Meter and tension effect
         const threshold = getBlinkThreshold();
@@ -982,7 +1539,7 @@ function updateGameLoop() {
         // Visual Stages (Classic Mode only)
         if (currentMode === 'CLASSIC') {
             updateClassicVisualStage(elapsed);
-        } else if (currentMode !== 'DAILY' && currentMode !== 'SURPRISE') {
+        } else if (!['DAILY', 'SURPRISE', 'DISTRACT'].includes(currentMode)) {
             if (elapsed > 10) container.classList.add('chaos-shake');
             if (elapsed > 20) container.classList.add('chaos-glitch');
             if (elapsed > 30) container.classList.add('chaos-invert');
@@ -995,6 +1552,11 @@ function updateGameLoop() {
 function endGame(reason = 'BLINK') {
     surpriseRound = null;
     surpriseOverlay.classList.add('hidden');
+    hideJoke();
+    gameOverScreen.classList.remove('versus-result', 'party-turn');
+    dareBox.classList.add('hidden');
+    partyNextBtn.classList.add('hidden');
+    restartBtn.innerText = 'RETRY';
     if (reason === 'MENU_EXIT') {
         showMenu();
         return;
@@ -1032,7 +1594,15 @@ function endGame(reason = 'BLINK') {
         finalScoreSub.classList.add('hidden');
         gameOverWorldRecord.classList.add('hidden');
 
-        if (reason === 'WIN_SURPRISE') {
+        if (reason === 'BALLOON_OVER' && balloonEnd) {
+            scoreToSave = balloonEnd.score;
+            finalScoreText = String(balloonEnd.score);
+            finalScoreLabel.innerText = balloonEnd.score === 1 ? 'BALLOON POPPED' : 'BALLOONS POPPED';
+            gameOverTitle.innerText = balloonEnd.score >= 15 ? 'BALLOON CHAMPION!' : balloonEnd.score >= 5 ? 'NICE POPPING!' : 'GAME OVER';
+            gameOverTitle.style.color = 'var(--neon-cyan)';
+            finalScoreSub.innerText = balloonEnd.faceLost ? 'Your face left the frame' : `${BALLOON_MISSES} misses and you're out`;
+            finalScoreSub.classList.remove('hidden');
+        } else if (reason === 'WIN_SURPRISE') {
             scoreToSave = 30;
             finalScoreText = '30.00s';
             finalScoreLabel.innerText = 'SURPRISE SURVIVOR';
@@ -1100,10 +1670,10 @@ function endGame(reason = 'BLINK') {
             finalScoreLabel.innerText = "YOUR EYES GAVE UP AT";
             gameOverTitle.innerText = "BLINK DETECTED";
             gameOverTitle.style.color = "var(--neon-red)";
-        } else if (currentMode === 'DAILY' || currentMode === 'SURPRISE') {
+        } else if (currentMode === 'DAILY' || currentMode === 'SURPRISE' || currentMode === 'DISTRACT') {
             scoreToSave = elapsed;
             finalScoreText = `${elapsed.toFixed(2)}s`;
-            finalScoreLabel.innerText = currentMode === 'SURPRISE' ? 'SURPRISE SURVIVAL' : 'DAILY SURVIVAL';
+            finalScoreLabel.innerText = currentMode === 'SURPRISE' ? 'SURPRISE SURVIVAL' : currentMode === 'DISTRACT' ? 'JOKES SURVIVED FOR' : 'DAILY SURVIVAL';
             gameOverTitle.innerText = "BLINK DETECTED";
             gameOverTitle.style.color = "var(--neon-pink)";
         }
@@ -1115,18 +1685,19 @@ function endGame(reason = 'BLINK') {
         finalScoreVal.innerText = finalScoreText;
 
         // Shareable photo: the last camera frame (with the skin's hat) in a themed frame.
-        try {
-            const dataUrl = composeSelfie(canvasElement, currentSkin, selfieCaption({ reason, mode: currentMode, elapsed, target: precisionTarget }), document);
-            selfiePreview.src = dataUrl;
-            selfieContainer.classList.remove('hidden');
-            if (typeof File === 'function' && typeof atob === 'function') {
-                // Prepare bytes before the tap so the browser keeps share activation.
-                const bytes = Uint8Array.from(atob(dataUrl.split(',')[1]), ch => ch.charCodeAt(0));
-                selfieFile = new File([bytes], 'blink-stop-photo.jpg', { type: 'image/jpeg' });
-            }
-        } catch (e) {
-            console.error("Selfie capture failed", e);
-            selfieContainer.classList.add('hidden');
+        shareLine = inviteLine(lastResult);
+        const photo = makeSelfie(selfieCaption({ reason, mode: currentMode, elapsed, target: precisionTarget, score: scoreToSave }));
+        let namePrefill = '';
+        if (party && partyTurn) {
+            // Party turn: record the stare (a lost face counts as zero), keep the photo for the reel.
+            const name = party.current();
+            party.record(lastScore ?? 0);
+            addToReel(photo, name);
+            partyTurn = false;
+            gameOverScreen.classList.add('party-turn');
+            namePrefill = name.toUpperCase().slice(0, 10);
+            partyNextBtn.textContent = party.turnsDone() ? 'SEE WHO MADE THE FINAL' : `NEXT UP: ${party.current().toUpperCase()}`;
+            partyNextBtn.classList.remove('hidden');
         }
         // Red flash on the frozen camera view behind Game Over.
         try {
@@ -1136,7 +1707,7 @@ function endGame(reason = 'BLINK') {
             canvasCtx.restore();
         } catch (e) { /* display only */ }
 
-        playerNameInput.value = '';
+        playerNameInput.value = namePrefill;
         playerNameInput.disabled = false;
         saveScoreBtn.disabled = lastScore === null;
         shareBtn.disabled = lastScore === null;

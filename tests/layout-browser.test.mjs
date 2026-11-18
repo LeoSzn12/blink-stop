@@ -97,7 +97,7 @@ test('camera permission error and menu controls remain readable above footer', a
         assert.ok(initialTitleTop >= (scenario.safeTop || 0) + 16, `title clipped by safe area: ${label}`);
         assert.ok(geometry.error.top >= 0 && geometry.error.bottom + 8 <= geometry.footer.top, `error/footer overlap: ${label}`);
         assert.ok(geometry.scrollWidth <= geometry.viewportWidth + 1, `horizontal overflow: ${label}`);
-        for (const button of await page.locator('.mode-btn').all()) {
+        for (const button of await page.locator('.mode-btn:visible').all()) {
           await button.evaluate(el => scrollBy(0, el.getBoundingClientRect().top - 96));
           const box = await button.boundingBox();
           assert.ok(box.y >= 0 && box.y + box.height <= geometry.footer.top, `mode button clipped or obscured: ${label}`);

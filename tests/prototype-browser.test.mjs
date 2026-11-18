@@ -47,6 +47,7 @@ test('Surprise consent, reward demo, portrait export and friend challenge work t
         assert.equal(await page.evaluate(() => document.body.classList.contains('skin-christmas')), true);
         assert.equal(await page.locator('[data-skin="CHRISTMAS"]').getAttribute('aria-checked'), 'true');
         assert.match(await page.evaluate(() => localStorage.getItem('blink_skin')), /^CHRISTMAS@\d{4}-\d{2}$/);
+        await page.locator('#more-modes > summary').click();
         await page.locator('[data-mode="SURPRISE"]').click();
         assert.equal(await page.locator('#surprise-sound').isChecked(), false);
         assert.equal(await page.evaluate(() => document.querySelector('.input_video').srcObject), null);
