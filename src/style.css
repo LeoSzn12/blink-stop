@@ -1091,7 +1091,7 @@ body.skin-party { --neon-cyan: #ffd23f; --neon-pink: #ff5fd2; --glass-bg: rgba(2
 
 /* Simple home: Endurance, Precision, Blink Olympics; the rest folded away. */
 .mode-selection { flex-direction: column; flex-wrap: nowrap; align-items: stretch; width: min(100%, 24rem); gap: 1rem; margin-left: auto; margin-right: auto; }
-.home-btn { width: 100%; min-width: 0; padding-top: 1.1rem; padding-bottom: 1.1rem; font-size: 1.25rem; }
+.main-mode-btn { width: 100%; min-width: 0; padding-top: 1.1rem; padding-bottom: 1.1rem; font-size: 1.25rem; }
 .precision-btn { border-color: var(--neon-pink); color: var(--neon-pink); }
 .olympics-btn, .balloon-btn { border-color: #39ff14; color: #39ff14; }
 .more-modes { text-align: center; color: #aaa; }
