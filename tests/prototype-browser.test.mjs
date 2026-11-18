@@ -143,9 +143,12 @@ test('Surprise consent, reward demo, portrait export and friend challenge work t
         await page.waitForFunction(() => document.querySelector('#challenge-input').value === 'BS1-P-10-5000');
         assert.equal(await page.locator('#challenge-input').inputValue(), 'BS1-P-10-5000');
         assert.equal(await page.evaluate(() => document.querySelector('.input_video').srcObject), null);
-        await page.locator('#challenge-form button').click();
+        assert.match(await page.locator('#challenge-banner-title').innerText(), /Beat 5\.000s off 10s/);
+        await page.locator('#challenge-banner-play').click();
+        assert.equal(await page.locator('#challenge-banner').isVisible(), false);
         await page.locator('#game-hud').waitFor({ state: 'visible' });
         assert.equal(await page.locator('#target-display .digital-text-sm').innerText(), '10.00s');
+        assert.equal(await page.locator('#challenge-hud-value').innerText(), '5.000s off');
         await page.evaluate(() => { window.testTimeOffset += 10000; window.testBlink = true; });
         await page.locator('#game-over-screen').waitFor({ state: 'visible' });
         assert.match(await page.locator('#challenge-caption').inputValue(), /Precision: .*s off.*Target 10s/);

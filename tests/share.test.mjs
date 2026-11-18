@@ -37,3 +37,34 @@ test('a repeated code in a caption and link is one challenge, while distinct cha
     const daily = sharePayload({ mode: 'DAILY', score: 5, elapsed: 5 });
     assert.equal(daily.url, 'https://www.playblinkstop.com/');
 });
+
+test('challenge links carry the skin, open on the score to beat, and brag in the skin', async () => {
+    const { challengeUrl, parseChallengeLink, challengeHeadline, inviteLine, skinPersona } = await import('../src/share.mjs');
+    const turkey = { mode: 'CLASSIC', score: 14, elapsed: 14 };
+    assert.equal(challengeUrl(turkey, 'THANKSGIVING'), 'https://www.playblinkstop.com/#challenge=BS1-C-0-14000&skin=thanksgiving');
+    assert.equal(challengeUrl(turkey, 'CLASSIC'), 'https://www.playblinkstop.com/#challenge=BS1-C-0-14000');
+    assert.equal(challengeUrl({ mode: 'DAILY', score: 5, elapsed: 5 }, 'PARTY'), 'https://www.playblinkstop.com/');
+    assert.equal(challengeUrl(null, 'PARTY'), 'https://www.playblinkstop.com/');
+
+    const link = parseChallengeLink('#challenge=BS1-C-0-14000&skin=thanksgiving');
+    assert.deepEqual(link, { code: 'BS1-C-0-14000', skin: 'THANKSGIVING', challenge: { mode: 'CLASSIC', score: 14, target: 0 } });
+    assert.equal(parseChallengeLink('#challenge=BS1-C-0-14000&skin=<script>').skin, null, 'unknown skins are ignored');
+    assert.equal(parseChallengeLink('#challenge=BS1-C-0-14000').skin, null);
+    assert.equal(parseChallengeLink('#other'), null);
+    assert.throws(() => parseChallengeLink('#challenge=garbage&skin=party'));
+
+    assert.equal(inviteLine(turkey, 'THANKSGIVING'), 'I kept my eyes open for 14.00s as a turkey 🦃 Can you beat me?');
+    assert.equal(inviteLine(turkey), 'I kept my eyes open for 14.00s 👀 Can you beat me?');
+    assert.match(inviteLine({ mode: 'BALLOON', score: 7, elapsed: 30 }, 'CHRISTMAS'), /^I popped 7 balloons just by blinking, in a Santa hat 🎅/);
+    assert.match(inviteLine({ mode: 'PRECISION', score: 0.05, elapsed: 9.95, target: 10 }, 'PARTY'), /0\.050s off the 10-second mark in a party hat 🎉/);
+    assert.equal(skinPersona('CLASSIC'), '');
+
+    assert.deepEqual(challengeHeadline({ mode: 'CLASSIC', score: 14 }, 'THANKSGIVING'), { title: 'Beat 14.00s', line: 'Your friend kept their eyes open for 14.00s in Endurance as a turkey 🦃. Your turn.' });
+    assert.equal(challengeHeadline({ mode: 'PRECISION', score: 0.05, target: 10 }, 'CLASSIC').title, 'Beat 0.050s off 10s');
+    assert.equal(challengeHeadline({ mode: 'BALLOON', score: 7 }).title, 'Pop more than 7');
+
+    const payload = sharePayload(turkey, 'THANKSGIVING');
+    assert.match(payload.text, /^I kept my eyes open for 14\.00s as a turkey/);
+    assert.equal(payload.url, 'https://www.playblinkstop.com/#challenge=BS1-C-0-14000&skin=thanksgiving');
+    assert.equal(parseChallenge(payload.text).score, 14, 'the caption still pastes as one challenge');
+});
