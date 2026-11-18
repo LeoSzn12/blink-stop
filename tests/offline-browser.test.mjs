@@ -39,7 +39,7 @@ test('offline reload loads versioned scripts, styles, policies, and the inferenc
         assert.equal(await page.locator('.mode-btn').count(), 10);
         assert.equal(await page.locator('.mode-selection').evaluate(el => getComputedStyle(el).display), 'flex');
         // Back must respond: this proves main.js and its imports actually executed offline.
-        await page.locator('[data-mode="PRECISION"]').click();
+        await page.locator('#precision-change-btn').click();
         await page.locator('#precision-back-btn').click();
         assert.equal(await page.locator('.mode-selection').isVisible(), true);
         const result = await page.evaluate(async () => {

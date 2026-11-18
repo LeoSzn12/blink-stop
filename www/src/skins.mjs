@@ -5,7 +5,7 @@
 export const SKINS = {
     CLASSIC: { id: 'CLASSIC', name: 'Classic', icon: '👁️', greeting: 'BLINK STOP', menuLine: '',
         colors: { primary: '#30f2d5', secondary: '#ff3df5', text: '#ffffff', muted: '#bfc7d5', bgTop: '#081520', bgBottom: '#230d35' } },
-    THANKSGIVING: { id: 'THANKSGIVING', name: 'Thanksgiving', icon: '🦃', greeting: 'HAPPY THANKSGIVING', menuLine: 'Gobble mode: pilgrim hat on, eyes wide open.',
+    THANKSGIVING: { id: 'THANKSGIVING', name: 'Thanksgiving', icon: '🦃', greeting: 'HAPPY THANKSGIVING', menuLine: 'Pilgrim hat on. Keep your eyes open as long as you can!',
         colors: { primary: '#ffb347', secondary: '#ff6b35', text: '#fff6e6', muted: '#f3d9b8', bgTop: '#3b1a08', bgBottom: '#8a3410' } },
     CHRISTMAS: { id: 'CHRISTMAS', name: 'Christmas', icon: '🎄', greeting: 'MERRY CHRISTMAS', menuLine: 'Santa hat on. Whoever blinks first does the dishes.',
         colors: { primary: '#ff4d5e', secondary: '#3ddc84', text: '#ffffff', muted: '#d7f5e3', bgTop: '#0b2a1a', bgBottom: '#5c0a14' } },

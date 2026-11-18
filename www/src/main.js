@@ -52,6 +52,10 @@ const restartBtn = document.getElementById('restart-btn');
 const menuBtn = document.getElementById('menu-btn');
 const loadingMsg = document.getElementById('loading-msg');
 const cameraError = document.getElementById('camera-error');
+const cameraProblem = document.getElementById('camera-problem');
+const cameraRetryBtn = document.getElementById('camera-retry-btn');
+const eyeTrackingStatus = document.getElementById('eye-tracking-status');
+const precisionTargetLabel = document.getElementById('precision-target-label');
 const scoreDisplay = document.getElementById('score');
 const targetDisplay = document.getElementById('target-display');
 const hudLabel = document.getElementById('hud-label');
@@ -245,9 +249,12 @@ let currentMode = 'CLASSIC';
 let startTime = 0;
 let animationFrameId;
 let calibrationFrameId;
-let precisionTarget = 10.00; 
+let precisionTarget = 10.00;
+let precisionChoice = 10; // The player's own pick; Precision starts with it in one tap. 
 let calibrationStartTime = 0;
 let calibrationLastFrame = null;
+let calibrationFirstFrame = null;
+const calibrationHintText = 'Face the camera with your eyes comfortably open. Put a light in front of you, not behind you.';
 let calibrationLastEye = null;
 let lastScore = null;
 let lastResult = null;
@@ -298,19 +305,84 @@ document.getElementById('challenge-banner-play').addEventListener('click', () =>
 document.getElementById('challenge-banner-dismiss').addEventListener('click', hideChallengeBanner);
 const social = createSocialUI(beginChallenge, { onLinkedChallenge: showChallengeBanner });
 
-// Service Worker Registration
-if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./service-worker.js')
-            .then(reg => console.log('Service Worker registered'))
-            .catch(err => console.log('Service Worker registration failed: ', err));
-    });
+// Eye tracking (about 10 MB) gets ready while the player is still on the home screen,
+// so a slow connection is spent here and not inside a round's calibration time.
+let eyeTrackingWarm = null;
+let eyeTrackingReady = false;
+function setEyeTrackingStatus(text) {
+    if (eyeTrackingStatus && eyeTrackingStatus.textContent !== text) eyeTrackingStatus.textContent = text;
 }
+function warmEyeTracking() {
+    if (eyeTrackingWarm) return eyeTrackingWarm;
+    if (typeof FaceMesh !== 'function') return (eyeTrackingWarm = Promise.resolve(false));
+    setEyeTrackingStatus('Getting eye tracking ready...');
+    const mesh = new FaceMesh({ locateFile: file => `vendor/face_mesh/${file}` });
+    mesh.setOptions({ maxNumFaces: 2, refineLandmarks: false, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+    eyeTrackingWarm = Promise.resolve()
+        .then(() => (typeof mesh.initialize === 'function' ? mesh.initialize() : undefined))
+        .then(() => {
+            eyeTrackingReady = true;
+            setEyeTrackingStatus('Eye tracking ready. Pick a game!');
+            setTimeout(() => { if (eyeTrackingReady) setEyeTrackingStatus(''); }, 4000);
+            return true;
+        })
+        .catch(err => {
+            console.warn('Eye tracking warm-up failed:', err);
+            setEyeTrackingStatus('');
+            return false;
+        })
+        .finally(() => { try { mesh.close(); } catch {} });
+    return eyeTrackingWarm;
+}
+
+// The offline copy is saved after the warm-up, so a first visit downloads the model
+// once instead of twice at the same time.
+function registerServiceWorker() {
+    if (!('serviceWorker' in navigator)) return;
+    navigator.serviceWorker.register('./service-worker.js')
+        .then(reg => console.log('Service Worker registered'))
+        .catch(err => console.log('Service Worker registration failed: ', err));
+}
+window.addEventListener('load', () => {
+    // Never hold the offline copy back for long if the warm-up is slow or stuck.
+    Promise.race([warmEyeTracking(), new Promise(resolve => setTimeout(resolve, 20000))]).finally(registerServiceWorker);
+});
 
 // Initialize Audio on user interaction
 document.addEventListener('click', () => {
     audioManager.resume();
 });
+
+// Camera problems show at the top of the home screen, with a way to try again.
+let retryMode = null;
+function showCameraProblem(message, { restart = false } = {}) {
+    cameraError.textContent = message;
+    cameraError.classList.remove('hidden');
+    restartCameraBtn.classList.toggle('hidden', !restart);
+    cameraRetryBtn.classList.toggle('hidden', restart || !retryMode);
+    cameraProblem.classList.remove('hidden');
+    try { cameraProblem.scrollIntoView?.({ block: 'start', behavior: 'smooth' }); } catch {}
+}
+function hideCameraProblem() {
+    cameraError.classList.add('hidden');
+    restartCameraBtn.classList.add('hidden');
+    cameraRetryBtn.classList.add('hidden');
+    cameraProblem.classList.add('hidden');
+}
+
+// A quick double tap must not open a menu and then start whatever sits under the
+// finger in it (Blink Olympics then Stare-down). Back buttons clear the guard.
+const TAP_GUARD_MS = 450;
+let lastMenuTapAt = -Infinity;
+function tapTooSoon() { return performance.now() - lastMenuTapAt < TAP_GUARD_MS; }
+function armTapGuard() { lastMenuTapAt = performance.now(); }
+function clearTapGuard() { lastMenuTapAt = -Infinity; }
+
+function setPrecisionChoice(seconds) {
+    precisionChoice = seconds;
+    if (precisionTargetLabel) precisionTargetLabel.textContent = `${seconds} seconds`;
+    optionBtns.forEach(b => b.classList.toggle('active', Number(b.dataset.time) === seconds));
+}
 
 // MediaPipe Setup
 function createSessionFaceMesh(session, maxNumFaces = 1) {
@@ -366,8 +438,7 @@ async function startCameraLoop(session) {
         stream.getTracks().forEach(track => track.addEventListener('ended', () => {
             if (session !== cameraSession || videoElement.srcObject !== stream) return;
             showMenu();
-            cameraError.textContent = 'Camera disconnected. Check your camera and try again.';
-            cameraError.classList.remove('hidden');
+            showCameraProblem('Camera disconnected. Check your camera and try again.');
         }));
 
         // Wait for video to actually play
@@ -381,7 +452,15 @@ async function startCameraLoop(session) {
         await videoElement.play();
         if (session !== cameraSession || document.hidden) return false;
 
-        // 2. Start Detection Loop (Decoupled)
+        // 2. If eye tracking is still downloading, finish that first (one download, and
+        // calibration time only starts once it can actually see eyes).
+        if (eyeTrackingWarm && !eyeTrackingReady) {
+            loadingMsg.innerText = 'LOADING EYE TRACKING...';
+            await eyeTrackingWarm;
+            if (session !== cameraSession || document.hidden) return false;
+        }
+
+        // 3. Start Detection Loop (Decoupled)
         startDetectionLoop(session);
         return true;
 
@@ -416,10 +495,16 @@ function stopDetectionLoop() {
 modeBtns.forEach(btn => {
     btn.addEventListener('click', (e) => {
         const mode = e.currentTarget.dataset.mode;
+        if (tapTooSoon()) return;
+        armTapGuard();
+        hideCameraProblem();
         activeChallenge = null;
 
         if (mode === 'CLASSIC') {
             startGame('CLASSIC');
+        } else if (mode === 'PRECISION') {
+            precisionTarget = precisionChoice;
+            startGame('PRECISION');
         } else if (mode === 'ENDURANCE') {
             startGame('ENDURANCE');
         } else if (mode === 'DAILY') {
@@ -444,11 +529,6 @@ modeBtns.forEach(btn => {
             modeSelection.classList.add('hidden');
             surpriseOptions.classList.remove('hidden');
             document.getElementById('surprise-start-btn').focus();
-        } else {
-            // Show options
-            modeSelection.classList.add('hidden');
-            precisionOptions.classList.remove('hidden');
-            optionBtns[0].focus();
         }
     });
 });
@@ -456,7 +536,21 @@ modeBtns.forEach(btn => {
 document.getElementById('surprise-start-btn').addEventListener('click', () => startGame('SURPRISE'));
 document.getElementById('calibration-cancel-btn').addEventListener('click', () => (party ? returnToParty() : showMenu()));
 restartCameraBtn.addEventListener('click', () => window.location.reload());
+cameraRetryBtn.addEventListener('click', () => {
+    if (!retryMode || gameState !== 'MENU') return;
+    if (retryMode === 'PRECISION') precisionTarget = precisionChoice;
+    startGame(retryMode);
+});
+document.getElementById('precision-change-btn').addEventListener('click', () => {
+    if (tapTooSoon()) return;
+    armTapGuard();
+    hideCameraProblem();
+    modeSelection.classList.add('hidden');
+    precisionOptions.classList.remove('hidden');
+    (precisionOptions.querySelector('.option-btn.active') || optionBtns[0])?.focus();
+});
 document.getElementById('surprise-back-btn').addEventListener('click', () => {
+    clearTapGuard();
     activeChallenge = null;
     document.getElementById('challenge-status').textContent = '';
     container.classList.remove('surprise-mode');
@@ -514,6 +608,7 @@ function finishDemoAd(claim) {
 }
 
 precisionBackBtn.addEventListener('click', () => {
+    clearTapGuard();
     precisionOptions.classList.add('hidden');
     modeSelection.classList.remove('hidden');
     document.querySelector('[data-mode="PRECISION"]').focus();
@@ -521,12 +616,10 @@ precisionBackBtn.addEventListener('click', () => {
 
 optionBtns.forEach(btn => {
     btn.addEventListener('click', (e) => {
-        // Set target
-        precisionTarget = parseFloat(e.target.dataset.time);
-
-        // Update active state
-        optionBtns.forEach(b => b.classList.remove('active'));
-        e.target.classList.add('active');
+        if (tapTooSoon()) return;
+        // The pick is remembered, so the Precision button starts it next time.
+        setPrecisionChoice(Number(e.currentTarget.dataset.time));
+        precisionTarget = precisionChoice;
 
         // Start Game
         startGame('PRECISION');
@@ -867,11 +960,13 @@ function endBalloon(faceLost) {
 
 // ---------- Party tournament ----------
 document.getElementById('party-back-btn').addEventListener('click', () => {
+    clearTapGuard();
     partyOptions.classList.add('hidden');
     olympicsOptions.classList.remove('hidden');
     olympicsOptions.querySelector('[data-mode="PARTY"]').focus();
 });
 document.getElementById('olympics-back-btn').addEventListener('click', () => {
+    clearTapGuard();
     olympicsOptions.classList.add('hidden');
     modeSelection.classList.remove('hidden');
     document.querySelector('[data-mode="OLYMPICS"]').focus();
@@ -1093,7 +1188,7 @@ function updateVersusLoop() {
             back();
             const message = 'Could not see both faces clearly. Sit side by side, cheek to cheek, with a light in front of you, and hold the phone at eye level.';
             if (party) partyMessage.textContent = message;
-            else { cameraError.textContent = message; cameraError.classList.remove('hidden'); }
+            else showCameraProblem(message);
             return;
         }
         const stale = versusLastFrame === null || now - versusLastFrame >= 1000;
@@ -1212,8 +1307,8 @@ function startGame(mode) {
     stopCameraAndDetection();
     const session = cameraSession;
     faceMesh = createSessionFaceMesh(session, 2); // Two faces: Stare-down needs both; solo keeps the closest player.
-    cameraError.classList.add('hidden');
-    restartCameraBtn.classList.add('hidden');
+    hideCameraProblem();
+    retryMode = party ? null : mode;
     currentMode = mode;
     loadingMsg.style.display = 'block';
     loadingMsg.innerText = 'INITIALIZING BLINK DETECTION...';
@@ -1272,10 +1367,9 @@ function startGame(mode) {
             console.error("Camera error:", err);
             loadingMsg.style.display = 'none';
 
-            if (party) endParty();
+            if (party) { endParty(); retryMode = null; }
             showMenu();
-            cameraError.textContent = cameraErrorMessage(err);
-            cameraError.classList.remove('hidden');
+            showCameraProblem(cameraErrorMessage(err));
         });
 }
 
@@ -1288,9 +1382,10 @@ function startCalibration() {
     tracking.reset();
     calibrationStartTime = performance.now();
     calibrationLastFrame = null;
+    calibrationFirstFrame = null;
     calibrationLastEye = null;
     calibrationStatus.innerText = 'FINDING YOUR EYES';
-    calibrationHint.innerText = 'Face the camera with your eyes comfortably open. Put a light in front of you, not behind you.';
+    calibrationHint.innerText = calibrationHintText;
     calibrationLoader.style.width = '0%';
 
     menuScreen.classList.add('hidden');
@@ -1316,7 +1411,14 @@ function updateCalibrationLoop() {
         if (elapsed >= 3000 && calibration.ready(now)) {
             finishCalibration();
         } else {
-            if (elapsed >= 15000) {
+            // The clock that matters starts at the first eye-tracking frame: on a slow
+            // connection the first one can take a while, and that is not the player's fault.
+            if (calibrationFirstFrame === null && calibrationLastFrame !== null) calibrationFirstFrame = calibrationLastFrame;
+            const loading = calibrationFirstFrame === null;
+            const timedOut = loading
+                ? elapsed >= (eyeTrackingReady ? 15000 : 60000)
+                : elapsed >= 15000 && now - calibrationFirstFrame >= 10000;
+            if (timedOut) {
                 const stalled = calibrationLastFrame === null || now - calibrationLastFrame >= 2000;
                 if (party) {
                     returnToParty();
@@ -1324,11 +1426,10 @@ function updateCalibrationLoop() {
                     return;
                 }
                 showMenu();
-                cameraError.textContent = stalled
-                    ? 'Eye tracking could not start. Restart the camera below and try again in a well-lit room.'
-                    : 'Could not get a clear view of your eyes. Face a light, hold the phone at eye level, and try a mode again. You do not need to force your eyes wide open.';
-                cameraError.classList.remove('hidden');
-                restartCameraBtn.classList[stalled ? 'remove' : 'add']('hidden');
+                showCameraProblem(stalled
+                    ? 'Eye tracking could not start. Tap Restart camera and try again in a well-lit room.'
+                    : 'Could not get a clear view of your eyes. Face a light, hold the phone at eye level, and tap Try again. You do not need to force your eyes wide open.',
+                    { restart: stalled });
                 return;
             }
             let message = 'FINDING YOUR EYES';
@@ -1336,8 +1437,11 @@ function updateCalibrationLoop() {
                 message = calibrationLastEye === null ? 'FACE NOT FOUND — TRY MORE LIGHT'
                     : calibrationLastEye >= .14 && calibrationLastEye <= .6 && progress > 0
                         ? 'EYES FOUND — HOLD STEADY' : 'LOOK FORWARD, EYES OPEN NORMALLY';
-            } else if (elapsed >= 4000) message = 'WAITING FOR EYE TRACKING';
+            } else if (loading && elapsed >= 2000) message = 'LOADING EYE TRACKING...';
+            else if (elapsed >= 4000) message = 'WAITING FOR EYE TRACKING';
             if (calibrationStatus.innerText !== message) calibrationStatus.innerText = message;
+            const hint = loading && elapsed >= 6000 ? 'Slow connection? This only happens the first time. Hang on a moment.' : calibrationHintText;
+            if (calibrationHint.innerText !== hint) calibrationHint.innerText = hint;
             // Keep valid samples across the three-second warm-up. Slower cameras
             // must be able to reach the required sample count without restarting.
             calibrationFrameId = requestAnimationFrame(updateCalibrationLoop);
@@ -1769,9 +1873,9 @@ function endGame(reason = 'BLINK') {
             }
         } else if (reason === 'DISQUALIFIED') {
             scoreToSave = 0;
-            finalScoreText = "DQ";
-            finalScoreLabel.innerText = "FACE LOST";
-            gameOverTitle.innerText = "DISQUALIFIED";
+            finalScoreText = "OUT";
+            finalScoreLabel.innerText = "YOUR FACE LEFT THE CAMERA";
+            gameOverTitle.innerText = "ROUND OVER";
             gameOverTitle.style.color = "var(--neon-red)";
         } else if (currentMode === 'CLASSIC') {
             scoreToSave = elapsed;
@@ -1804,7 +1908,7 @@ function endGame(reason = 'BLINK') {
                 gameOverTitle.style.color = "var(--neon-cyan)";
                 audioManager.playWin();
             } else {
-                gameOverTitle.innerText = "TOO EARLY/LATE";
+                gameOverTitle.innerText = elapsed < precisionTarget ? "TOO EARLY" : "TOO LATE";
                 gameOverTitle.style.color = "var(--neon-red)";
             }
         } else if (currentMode === 'ENDURANCE') {

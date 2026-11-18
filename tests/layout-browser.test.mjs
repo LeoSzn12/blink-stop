@@ -70,9 +70,21 @@ test('camera permission error and menu controls remain readable above footer', a
           const error = document.querySelector('#camera-error');
           error.textContent = 'Camera access was denied. Allow camera access in your browser settings, then reload to play. Your video stays on this device.';
           error.classList.remove('hidden');
+          document.querySelector('#camera-problem').classList.remove('hidden');
+          document.querySelector('#camera-retry-btn').classList.remove('hidden');
           document.querySelector('#loading-msg').classList.add('hidden');
         }, scenario);
         const initialTitleTop = await page.locator('#menu-screen h1').evaluate(el => el.getBoundingClientRect().top);
+        // The problem sits above the game buttons and is in view once scrolled to, as the app does.
+        const errorView = await page.evaluate(() => {
+          document.querySelector('#camera-problem').scrollIntoView({ block: 'start' });
+          const error = document.querySelector('#camera-error').getBoundingClientRect();
+          const retry = document.querySelector('#camera-retry-btn').getBoundingClientRect();
+          const menu = document.querySelector('.mode-selection').getBoundingClientRect();
+          return { top: error.top, bottom: error.bottom, retryBottom: retry.bottom, menuTop: menu.top, viewportHeight: innerHeight };
+        });
+        assert.ok(errorView.top >= 0 && errorView.top < errorView.viewportHeight / 2, `camera problem not in view: ${scenario.name} ${JSON.stringify(errorView)}`);
+        assert.ok(errorView.retryBottom <= errorView.menuTop, `camera problem not above the game buttons: ${scenario.name} ${JSON.stringify(errorView)}`);
         await page.evaluate(() => scrollTo(0, document.documentElement.scrollHeight));
         const geometry = await page.evaluate(() => {
           const box = selector => {
@@ -95,7 +107,7 @@ test('camera permission error and menu controls remain readable above footer', a
         }
         const label = `${scenario.name}: ${JSON.stringify(geometry)}`;
         assert.ok(initialTitleTop >= (scenario.safeTop || 0) + 16, `title clipped by safe area: ${label}`);
-        assert.ok(geometry.error.top >= 0 && geometry.error.bottom + 8 <= geometry.footer.top, `error/footer overlap: ${label}`);
+        assert.ok(geometry.error.bottom + 8 <= geometry.footer.top, `error/footer overlap: ${label}`);
         assert.ok(geometry.scrollWidth <= geometry.viewportWidth + 1, `horizontal overflow: ${label}`);
         for (const button of await page.locator('.mode-btn:visible').all()) {
           await button.evaluate(el => scrollBy(0, el.getBoundingClientRect().top - 96));

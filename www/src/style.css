@@ -1139,3 +1139,16 @@ body.skin-party { --neon-cyan: #ffd23f; --neon-pink: #ff5fd2; --glass-bg: rgba(2
 .clip-btn { border-color: #39ff14; color: #39ff14; }
 .clip-btn.hidden { display: none; }
 .clip-btn:disabled { opacity: .7; cursor: progress; }
+
+/* Camera problems sit at the top of the home screen, where they are seen. */
+.camera-problem { width: min(100%, 25rem); margin: .5rem auto 1rem; display: flex; flex-direction: column; align-items: center; gap: .6rem; scroll-margin-top: calc(1rem + var(--safe-top)); }
+.camera-problem .camera-error { margin: 0; width: 100%; }
+.camera-problem-actions { display: flex; gap: .6rem; justify-content: center; flex-wrap: wrap; }
+.camera-promise { max-width: 25rem; margin: .4rem auto .8rem; text-align: center; color: #ddd; font-size: .9rem; line-height: 1.4; }
+.eye-tracking-status { min-height: 1.2em; margin: 0 auto .4rem; text-align: center; color: var(--neon-cyan); font-size: .8rem; }
+.eye-tracking-status:empty { min-height: 0; margin: 0; }
+.precision-change { align-self: center; margin-top: -.3rem; font-size: .8rem; }
+.option-btn { text-transform: none; }
+
+/* The footer follows the page instead of floating over its last buttons. */
+.footer, footer { position: static; }

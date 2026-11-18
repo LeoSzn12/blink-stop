@@ -77,12 +77,34 @@ test('missing face gives guidance, times out, and releases the camera instead of
   assert.equal(h.tracks[0].stops,1);
   assert.equal(h.pendingRaf(),0);
   assert.match(h.el('camera-error').textContent,/light.*eye level/i);
+  assert.equal(h.el('camera-problem').classList.contains('hidden'),false,'the problem shows at the top of home');
+  assert.equal(h.el('camera-retry-btn').classList.contains('hidden'),false,'Try again is offered');
+  assert.equal(h.el('restart-camera-btn').classList.contains('hidden'),true);
+  h.click('camera-retry-btn'); await h.settle(); await h.timers();
+  assert.equal(h.debug.getState(),'CALIBRATING','Try again starts the same mode');
+  assert.equal(h.el('camera-problem').classList.contains('hidden'),true,'the old message clears');
+});
+
+test('a slow eye-tracking download does not eat the calibration time', async () => {
+  const h = harness();
+  h.debug.startGame('CLASSIC'); await h.settle(); await h.timers();
+  h.setClock(15000); h.raf();
+  assert.equal(h.debug.getState(),'CALIBRATING','no frames yet: still loading, not a failure');
+  assert.match(h.el('calibration-status').innerText,/LOADING EYE TRACKING/);
+  assert.match(h.el('calibration-hint').innerText,/slow connection/i);
+  // The first frame arrives late; the player still gets their full time from there.
+  h.setClock(30000); h.tickInference(); h.deliver(); await h.settle(); h.raf();
+  assert.equal(h.debug.getState(),'CALIBRATING');
+  for (let i = 1; i < 12 && h.debug.getState() === 'CALIBRATING'; i++) {
+    h.setClock(30000 + i * 400); h.tickInference(); h.deliver(); await h.settle(); h.raf();
+  }
+  assert.equal(h.debug.getState(),'PLAYING');
 });
 
 test('stalled inference exits calibration with a camera restart action; cancel also releases the camera', async () => {
   const h = harness();
   h.debug.startGame('CLASSIC'); await h.settle(); await h.timers();
-  h.setClock(15000); h.raf();
+  h.setClock(60000); h.raf();
   assert.equal(h.debug.getState(),'MENU');
   assert.match(h.el('camera-error').textContent,/restart.*camera/i);
   assert.equal(h.el('restart-camera-btn').classList.contains('hidden'),false);
