@@ -1,5 +1,8 @@
 # Blink Stop submission package
 
+For the iOS 1.0 listing copy and the owner's App Store steps in order, see
+[APP_STORE_LISTING.md](APP_STORE_LISTING.md).
+
 Prepared October 9, 2026 for Nova Acquisitions LLC, California, USA.
 Support/privacy contact: novaacquisitionsllc@gmail.com.
 Version 1 is free, for a general audience age 13+, with no ads, analytics SDK,

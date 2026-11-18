@@ -27,10 +27,12 @@ def capture(app, output):
         raise SystemExit('An available iOS simulator runtime is required')
     runtime = max(available, key=lambda r: tuple(map(int, r['version'].split('.'))))
     types = json.loads(sim('list', 'devicetypes', '--json'))['devicetypes']
-    phone = next((d for d in types if d['name'] == 'iPhone 16 Pro'), None)
+    # App Store Connect's required iPhone size is the 6.9-inch display.
+    phone = next((d for name in ('iPhone 17 Pro Max', 'iPhone 16 Pro Max')
+                  for d in types if d['name'] == name), None)
     tablet = next((d for d in types if d['name'].startswith('iPad Pro 13-inch (M4)')), None)
     if not phone or not tablet:
-        raise SystemExit('iPhone 16 Pro and iPad Pro 13-inch (M4) device types are required')
+        raise SystemExit('A 6.9-inch iPhone Pro Max and iPad Pro 13-inch (M4) device types are required')
     output.mkdir(parents=True, exist_ok=True)
     manifest = {
         'commit': run('git', 'rev-parse', 'HEAD'),
@@ -39,7 +41,7 @@ def capture(app, output):
         'captures': [],
     }
     for label, device, sizes in [
-        ('iphone-menu', phone, {(1206, 2622), (1179, 2556)}),
+        ('iphone-menu', phone, {(1320, 2868), (1290, 2796)}),
         ('ipad-menu', tablet, {(2064, 2752), (2048, 2732)}),
     ]:
         identifier = sim('create', f'Blink Stop {label}', device['identifier'], runtime['identifier'])
