@@ -90,6 +90,10 @@ test('Surprise consent, reward demo, portrait export and friend challenge work t
         await page.locator('#player-name-input').fill('TEST');
         await page.locator('#save-score-btn').click();
         assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('blink_lb_SURPRISE'))[0].score), 30);
+        // Version 1.0 hides the bonus theme demo; its code is kept and still checked here.
+        assert.equal(await page.locator('#demo-bonus-btn').isVisible(), false);
+        assert.equal(await page.locator('#demo-menu-btn').isVisible(), false);
+        await page.evaluate(() => { const btn = document.querySelector('#demo-bonus-btn'); btn.hidden = false; btn.classList.remove('hidden'); });
         await page.locator('#demo-bonus-btn').click();
         assert.equal(await page.evaluate(() => document.querySelector('.input_video').srcObject), null);
         assert.equal(await page.locator('#demo-claim-btn').isEnabled(), false);

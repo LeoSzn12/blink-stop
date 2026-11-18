@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Blink Stop - Don't Blink Challenge</title>
-    <link rel="stylesheet" href="src/style.css?v=12">
+    <link rel="stylesheet" href="src/style.css?v=13">
 
     <link rel="manifest" href="manifest.json">
 
@@ -75,7 +75,8 @@
                                 <button class="neon-btn mode-btn" data-mode="ENDURANCE">30 SECONDS<span class="btn-sub">Make it to 30 without blinking</span></button>
                                 <button class="neon-btn mode-btn" data-mode="DAILY">DAILY<span class="btn-sub">A new twist every day</span></button>
                                 <button class="neon-btn mode-btn surprise-btn" data-mode="SURPRISE">SURPRISE<span class="btn-sub">30s • Can startle you</span></button>
-                                <button id="demo-menu-btn" class="neon-btn-small demo-link" type="button">Preview bonus theme demo</button>
+                                <!-- Hidden for version 1.0; the demo code stays for a later update. -->
+                    <button id="demo-menu-btn" class="neon-btn-small demo-link hidden" type="button" hidden>Preview bonus theme demo</button>
                             </div>
                         </details>
                     </div>
@@ -300,7 +301,8 @@
                         <p id="social-status" role="status" aria-live="polite"></p>
                     </section>
                     <button id="menu-btn" class="neon-btn-small">MENU</button>
-                    <button id="demo-bonus-btn" class="neon-btn-small demo-link" type="button">Preview bonus theme demo</button>
+                    <!-- Hidden for version 1.0; the demo code stays for a later update. -->
+                    <button id="demo-bonus-btn" class="neon-btn-small demo-link hidden" type="button" hidden>Preview bonus theme demo</button>
                 </div>
 
                 <div id="demo-ad-screen" class="screen hidden">
@@ -331,7 +333,7 @@
         <a href="support.html" class="footer-link">Support</a>
     </footer>
 
-    <script type="module" src="src/main.js?v=74"></script>
+    <script type="module" src="src/main.js?v=75"></script>
 </body>
 
 </html>

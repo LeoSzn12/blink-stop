@@ -35,3 +35,12 @@ test('first-time players get plain words and a camera line above the games', () 
     assert.doesNotMatch(js, /"DQ"|TOO EARLY\/LATE/);
     assert.match(js, /TAP_GUARD_MS = 450/);
 });
+
+test('version 1.0 hides the bonus theme demo but keeps its code', () => {
+    const html = read('index.html');
+    for (const id of ['demo-menu-btn', 'demo-bonus-btn']) {
+        assert.match(html, new RegExp(`<button id="${id}" class="[^"]*\\bhidden\\b[^"]*"[^>]*\\bhidden>`), id);
+    }
+    assert.doesNotMatch(read('src/main.js'), /demo(Bonus|Menu)Btn?\.(hidden|classList\.remove)/);
+    assert.match(read('src/main.js'), /function startDemoAd/);
+});

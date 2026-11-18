@@ -39,10 +39,10 @@ content-rating reasoning and DEVICE_TESTS.md for the phone checks.
 
 ## Listing copy
 
-Build 1.0 (8.1) has the menu as shown under GAME MODES. Leave out the BLINK
-OLYMPICS section for that build. For a build with the new home screen (Endurance,
-Precision, Blink Olympics), rename Classic to Endurance, Endurance to 30 Seconds,
-add the BLINK OLYMPICS section, and say "choose Endurance" in the review notes.
+This copy matches builds from November 18, 2026 on: the home screen has
+Endurance, Precision and Blink Olympics, with 30 Seconds, Daily and Surprise
+under More ways to play. Build 1.0 (8.1) predates it, so don't submit that one
+with this copy.
 
 - **Name (30):** Blink Stop
 - **Subtitle (30):** Staring contest party game
@@ -75,23 +75,24 @@ After each round, Share Photo frames the moment you blinked with your time,
 ready for the family group chat.
 
 GAME MODES
-• Classic: how long can you last?
-• Precision: blink as close to 5, 10 or 15 seconds as you can
-• Endurance: survive 30 seconds
-• Daily: a new twist every day
-• Surprise: an optional 30-second round with a sudden face (it can startle you)
+• Endurance: how long can you keep your eyes open?
+• Precision: blink right at 10 seconds (or pick 5 or 15)
+• Blink Olympics: party games for family and friends (below)
+• More ways to play: 30 Seconds, Daily (a new twist every day), and Surprise
+  (an optional 30-second round with a sudden face that can startle you)
 
 BLINK OLYMPICS
 • Balloon Pop: blink to pop balloons as they float through the zone
-• Stare-down: two faces, one phone, first to blink loses
-• Party tournament: 2 to 8 players pass the phone, the top two meet in a final, and the champion gets a crown
+• Stare-Down: two faces, one phone, first to blink loses
+• Pass the Phone: 2 to 8 players take turns, the top two meet in a final, and the champion gets a crown
 • Blink Reel: everyone's caught-blinking photos in one picture
 • Dares for whoever blinks first, themed for each holiday
 • Distraction: the phone tells jokes while you try not to blink
 
 CHALLENGE FRIENDS
-Share a challenge card or code. Friends play the same mode and target on their
-own phone, or hand yours over with Friend's Turn.
+Send a challenge link in your holiday skin, or a short blink clip made on your
+phone. Friends play the same mode and target on their own phone, or hand yours
+over with Friend's Turn.
 
 PRIVATE BY DESIGN
 Blink detection runs entirely on your device. Camera frames are never uploaded,
@@ -104,14 +105,26 @@ health or vision tool.
 ## App Review notes
 
 No sign-in, payment or server is needed. Open the app, choose a skin (optional),
-then Classic, and allow front-camera access. Keep your face in view with eyes
-open while it calibrates, then blink to end the round. The hat is drawn on the
-device over the camera preview; detection reads the camera frames, not the
-drawings. Share Photo opens the system share sheet with a framed JPEG; Share Card
-exports a photo-free PNG. Surprise Mode is opt-in, shows a warning first, and has
-sound off by default. Head-to-head needs two people in front of the front
-camera; Party mode keeps typed names and round photos in memory only and
-discards them when the party ends. Camera frames, landmarks and scores never leave the device.
+then tap Endurance and allow front-camera access. Keep your face in view with
+eyes open while it calibrates, then blink to end the round. The hat is drawn on
+the device over the camera preview; detection reads the camera frames, not the
+drawings.
+
+The home screen has three games: Endurance (how long you can keep your eyes
+open), Precision (blink right at 10 seconds; Change target time picks 5 or 15)
+and Blink Olympics. Blink Olympics holds Balloon Pop, Stare-Down (two people in
+front of the front camera, first to blink loses), Pass the Phone (2 to 8 players
+take turns on one phone; typed names and round photos stay in memory only and
+are discarded when the game ends) and Distraction (on-screen jokes). More ways
+to play holds 30 Seconds, Daily and Surprise. Surprise is opt-in, shows a warning
+first, and has sound off by default.
+
+After a round, Share Photo opens the system share sheet with a framed JPEG,
+Share Card exports a photo-free PNG, and Share Clip makes a short video of the
+blink on the device and opens the share sheet. A challenge link carries only the
+mode, target, score and skin. Nothing is shared unless the player taps a share
+button. There are no ads, accounts or tracking. Camera frames, landmarks and
+scores never leave the device.
 
 ## App Privacy answers
 

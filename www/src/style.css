@@ -1152,3 +1152,8 @@ body.skin-party { --neon-cyan: #ffd23f; --neon-pink: #ff5fd2; --glass-bg: rgba(2
 
 /* The footer follows the page instead of floating over its last buttons. */
 .footer, footer { position: static; }
+
+/* Small lines under button names stay readable on the dark button and when it fills
+   with color (hover, or the "sticky" hover a tap leaves behind on phones). */
+.btn-sub { color: #c4c4c4; }
+.neon-btn:hover .btn-sub, .neon-btn:active .btn-sub, .neon-btn:focus-visible .btn-sub { color: #111; }
