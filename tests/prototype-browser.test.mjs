@@ -43,6 +43,10 @@ test('Surprise consent, reward demo, portrait export and friend challenge work t
                 }
             };` }));
         await page.goto(server.url);
+        await page.locator('[data-skin="CHRISTMAS"]').click();
+        assert.equal(await page.evaluate(() => document.body.classList.contains('skin-christmas')), true);
+        assert.equal(await page.locator('[data-skin="CHRISTMAS"]').getAttribute('aria-checked'), 'true');
+        assert.match(await page.evaluate(() => localStorage.getItem('blink_skin')), /^CHRISTMAS@\d{4}-\d{2}$/);
         await page.locator('[data-mode="SURPRISE"]').click();
         assert.equal(await page.locator('#surprise-sound').isChecked(), false);
         assert.equal(await page.evaluate(() => document.querySelector('.input_video').srcObject), null);
@@ -75,6 +79,13 @@ test('Surprise consent, reward demo, portrait export and friend challenge work t
         await page.locator('#game-over-screen').waitFor({ state: 'visible' });
         console.log('Prototype: 30-second win');
         assert.equal(await page.locator('#final-score-val').innerText(), '30.00s');
+        // Framed holiday photo is shared as a JPEG file where the browser can share files.
+        assert.equal(await page.locator('#selfie-preview').evaluate(img => [img.naturalWidth, img.naturalHeight].join('x')), '1080x1350');
+        await page.locator('#selfie-btn').click();
+        const photo = await page.evaluate(() => window.lastShare);
+        assert.equal(photo.name, 'blink-stop-photo.jpg');
+        assert.equal(photo.type, 'image/jpeg');
+        assert.ok(photo.size > 10000);
         await page.locator('#player-name-input').fill('TEST');
         await page.locator('#save-score-btn').click();
         assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('blink_lb_SURPRISE'))[0].score), 30);

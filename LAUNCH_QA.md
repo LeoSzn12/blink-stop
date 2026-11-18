@@ -33,7 +33,7 @@ On at least one supported iPhone and Android phone, repeat each item in all five
 - Fresh install offline: menu, local inference assets and camera prompt work without network. Verify permission allow and deny, return to device settings, then retry. Denied message stays visible; no blank screen.
 - Center face in ordinary lighting, finish 3s calibration with open eyes, blink: timer stops. Compare quick wink vs long closure; no false completion with face out of view. Try glasses, different skin tones, front camera orientation, low light.
 - Lock/background while permission prompt, calibration, or round is active; return to menu with camera indicator off. Retry, navigate Menu, repeat quickly; no stale calibration or duplicate camera stream.
-- Endurance completes at 30s without externally hosted video. Save a score with text and punctuation; confirm local ranking survives relaunch and name never renders as HTML. Share/copy and Save Selfie (including native file location/permissions) must be explicitly verified.
+- Endurance completes at 30s without externally hosted video. Save a score with text and punctuation; confirm local ranking survives relaunch and name never renders as HTML. Share/copy and Share Photo (including native file location/permissions) must be explicitly verified.
 - Small phone/large font/VoiceOver/TalkBack/landscape: controls, error, and policy links reachable; no clipped status bar or home indicator. Check privacy and Terms links in native WebView.
 - Inspect network on real devices: camera frames must not leave device; candidate uses system fonts (no Google Fonts request), no Firebase/AdSense calls. Test offline after install and after app update. Check thermal load and battery during sustained inference.
 

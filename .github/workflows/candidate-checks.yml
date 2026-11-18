@@ -87,3 +87,12 @@ jobs:
           name: ios-simulator-test-candidate
           path: build/ios-simulator.zip
           retention-days: 14
+      - name: Capture native menu screenshots for manual release preparation
+        if: github.event_name == 'workflow_dispatch'
+        run: python3 scripts/capture-ios-menu.py build/ios/Build/Products/Debug-iphonesimulator/App.app build/store-screenshots
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: github.event_name == 'workflow_dispatch'
+        with:
+          name: ios-store-menu-screenshots
+          path: build/store-screenshots
+          retention-days: 14

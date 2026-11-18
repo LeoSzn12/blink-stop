@@ -9,6 +9,7 @@ import { createGameOverCameraStop } from './roundLifecycle.mjs';
 import { sharePayload, shareClipboardText } from './share.mjs';
 import { createSurpriseRound, createRewardedDemo } from './surprise.mjs';
 import { createSocialUI } from './social.mjs';
+import { SKINS, SKIN_STORAGE_KEY, resolveSkin, storedSkinValue, drawSkinOverlay, composeSelfie, selfieCaption } from './skins.mjs';
 
 // DOM Elements
 const videoElement = document.getElementsByClassName('input_video')[0];
@@ -61,6 +62,26 @@ const shareBtn = document.getElementById('share-btn');
 const selfieContainer = document.getElementById('selfie-container');
 const selfiePreview = document.getElementById('selfie-preview');
 const selfieBtn = document.getElementById('selfie-btn');
+const skinBtns = document.querySelectorAll('.skin-btn');
+const skinGreeting = document.getElementById('skin-greeting');
+let selfieFile = null;
+
+// Holiday/party skin: hats on the camera view, matching colors, and a framed photo.
+let currentSkin = 'CLASSIC';
+function applySkin(id, remember = false) {
+    currentSkin = SKINS[id] ? id : 'CLASSIC';
+    for (const key of Object.keys(SKINS)) document.body.classList.remove(`skin-${key.toLowerCase()}`);
+    if (currentSkin !== 'CLASSIC') document.body.classList.add(`skin-${currentSkin.toLowerCase()}`);
+    skinBtns.forEach(btn => btn.setAttribute('aria-checked', String(btn.dataset.skin === currentSkin)));
+    if (skinGreeting) skinGreeting.textContent = SKINS[currentSkin].menuLine;
+    if (remember) {
+        try { localStorage.setItem(SKIN_STORAGE_KEY, storedSkinValue(currentSkin)); }
+        catch (err) { console.warn('Skin preference not saved:', err); }
+    }
+}
+try { applySkin(resolveSkin(localStorage.getItem(SKIN_STORAGE_KEY))); }
+catch (err) { applySkin(resolveSkin(null)); }
+skinBtns.forEach(btn => btn.addEventListener('click', () => applySkin(btn.dataset.skin, true)));
 
 // UI Elements (New - World Record & Precision)
 const worldRecordDisplay = document.getElementById('world-record-display');
@@ -481,6 +502,7 @@ shareBtn.addEventListener('click', async () => {
 });
 
 function clearSelfie() {
+    selfieFile = null;
     selfiePreview.removeAttribute('src');
     selfieContainer.classList.add('hidden');
 }
@@ -493,16 +515,25 @@ selfieBtn.addEventListener('click', async () => {
         try {
             const { exportNativeSelfie } = await import('./deviceActions.mjs');
             await exportNativeSelfie(selfiePreview.src);
-            selfieBtn.innerText = 'SAVE SELFIE';
+            selfieBtn.innerText = 'SHARE PHOTO';
         } catch (error) {
-            selfieBtn.innerText = 'SAVE CANCELLED — TRY AGAIN';
+            selfieBtn.innerText = 'SHARE CANCELLED — TRY AGAIN';
         } finally {
             selfieBtn.disabled = false;
         }
         return;
     }
+    const file = selfieFile;
+    if (file && navigator.share && navigator.canShare?.({ files: [file] })) {
+        try {
+            await navigator.share({ files: [file], title: 'Blink Stop', text: 'Think you can beat me? https://www.playblinkstop.com/ #BlinkStop' });
+            return;
+        } catch (error) {
+            if (error?.name === 'AbortError') return; // Cancelled; the photo stays here.
+        }
+    }
     const link = document.createElement('a');
-    link.download = `blink-stop-selfie-${Date.now()}.jpg`;
+    link.download = `blink-stop-photo-${Date.now()}.jpg`;
     link.href = selfiePreview.src;
     link.click();
 });
@@ -808,6 +839,9 @@ function onResults(results, session) {
     canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
 
     const landmarks = results.multiFaceLandmarks?.[0];
+    // Display canvas only; detection reads the video element, never these drawings.
+    try { drawSkinOverlay(canvasCtx, currentSkin, landmarks, canvasElement.width, canvasElement.height, now); }
+    catch (err) { console.warn('Skin overlay skipped:', err); }
     const eye = landmarks ? checkBlink(landmarks, now, videoElement.videoWidth, videoElement.videoHeight) : null;
     if (gameState === 'CALIBRATING') {
         calibrationLastFrame = now;
@@ -990,32 +1024,6 @@ function endGame(reason = 'BLINK') {
         // Haptic failure shock
         if (navigator.vibrate && currentMode !== 'SURPRISE') navigator.vibrate([200, 100, 200]);
 
-        // Draw Game Over Overlay on Canvas for Selfie
-        try {
-            canvasCtx.save();
-            canvasCtx.fillStyle = "rgba(255, 0, 0, 0.4)";
-            canvasCtx.fillRect(0, 0, canvasElement.width, canvasElement.height);
-            canvasCtx.fillStyle = "#fff";
-            canvasCtx.font = "bold 60px system-ui";
-            canvasCtx.textAlign = "center";
-            canvasCtx.textBaseline = "middle";
-            canvasCtx.shadowColor = "#f00";
-            canvasCtx.shadowBlur = 20;
-            const won = reason === 'WIN_SURPRISE' || reason === 'WIN_ENDURANCE';
-            canvasCtx.fillText(won ? 'SURVIVED!' : reason === 'DISQUALIFIED' ? 'FACE LOST' : 'BLINK DETECTED!', canvasElement.width/2, canvasElement.height/2 - 40);
-            canvasCtx.font = "bold 40px monospace";
-            canvasCtx.fillText(`TIME: ${won ? '30.00' : ((Date.now() - startTime) / 1000).toFixed(2)}s`, canvasElement.width/2, canvasElement.height/2 + 40);
-            canvasCtx.restore();
-            
-            // Output to Selfie Preview
-            const dataUrl = canvasElement.toDataURL('image/jpeg', 0.8);
-            selfiePreview.src = dataUrl;
-            selfieContainer.classList.remove('hidden');
-        } catch(e) {
-            console.error("Selfie capture failed", e);
-            selfieContainer.classList.add('hidden');
-        }
-
         const elapsed = (Date.now() - startTime) / 1000;
         let finalScoreText = '';
         let scoreToSave = 0;
@@ -1103,15 +1111,37 @@ function endGame(reason = 'BLINK') {
         lastScore = reason === 'DISQUALIFIED' ? null : scoreToSave;
         if (lastScore !== null && ['ENDURANCE', 'SURPRISE'].includes(currentMode)) lastScore = Math.min(30, lastScore);
         lastResult = lastScore === null ? null : { mode: currentMode, score: lastScore, elapsed, target: precisionTarget };
-        social.render(lastResult, activeChallenge);
+        social.render(lastResult, activeChallenge, currentSkin);
         finalScoreVal.innerText = finalScoreText;
+
+        // Shareable photo: the last camera frame (with the skin's hat) in a themed frame.
+        try {
+            const dataUrl = composeSelfie(canvasElement, currentSkin, selfieCaption({ reason, mode: currentMode, elapsed, target: precisionTarget }), document);
+            selfiePreview.src = dataUrl;
+            selfieContainer.classList.remove('hidden');
+            if (typeof File === 'function' && typeof atob === 'function') {
+                // Prepare bytes before the tap so the browser keeps share activation.
+                const bytes = Uint8Array.from(atob(dataUrl.split(',')[1]), ch => ch.charCodeAt(0));
+                selfieFile = new File([bytes], 'blink-stop-photo.jpg', { type: 'image/jpeg' });
+            }
+        } catch (e) {
+            console.error("Selfie capture failed", e);
+            selfieContainer.classList.add('hidden');
+        }
+        // Red flash on the frozen camera view behind Game Over.
+        try {
+            canvasCtx.save();
+            canvasCtx.fillStyle = "rgba(255, 0, 0, 0.4)";
+            canvasCtx.fillRect(0, 0, canvasElement.width, canvasElement.height);
+            canvasCtx.restore();
+        } catch (e) { /* display only */ }
 
         playerNameInput.value = '';
         playerNameInput.disabled = false;
         saveScoreBtn.disabled = lastScore === null;
         shareBtn.disabled = lastScore === null;
         demoBonusBtn.disabled = lastScore === null;
-        selfieBtn.innerText = 'SAVE SELFIE';
+        selfieBtn.innerText = 'SHARE PHOTO';
         saveScoreBtn.innerText = "SAVE";
 
         Leaderboard.render(currentMode);

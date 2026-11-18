@@ -6,6 +6,7 @@ import { readFileSync } from 'node:fs';
 import { createCalibrationTracker, createTrackingFreshness, createFaceLossTracker } from '../src/gameRules.mjs';
 import { createSerializedInference } from '../src/inference.mjs';
 import { createSurpriseRound, createRewardedDemo } from '../src/surprise.mjs';
+import * as skins from '../src/skins.mjs';
 
 const source = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8').replace(/^import .*;\s*$/gm, '');
 function harness(storage = { getItem: () => null, setItem() {} }, clipboard) {
@@ -29,13 +30,14 @@ function harness(storage = { getItem: () => null, setItem() {} }, clipboard) {
     }
     return els.get(key);
   }
-  const canvas = Object.fromEntries(['save','restore','clearRect','drawImage','fillRect','fillText'].map(x => [x, () => {}]));
+  // Any 2D context call is a no-op that returns the context (gradients included).
+  const canvas = new Proxy({}, { get: (target, key) => key in target ? target[key] : () => canvas, set: (target, key, value) => { target[key] = value; return true; } });
   const document = { hidden: false, body: el('body'), getElementsByClassName: cls => [el(cls)], getElementById: el,
     querySelector: el, querySelectorAll: () => [], addEventListener(type, fn) { documentEvents.set(type, fn); }, createElement: el };
   class FaceMesh { constructor() { this.closes = 0; meshes.push(this); } onResults(fn) { this.resultHandler = fn; } setOptions() {} send() { return new Promise(resolve => { const emit = () => this.resultHandler({ image: {}, multiFaceLandmarks: [{}] }); pending.push(() => { lastDelivered = emit; emit(); resolve(); }); }); } close() { this.closes++; } }
   const context = { document, window: { innerWidth: 500, addEventListener() {} }, navigator: { clipboard, mediaDevices: { getUserMedia: () => permission || Promise.resolve(stream()) } },
     FaceMesh, console: { log() {}, warn() {}, error() {} }, performance: { now: () => clock }, Date,
-    createCalibrationTracker, createTrackingFreshness, createFaceLossTracker, createSerializedInference, createSurpriseRound, createRewardedDemo,
+    createCalibrationTracker, createTrackingFreshness, createFaceLossTracker, createSerializedInference, createSurpriseRound, createRewardedDemo, ...skins,
     checkBlink: () => eyeValue === null ? null : ({ minEar: eyeValue, ear: eyeValue, blinking: false }), setBlinkThreshold(value) { threshold = value; }, resetBlinkState() {}, getBlinkThreshold: () => threshold,
     audioManager: { startDrone() {}, stopDrone() {}, playGlitch() {}, playWin() {}, playHeartbeat() {}, playSurprise() {} },
     appendScore() {}, cameraErrorMessage: () => '', createGameOverCameraStop: fn => ({ cancel() {}, schedule() {} }), sharePayload() {}, shareClipboardText() {}, createSocialUI: () => ({ reset() {}, render() {} }),

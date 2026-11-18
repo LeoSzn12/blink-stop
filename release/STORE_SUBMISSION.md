@@ -1,5 +1,8 @@
 # Blink Stop submission package
 
+For the iOS 1.0 listing copy and the owner's App Store steps in order, see
+[APP_STORE_LISTING.md](APP_STORE_LISTING.md).
+
 Prepared October 9, 2026 for Nova Acquisitions LLC, California, USA.
 Support/privacy contact: novaacquisitionsllc@gmail.com.
 Version 1 is free, for a general audience age 13+, with no ads, analytics SDK,
@@ -63,7 +66,7 @@ the camera/local-data explanation, choose Classic, and allow front-camera access
 Keep your face visible and eyes open for calibration, then blink to finish. Precision
 offers 5/10/15-second targets; Endurance lasts up to 30 seconds; Daily changes visuals. Optional Surprise Mode adds a sudden illustrated face during a 30-second round after a clear opt-in screen; sound is off by default. Reassess fear/horror content answers for the final store rating.
 Menu/backgrounding releases the camera. Face loss invalidates a round. Scores stay
-on the device. Save Selfie opens a system export sheet, and Share Challenge shares mode-aware text and a friend code. Share Card exports a photo-free PNG. Codes contain a mode, target and reported score, without names or images. There is no authenticated ranking, contacts access or auto-posting.
+on the device. Share Photo opens a system export sheet with a framed photo (holiday skins add drawn hats and decorations on the device), and Share Challenge shares mode-aware text and a friend code. Share Card exports a photo-free PNG. Codes contain a mode, target and reported score, without names or images. There is no authenticated ranking, contacts access or auto-posting.
 Support provides local-data deletion, troubleshooting, and policy/license links.
 Blink comfortably; this is entertainment, not a health or vision-improvement tool.
 

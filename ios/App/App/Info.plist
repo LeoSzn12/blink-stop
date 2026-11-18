@@ -49,5 +49,9 @@
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>Blink Stop uses the camera to detect facial landmarks and blinks locally on your device.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Blink Stop saves the photo or challenge card you choose to share to your photo library.</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 </dict>
 </plist>

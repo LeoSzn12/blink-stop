@@ -3,12 +3,12 @@ import { clearStoredGameData } from './localData.mjs';
 const button = document.getElementById('clear-local-data');
 const status = document.getElementById('clear-status');
 button.addEventListener('click', async () => {
-    if (!confirm('Delete your Blink Stop scores and theme preference on this installation? This cannot be undone. Copies saved in other apps are not deleted.')) return;
+    if (!confirm('Delete your Blink Stop scores and theme and skin preferences on this installation? This cannot be undone. Copies saved in other apps are not deleted.')) return;
     button.disabled = true;
     try {
         clearStoredGameData(localStorage);
-        document.body.classList.remove('theme-purple', 'theme-demo');
-        status.textContent = 'Local scores and theme preference cleared.';
+        document.body.classList.remove('theme-purple', 'theme-demo', 'skin-thanksgiving', 'skin-christmas', 'skin-party');
+        status.textContent = 'Local scores and theme and skin preferences cleared.';
         if (window.Capacitor?.isNativePlatform?.()) {
             const { Filesystem, Directory } = await import('../vendor/native.js');
             try {
