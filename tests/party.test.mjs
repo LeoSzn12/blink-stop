@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createVersusMatch, orderFaces, thresholdFrom } from '../src/versus.mjs';
+import { createVersusMatch, orderFaces, thresholdFrom, largestFace } from '../src/versus.mjs';
 import { parseNames, createParty, createDeck, forfeitCards, jokeCards, MAX_PLAYERS } from '../src/party.mjs';
 import { reelLayout, REEL_SIZE, REEL_LIMIT } from '../src/reel.mjs';
 import { parseChallenge, challengeCode } from '../src/share.mjs';
@@ -143,4 +143,14 @@ test('distraction challenges round-trip and hats follow up to two faces', () => 
     hats = 0;
     drawSkinOverlay(ctx, 'PARTY', face(0.5), 640, 480, 0);
     assert.ok(twoFaces > hats, `${twoFaces} vs ${hats}`);
+});
+
+test('solo rounds track the closest face when someone leans into the shot', () => {
+    const player = face(0.5), onlooker = face(0.2);
+    for (const i of [234, 454]) onlooker[i] = { x: onlooker[i].x * 0.5 + 0.1, y: 0.5, z: 0 };
+    assert.equal(largestFace([onlooker, player]), player);
+    assert.equal(largestFace([player]), player);
+    assert.equal(largestFace([]), undefined);
+    const opaque = {};
+    assert.equal(largestFace([opaque]), opaque);
 });

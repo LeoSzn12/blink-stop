@@ -97,3 +97,16 @@ export function createVersusMatch({ warmupMs = 2500, faceLossMs = 1000 } = {}) {
         stall(now) { return phase === 'PLAYING' ? finish('VOID', now).outcome : outcome; },
     };
 }
+
+// Solo rounds: when someone leans into the shot, keep tracking the player,
+// who is the biggest face (closest to the phone). Unmeasurable input passes through.
+export function largestFace(faces) {
+    if (!Array.isArray(faces) || !faces.length) return undefined;
+    let best = faces[0], bestWidth = -1;
+    for (const face of faces) {
+        const a = face?.[234], b = face?.[454];
+        const width = a && b && Number.isFinite(a.x) && Number.isFinite(b.x) ? Math.abs(a.x - b.x) : -1;
+        if (width > bestWidth) { best = face; bestWidth = width; }
+    }
+    return best;
+}

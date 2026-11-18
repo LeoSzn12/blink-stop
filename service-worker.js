@@ -1,4 +1,18 @@
 const CACHE_NAME = 'blink-stop-v15';
+// The 10+ MB face model rarely changes, so it lives in its own cache: app updates
+// re-download only the small files, not the model. Bump only when vendor/face_mesh changes.
+const MODEL_CACHE = 'blink-stop-model-v1';
+const MODEL_ASSETS = [
+    './vendor/face_mesh/face_mesh.js',
+    './vendor/face_mesh/face_mesh.binarypb',
+    './vendor/face_mesh/face_mesh_solution_packed_assets.data',
+    './vendor/face_mesh/face_mesh_solution_packed_assets_loader.js',
+    './vendor/face_mesh/face_mesh_solution_simd_wasm_bin.data',
+    './vendor/face_mesh/face_mesh_solution_simd_wasm_bin.js',
+    './vendor/face_mesh/face_mesh_solution_simd_wasm_bin.wasm',
+    './vendor/face_mesh/face_mesh_solution_wasm_bin.js',
+    './vendor/face_mesh/face_mesh_solution_wasm_bin.wasm'
+];
 const ASSETS_TO_CACHE = [
     './',
     './index.html',
@@ -36,39 +50,32 @@ const ASSETS_TO_CACHE = [
     './icons/icon-192.png',
     './icons/icon-512.png',
     './src/audioManager.js',
-    './vendor/face_mesh/face_mesh.js',
-    './vendor/face_mesh/face_mesh.binarypb',
-    './vendor/face_mesh/face_mesh_solution_packed_assets.data',
-    './vendor/face_mesh/face_mesh_solution_packed_assets_loader.js',
-    './vendor/face_mesh/face_mesh_solution_simd_wasm_bin.data',
-    './vendor/face_mesh/face_mesh_solution_simd_wasm_bin.js',
-    './vendor/face_mesh/face_mesh_solution_simd_wasm_bin.wasm',
-    './vendor/face_mesh/face_mesh_solution_wasm_bin.js',
-    './vendor/face_mesh/face_mesh_solution_wasm_bin.wasm',
     './manifest.json'
 ];
 
 self.addEventListener('install', (event) => {
-    event.waitUntil(
-        caches.open(CACHE_NAME)
-            .then((cache) => {
-                return cache.addAll(ASSETS_TO_CACHE);
-            })
-    );
+    event.waitUntil(Promise.all([
+        caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS_TO_CACHE)),
+        // Fetch only model files this device doesn't already have.
+        caches.open(MODEL_CACHE).then(async cache => {
+            const missing = [];
+            for (const url of MODEL_ASSETS) if (!(await cache.match(url))) missing.push(url);
+            return cache.addAll(missing);
+        }),
+    ]));
 });
 
 self.addEventListener('fetch', (event) => {
     if (event.request.method !== 'GET' || new URL(event.request.url).origin !== self.location.origin) return;
     event.respondWith(
         caches.open(CACHE_NAME).then(cache => cache.match(event.request, { ignoreSearch: true }))
-            .then((response) => {
-                return response || fetch(event.request);
-            })
+            .then(response => response || caches.open(MODEL_CACHE).then(cache => cache.match(event.request, { ignoreSearch: true })))
+            .then(response => response || fetch(event.request))
     );
 });
 
 self.addEventListener('activate', (event) => {
-    const cacheWhitelist = [CACHE_NAME];
+    const cacheWhitelist = [CACHE_NAME, MODEL_CACHE];
     event.waitUntil(
         caches.keys().then((cacheNames) => {
             return Promise.all(

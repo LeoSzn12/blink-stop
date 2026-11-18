@@ -10,7 +10,7 @@ import { sharePayload, shareClipboardText, formatScore, inviteLine } from './sha
 import { createSurpriseRound, createRewardedDemo } from './surprise.mjs';
 import { createSocialUI } from './social.mjs';
 import { SKINS, SKIN_STORAGE_KEY, resolveSkin, storedSkinValue, drawSkinOverlay, composeSelfie, selfieCaption } from './skins.mjs';
-import { createVersusMatch } from './versus.mjs';
+import { createVersusMatch, largestFace } from './versus.mjs';
 import { parseNames, createParty, createDeck, forfeitCards, jokeCards } from './party.mjs';
 import { drawReel } from './reel.mjs';
 import { createBalloonRound, drawBalloons, BALLOON_MISSES } from './balloons.mjs';
@@ -1077,7 +1077,7 @@ function startGame(mode) {
     // Abandon any previous camera permission prompt or pending startup.
     stopCameraAndDetection();
     const session = cameraSession;
-    faceMesh = createSessionFaceMesh(session, mode === 'VERSUS' ? 2 : 1);
+    faceMesh = createSessionFaceMesh(session, 2); // Two faces: Stare-down needs both; solo keeps the closest player.
     cameraError.classList.add('hidden');
     restartCameraBtn.classList.add('hidden');
     currentMode = mode;
@@ -1384,7 +1384,7 @@ function onResults(results, session) {
     canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
     canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
 
-    const landmarks = results.multiFaceLandmarks?.[0];
+    const landmarks = largestFace(results.multiFaceLandmarks);
     // Display canvas only; detection reads the video element, never these drawings.
     try { drawSkinOverlay(canvasCtx, currentSkin, results.multiFaceLandmarks, canvasElement.width, canvasElement.height, now); }
     catch (err) { console.warn('Skin overlay skipped:', err); }
