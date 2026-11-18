@@ -1,5 +1,5 @@
-const modes = { CLASSIC: 'Classic', PRECISION: 'Precision', ENDURANCE: 'Endurance', DAILY: 'Daily', SURPRISE: 'Surprise', DISTRACT: 'Distraction' };
-const codes = { C: 'CLASSIC', P: 'PRECISION', E: 'ENDURANCE', S: 'SURPRISE', J: 'DISTRACT' };
+const modes = { CLASSIC: 'Endurance', PRECISION: 'Precision', ENDURANCE: '30 Seconds', DAILY: 'Daily', SURPRISE: 'Surprise', DISTRACT: 'Distraction', BALLOON: 'Balloon Pop' };
+const codes = { C: 'CLASSIC', P: 'PRECISION', E: 'ENDURANCE', S: 'SURPRISE', J: 'DISTRACT', B: 'BALLOON' };
 export const PUBLIC_PLAY_URL = 'https://www.playblinkstop.com/';
 
 export function resultDetails(result) {
@@ -10,8 +10,12 @@ export function resultDetails(result) {
     if (precision && !Number.isFinite(result.elapsed)) throw new Error('Invalid elapsed time');
     const score = Math.round(result.score * 1000) / 1000;
     if (['ENDURANCE', 'SURPRISE'].includes(result.mode) && score > 30) throw new Error('Invalid survival result');
+    if (result.mode === 'BALLOON') {
+        if (!Number.isInteger(score) || score > 9999) throw new Error('Invalid balloon count');
+        return { ...result, score, label: modes.BALLOON, metric: formatScore('BALLOON', score), detail: 'Popped just by blinking', invitation: 'Can you pop more?' };
+    }
     return { ...result, score, label: modes[result.mode],
-        metric: precision ? `${score.toFixed(3)}s off` : `${score.toFixed(2)}s`,
+        metric: formatScore(result.mode, score),
         detail: precision ? `Target ${result.target}s · blinked at ${result.elapsed.toFixed(2)}s` : 'Without blinking',
         invitation: precision ? `Can you get closer to ${result.target}s?` : score >= 30 && ['ENDURANCE', 'SURPRISE'].includes(result.mode) ? 'Can you make it to 30 seconds too?' : 'Can you beat my time?' };
 }
@@ -26,7 +30,7 @@ export function challengeCode(result) {
 
 export function parseChallenge(text) {
     if (typeof text !== 'string' || text.length > 1000) throw new Error('Paste a Blink Stop challenge code.');
-    const found = [...text.toUpperCase().matchAll(/\bBS1-([CPESJ])-(0|5|10|15)-(\d{1,8})\b/g)];
+    const found = [...text.toUpperCase().matchAll(/\bBS1-([CPESJB])-(0|5|10|15)-(\d{1,8})\b/g)];
     const matches = [...new Map(found.map(match => [match[0], match])).values()];
     if (matches.length !== 1) throw new Error('Paste one valid Blink Stop challenge code.');
     const [, key, target, value] = matches[0];
@@ -51,3 +55,22 @@ export function sharePayload(result) {
 }
 
 export function shareClipboardText(result) { return sharePayload(result).text; }
+
+// How a score reads everywhere: seconds, seconds off target, or balloons.
+export function formatScore(mode, score) {
+    if (mode === 'BALLOON') return `${score} balloon${score === 1 ? '' : 's'} popped`;
+    if (mode === 'PRECISION') return `${score.toFixed(3)}s off`;
+    return `${score.toFixed(2)}s`;
+}
+
+// One friendly line that travels with a shared photo, ahead of the play link.
+export function inviteLine(result) {
+    try {
+        const r = resultDetails(result);
+        if (r.mode === 'BALLOON') return `I popped ${r.metric.replace(' popped', '')} just by blinking 🎈 Can you beat me?`;
+        if (r.mode === 'PRECISION') return `I blinked ${r.metric} the ${r.target}-second mark 🎯 Can you get closer?`;
+        return `I kept my eyes open for ${r.metric} 👀 Can you beat me?`;
+    } catch {
+        return 'Think you can beat me? 👀';
+    }
+}

@@ -10,11 +10,13 @@ import * as skins from '../src/skins.mjs';
 import * as versus from '../src/versus.mjs';
 import * as party from '../src/party.mjs';
 import * as reel from '../src/reel.mjs';
+import * as balloons from '../src/balloons.mjs';
+import { formatScore, inviteLine } from '../src/share.mjs';
 
 const source = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8').replace(/^import .*;\s*$/gm, '');
 function harness(storage = { getItem: () => null, setItem() {} }, clipboard) {
   const els = new Map(), raf = new Map(), timers = new Map(), intervals = new Map(), listeners = new Map();
-  let clock = 0, id = 0, lastDelivered, jpegCount = 0, eyeValue = .3, threshold = .22;
+  let clock = 0, id = 0, lastDelivered, jpegCount = 0, eyeValue = .3, threshold = .22, blinking = false;
   const pending = [], tracks = [], meshes = [], documentEvents = new Map();
   let permission;
   function stream() {
@@ -40,8 +42,8 @@ function harness(storage = { getItem: () => null, setItem() {} }, clipboard) {
   class FaceMesh { constructor() { this.closes = 0; meshes.push(this); } onResults(fn) { this.resultHandler = fn; } setOptions() {} send() { return new Promise(resolve => { const emit = () => this.resultHandler({ image: {}, multiFaceLandmarks: [{}] }); pending.push(() => { lastDelivered = emit; emit(); resolve(); }); }); } close() { this.closes++; } }
   const context = { document, window: { innerWidth: 500, addEventListener() {} }, navigator: { clipboard, mediaDevices: { getUserMedia: () => permission || Promise.resolve(stream()) } },
     FaceMesh, console: { log() {}, warn() {}, error() {} }, performance: { now: () => clock }, Date,
-    createCalibrationTracker, createTrackingFreshness, createFaceLossTracker, createSerializedInference, createSurpriseRound, createRewardedDemo, ...skins, ...versus, ...party, ...reel,
-    checkBlink: () => eyeValue === null ? null : ({ minEar: eyeValue, ear: eyeValue, blinking: false }), setBlinkThreshold(value) { threshold = value; }, resetBlinkState() {}, getBlinkThreshold: () => threshold,
+    createCalibrationTracker, createTrackingFreshness, createFaceLossTracker, createSerializedInference, createSurpriseRound, createRewardedDemo, ...skins, ...versus, ...party, ...reel, ...balloons, formatScore, inviteLine,
+    checkBlink: () => eyeValue === null ? null : ({ minEar: eyeValue, ear: eyeValue, blinking }), setBlinkThreshold(value) { threshold = value; }, resetBlinkState() {}, getBlinkThreshold: () => threshold,
     audioManager: { startDrone() {}, stopDrone() {}, playGlitch() {}, playWin() {}, playHeartbeat() {}, playSurprise() {} },
     appendScore() {}, cameraErrorMessage: () => '', createGameOverCameraStop: fn => ({ cancel() {}, schedule() {} }), sharePayload() {}, shareClipboardText() {}, createSocialUI: () => ({ reset() {}, render() {} }),
     localStorage: storage,
@@ -49,7 +51,7 @@ function harness(storage = { getItem: () => null, setItem() {} }, clipboard) {
     Image: class { set src(value) { this._src = value; queueMicrotask(() => this.onload?.()); } get src() { return this._src; } },
     requestAnimationFrame: fn => { const n = ++id; raf.set(n, fn); return n; }, cancelAnimationFrame: n => raf.delete(n), confirm: () => true };
   vm.runInNewContext(source + '\n globalThis.debug = { startGame, showMenu, startCalibration, endGame, startDemoAd, finishDemoAd, updateDemoAd, calibration, inference, Leaderboard, getState: () => gameState };', context);
-  return { debug: context.debug, el, setEye: value => { eyeValue = value; }, threshold: () => threshold, click: key => listeners.get(`${key}:click`)(), jpegCount: () => jpegCount, tracks, meshes, document, visibility: () => documentEvents.get('visibilitychange')(), deferPermission() { let resolve; permission = new Promise(r => { resolve = r; }); return () => resolve(stream()); }, setClock: n => { clock = n; }, deliver: () => pending.shift()(), lateCallback: () => lastDelivered(), pendingSend: () => pending.length, tickInference() { for (const fn of intervals.values()) fn(); }, async settle() { for (let i = 0; i < 10; i++) await Promise.resolve(); }, async timers() { for (const [n,fn] of [...timers]) { timers.delete(n); fn(); } await this.settle(); }, raf() { for (const [n,fn] of [...raf]) { raf.delete(n); fn(); } }, pendingRaf: () => raf.size };
+  return { debug: context.debug, el, setEye: value => { eyeValue = value; }, setBlinking: value => { blinking = value; }, threshold: () => threshold, click: key => listeners.get(`${key}:click`)(), jpegCount: () => jpegCount, tracks, meshes, document, visibility: () => documentEvents.get('visibilitychange')(), deferPermission() { let resolve; permission = new Promise(r => { resolve = r; }); return () => resolve(stream()); }, setClock: n => { clock = n; }, deliver: () => pending.shift()(), lateCallback: () => lastDelivered(), pendingSend: () => pending.length, tickInference() { for (const fn of intervals.values()) fn(); }, async settle() { for (let i = 0; i < 10; i++) await Promise.resolve(); }, async timers() { for (const [n,fn] of [...timers]) { timers.delete(n); fn(); } await this.settle(); }, raf() { for (const [n,fn] of [...raf]) { raf.delete(n); fn(); } }, pendingRaf: () => raf.size };
 }
 
 test('slow iPhone calibration keeps progress past three seconds and fits the eye baseline', async () => {
@@ -392,4 +394,23 @@ test('distraction round shows jokes while playing and hides them at the end', ()
   h.debug.endGame('BLINK');
   assert.equal(h.el('joke-card').classList.contains('hidden'), true);
   assert.equal(h.el('final-score-label').innerText, 'JOKES SURVIVED FOR');
+});
+
+test('Blink Olympics: Balloon Pop counts blinks as pops, ends on misses and shares a count', async () => {
+  const h = harness();
+  h.debug.startGame('BALLOON'); await h.settle(); await h.timers();
+  for (let i = 0; i < 10; i++) { h.setClock(i * 400); h.tickInference(); h.deliver(); await h.settle(); h.raf(); }
+  assert.equal(h.debug.getState(), 'BALLOON');
+  assert.equal(h.el('balloon-layer').classList.contains('hidden'), false);
+  assert.equal(h.el('hud-label').innerText, 'POPPED');
+  // Blink while nothing is in the zone: three times is out.
+  for (let i = 0; i < 3; i++) {
+    h.setBlinking(true); h.setClock(4000 + i * 600); h.tickInference(); h.deliver(); await h.settle();
+    h.setBlinking(false); h.setClock(4300 + i * 600); h.tickInference(); h.deliver(); await h.settle();
+  }
+  assert.equal(h.debug.getState(), 'GAME_OVER');
+  assert.equal(h.el('final-score-val').innerText, '0');
+  assert.equal(h.el('final-score-label').innerText, 'BALLOONS POPPED');
+  assert.equal(h.el('balloon-layer').classList.contains('hidden'), true);
+  assert.equal(h.jpegCount(), 1);
 });

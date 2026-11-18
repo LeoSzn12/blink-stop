@@ -54,6 +54,6 @@ export function drawReel(photos, skinId, { champion = null, doc = globalThis.doc
         }
     });
     ctx.fillStyle = c.secondary; ctx.font = font(32);
-    ctx.fillText('playblinkstop.com  #BlinkStop', out.width / 2, out.height - 45, out.width - 80);
+    ctx.fillText('Your turn! Play free at playblinkstop.com  #BlinkStop', out.width / 2, out.height - 45, out.width - 80);
     return out.toDataURL('image/jpeg', 0.86);
 }

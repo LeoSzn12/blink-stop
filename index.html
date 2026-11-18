@@ -26,13 +26,15 @@
         <div class="video-wrapper">
             <video class="input_video" playsinline muted></video>
             <canvas class="output_canvas"></canvas>
+            <!-- Balloon Pop layer: drawn unmirrored over the camera, under the HUD -->
+            <canvas id="balloon-layer" class="balloon-layer hidden" aria-hidden="true"></canvas>
 
             <!-- Game Overlay UI -->
             <div class="ui-overlay" id="ui-layer">
                 <!-- Main Menu -->
                 <div id="menu-screen" class="screen active">
                     <h1 class="glitch" data-text="BLINK STOP">BLINK STOP</h1>
-                    <p class="subtitle">Blink. Challenge. Your friend's turn.</p>
+                    <p class="subtitle">The game you play with your eyes.</p>
 
                     <div class="skin-picker" role="radiogroup" aria-label="Photo skin">
                         <span class="label">SKIN</span>
@@ -44,22 +46,32 @@
                     <p id="skin-greeting" class="skin-greeting" aria-live="polite"></p>
 
                     <div class="mode-selection">
-                        <button class="neon-btn mode-btn" data-mode="CLASSIC">CLASSIC<span class="btn-sub">Survive the
-                                Void</span></button>
-                        <button class="neon-btn mode-btn" data-mode="PRECISION">PRECISION<span class="btn-sub">Target
-                                Mode</span></button>
-                        <button class="neon-btn mode-btn" data-mode="ENDURANCE">ENDURANCE<span class="btn-sub">30s
-                                Challenge</span></button>
-                        <button class="neon-btn mode-btn" data-mode="DAILY" style="border-color: var(--neon-pink); color: var(--neon-pink)">DAILY<span class="btn-sub" style="color: var(--neon-pink)">Mystery Modifiers</span></button>
-                        <button class="neon-btn mode-btn surprise-btn" data-mode="SURPRISE">SURPRISE<span class="btn-sub">30s • Expect the unexpected</span></button>
-                        <button class="neon-btn mode-btn party-mode-btn" data-mode="VERSUS">HEAD-TO-HEAD<span class="btn-sub">2 faces • First blink loses</span></button>
-                        <button class="neon-btn mode-btn party-mode-btn" data-mode="PARTY">PARTY<span class="btn-sub">2-8 players • Crown a champion</span></button>
-                        <button class="neon-btn mode-btn party-mode-btn" data-mode="DISTRACT">DISTRACTION<span class="btn-sub">Jokes try to break you</span></button>
+                        <button class="neon-btn mode-btn home-btn" data-mode="CLASSIC">ENDURANCE<span class="btn-sub">Who can keep their eyes open longest?</span></button>
+                        <button class="neon-btn mode-btn home-btn precision-btn" data-mode="PRECISION">PRECISION<span class="btn-sub">Blink right on 5, 10 or 15 seconds</span></button>
+                        <button class="neon-btn mode-btn home-btn olympics-btn" data-mode="OLYMPICS">BLINK OLYMPICS<span class="btn-sub">Mini-games for family and friends</span></button>
+                        <details id="more-modes" class="more-modes">
+                            <summary>More ways to play</summary>
+                            <div class="more-modes-list">
+                                <button class="neon-btn mode-btn" data-mode="ENDURANCE">30 SECONDS<span class="btn-sub">Make it to 30 without blinking</span></button>
+                                <button class="neon-btn mode-btn" data-mode="DAILY">DAILY<span class="btn-sub">A new twist every day</span></button>
+                                <button class="neon-btn mode-btn surprise-btn" data-mode="SURPRISE">SURPRISE<span class="btn-sub">30s • Can startle you</span></button>
+                                <button id="demo-menu-btn" class="neon-btn-small demo-link" type="button">Preview bonus theme demo</button>
+                            </div>
+                        </details>
+                    </div>
+
+                    <div id="olympics-options" class="options-container prototype-options hidden">
+                        <h2>BLINK OLYMPICS</h2>
+                        <button class="neon-btn mode-btn balloon-btn" data-mode="BALLOON">BALLOON POP<span class="btn-sub">Blink when a balloon is in the zone</span></button>
+                        <button class="neon-btn mode-btn" data-mode="VERSUS">STARE-DOWN<span class="btn-sub">2 players side by side • First blink loses</span></button>
+                        <button class="neon-btn mode-btn" data-mode="PARTY">PASS THE PHONE<span class="btn-sub">2 to 8 players • Top two meet in a final</span></button>
+                        <button class="neon-btn mode-btn" data-mode="DISTRACT">DISTRACTION<span class="btn-sub">Jokes try to make you blink</span></button>
+                        <button id="olympics-back-btn" class="neon-btn-small" type="button">Back</button>
                     </div>
 
                     <div id="party-options" class="options-container prototype-options hidden">
-                        <h2>PARTY</h2>
-                        <p>Everyone takes a turn. The top two meet in a head-to-head final, and the champion gets the crown.</p>
+                        <h2>PASS THE PHONE</h2>
+                        <p>Everyone takes one turn. The top two meet in a stare-down final, and the champion gets the crown.</p>
                         <label for="party-names">Players, one per line (2 to 8)</label>
                         <textarea id="party-names" rows="4" maxlength="200" placeholder="Mom&#10;Dad&#10;Priya" spellcheck="false"></textarea>
                         <p id="party-setup-status" class="social-note" role="status" aria-live="polite"></p>
@@ -107,7 +119,6 @@
                         Blink Stop detects blinks on your device. Camera frames stay on your device; scores are saved locally only. A framed photo preview is created after a round; saving or sharing it is your choice. Ages 13+. Blink normally and stop if uncomfortable.
                     </div>
 
-                    <button id="demo-menu-btn" class="neon-btn-small demo-link" type="button">Preview bonus theme demo</button>
                     <p class="loading-text" id="loading-msg" style="display:none">INITIALIZING BLINK DETECTION...</p>
                     <p id="camera-error" role="alert" class="camera-error hidden"></p>
                     <button id="restart-camera-btn" class="neon-btn-small hidden" type="button">Restart camera</button>

@@ -192,8 +192,12 @@ function roundRect(ctx, x, y, w, h, r) {
 }
 
 // Words for the shareable photo, from the round's outcome.
-export function selfieCaption({ reason, mode, elapsed, target }) {
+export function selfieCaption({ reason, mode, elapsed, target, score }) {
     const time = Number.isFinite(elapsed) ? `${Math.max(0, elapsed).toFixed(2)}s` : '';
+    if (mode === 'BALLOON') {
+        const n = Number.isFinite(score) ? score : 0;
+        return { headline: `${n} BALLOON${n === 1 ? '' : 'S'} POPPED!`, detail: 'Popped just by blinking. Your turn?' };
+    }
     if (reason === 'DISQUALIFIED') return { headline: 'FACE LOST!', detail: 'Stay in frame next time' };
     if (reason === 'WIN_ENDURANCE' || reason === 'WIN_SURPRISE') return { headline: 'EYES OF STEEL', detail: 'Survived all 30 seconds without blinking' };
     if (mode === 'PRECISION' && Number.isFinite(target)) return { headline: 'CAUGHT BLINKING!', detail: `Blinked at ${time} · target ${target}s` };
@@ -239,6 +243,6 @@ export function composeSelfie(source, skinId, caption, doc = globalThis.document
     text(`${skin.icon} ${skin.greeting} ${skin.icon}`, 105, 64, c.primary);
     text(caption?.headline || 'CAUGHT BLINKING!', 1125, 76, c.text);
     text(caption?.detail || '', 1200, 40, c.muted);
-    text('Think you can beat me? playblinkstop.com  #BlinkStop', 1278, 32, c.secondary);
+    text('Your turn! Play free at playblinkstop.com  #BlinkStop', 1278, 32, c.secondary);
     return out.toDataURL('image/jpeg', 0.88);
 }

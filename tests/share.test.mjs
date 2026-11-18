@@ -5,7 +5,7 @@ import { sharePayload, shareClipboardText, challengeCode, parseChallenge, challe
 test('share invitation includes mode and portable challenge and the approved public launch URL', () => {
     const payload = sharePayload({ mode: 'CLASSIC', score: 12.34, elapsed: 12.34 });
     assert.equal(payload.title, 'Blink Stop');
-    assert.match(payload.text, /Classic: 12\.34s/);
+    assert.match(payload.text, /Endurance: 12\.34s/);
     assert.match(payload.text, /Can you beat my time/);
     assert.equal(payload.url, 'https://www.playblinkstop.com/#challenge=BS1-C-0-12340');
     assert.doesNotMatch(JSON.stringify(payload), /vercel\.app|github\.com/);

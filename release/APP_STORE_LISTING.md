@@ -39,8 +39,10 @@ content-rating reasoning and DEVICE_TESTS.md for the phone checks.
 
 ## Listing copy
 
-The PARTY PLAY section describes the party-modes update. Leave it out for a build
-that doesn't have the Head-to-head, Party and Distraction buttons on the menu.
+Build 1.0 (8.1) has the menu as shown under GAME MODES. Leave out the BLINK
+OLYMPICS section for that build. For a build with the new home screen (Endurance,
+Precision, Blink Olympics), rename Classic to Endurance, Endurance to 30 Seconds,
+add the BLINK OLYMPICS section, and say "choose Endurance" in the review notes.
 
 - **Name (30):** Blink Stop
 - **Subtitle (30):** Staring contest party game
@@ -79,8 +81,9 @@ GAME MODES
 • Daily: a new twist every day
 • Surprise: an optional 30-second round with a sudden face (it can startle you)
 
-PARTY PLAY
-• Head-to-head: two faces, one phone, first to blink loses
+BLINK OLYMPICS
+• Balloon Pop: blink to pop balloons as they float through the zone
+• Stare-down: two faces, one phone, first to blink loses
 • Party tournament: 2 to 8 players pass the phone, the top two meet in a final, and the champion gets a crown
 • Blink Reel: everyone's caught-blinking photos in one picture
 • Dares for whoever blinks first, themed for each holiday
