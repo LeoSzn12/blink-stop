@@ -1077,3 +1077,14 @@ footer {
 .social-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: .65rem; }
 .challenge-outcome { color: var(--neon-cyan); font-weight: bold; line-height: 1.5; }
 #social-status { color: #d3dbe5; font-size: .85rem; line-height: 1.5; }
+
+/* Holiday and party skins (menu picker). Later rules win over unlockable themes. */
+.skin-picker { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: .4rem; margin: .75rem 0 .25rem; max-width: 28rem; }
+.skin-picker .label { font-size: .7rem; letter-spacing: .12em; color: #aaa; margin-right: .25rem; }
+.skin-btn { font: inherit; font-size: .8rem; padding: .45rem .7rem; min-height: 44px; border-radius: 999px; border: 1px solid var(--glass-border); background: rgba(255, 255, 255, .06); color: #ddd; cursor: pointer; }
+.skin-btn[aria-checked="true"] { border-color: var(--neon-cyan); color: var(--neon-cyan); box-shadow: 0 0 10px var(--neon-cyan); background: rgba(255, 255, 255, .1); }
+.skin-btn:focus-visible { outline: 2px solid var(--neon-pink); outline-offset: 2px; }
+.skin-greeting { min-height: 1.2em; font-size: .85rem; color: var(--neon-pink); text-align: center; margin-bottom: .5rem; }
+body.skin-thanksgiving { --neon-cyan: #ffb347; --neon-pink: #ff6b35; --glass-bg: rgba(59, 26, 8, .75); --bg-dark: #1a0c04; }
+body.skin-christmas { --neon-cyan: #ff4d5e; --neon-pink: #3ddc84; --glass-bg: rgba(11, 42, 26, .75); --bg-dark: #06140c; }
+body.skin-party { --neon-cyan: #ffd23f; --neon-pink: #ff5fd2; --glass-bg: rgba(26, 11, 61, .75); --bg-dark: #0d0620; }

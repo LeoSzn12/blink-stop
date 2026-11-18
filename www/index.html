@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Blink Stop - Don't Blink Challenge</title>
-    <link rel="stylesheet" href="src/style.css?v=7">
+    <link rel="stylesheet" href="src/style.css?v=8">
 
     <link rel="manifest" href="manifest.json">
 
@@ -33,6 +33,15 @@
                 <div id="menu-screen" class="screen active">
                     <h1 class="glitch" data-text="BLINK STOP">BLINK STOP</h1>
                     <p class="subtitle">Blink. Challenge. Your friend's turn.</p>
+
+                    <div class="skin-picker" role="radiogroup" aria-label="Photo skin">
+                        <span class="label">SKIN</span>
+                        <button type="button" class="skin-btn" role="radio" aria-checked="false" data-skin="CLASSIC">Classic</button>
+                        <button type="button" class="skin-btn" role="radio" aria-checked="false" data-skin="THANKSGIVING">🦃 Thanksgiving</button>
+                        <button type="button" class="skin-btn" role="radio" aria-checked="false" data-skin="CHRISTMAS">🎄 Christmas</button>
+                        <button type="button" class="skin-btn" role="radio" aria-checked="false" data-skin="PARTY">🎉 Party</button>
+                    </div>
+                    <p id="skin-greeting" class="skin-greeting" aria-live="polite"></p>
 
                     <div class="mode-selection">
                         <button class="neon-btn mode-btn" data-mode="CLASSIC">CLASSIC<span class="btn-sub">Survive the
@@ -80,7 +89,7 @@
 
                     <!-- SEO About Text -->
                     <div style="max-width: 400px; margin-top: 1.5rem; text-align: center; color: #888; font-size: 0.8rem; line-height: 1.4;">
-                        Blink Stop detects blinks on your device. Camera frames stay on your device; scores are saved locally only. A selfie preview is created after a round; saving or sharing it is your choice. Ages 13+. Blink normally and stop if uncomfortable.
+                        Blink Stop detects blinks on your device. Camera frames stay on your device; scores are saved locally only. A framed photo preview is created after a round; saving or sharing it is your choice. Ages 13+. Blink normally and stop if uncomfortable.
                     </div>
 
                     <button id="demo-menu-btn" class="neon-btn-small demo-link" type="button">Preview bonus theme demo</button>
@@ -195,13 +204,13 @@
                     <div class="game-over-btns">
                         <button id="restart-btn" class="neon-btn">RETRY</button>
                         <button id="share-btn" class="neon-btn" aria-label="Share result and friend challenge caption">SHARE CHALLENGE</button>
-                        <button id="selfie-btn" class="neon-btn" style="border-color: var(--neon-pink); color: var(--neon-pink)">SAVE SELFIE</button>
+                        <button id="selfie-btn" class="neon-btn" style="border-color: var(--neon-pink); color: var(--neon-pink)">SHARE PHOTO</button>
                     </div>
                     <section id="social-result" class="social-result hidden" aria-label="Your challenge card">
                         <p id="challenge-outcome" class="challenge-outcome" role="status"></p>
                         <h3>MAKE IT A FRIEND CHALLENGE</h3>
                         <img id="score-card" alt="Portrait Blink Stop card showing your mode, result and friend challenge" width="1080" height="1920">
-                        <p class="social-note">A photo-free card for your Story or post. Save it, attach it, and tag a friend. Camera photos are only exported with Save Selfie.</p>
+                        <p class="social-note">A photo-free card for your Story or post. Save it, attach it, and tag a friend. Camera photos are only exported with Share Photo.</p>
                         <div class="social-actions">
                             <button id="share-card-btn" class="neon-btn-small" type="button">Share card</button>
                             <button id="save-card-btn" class="neon-btn-small" type="button">Save card</button>
@@ -244,7 +253,7 @@
         <a href="support.html" class="footer-link">Support</a>
     </footer>
 
-    <script type="module" src="src/main.js?v=70"></script>
+    <script type="module" src="src/main.js?v=71"></script>
 </body>
 
 </html>

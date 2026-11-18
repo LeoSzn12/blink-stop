@@ -53,11 +53,11 @@ export function createSocialUI(startChallenge) {
     });
     return {
         reset() { result = null; cardUrl = ''; cardFile = null; panel.classList.add('hidden'); card.removeAttribute('src'); el('challenge-caption').value = ''; status.textContent = ''; },
-        render(value, challenge) {
+        render(value, challenge, skinId) {
             this.reset();
             if (!value) return;
             result = value;
-            cardUrl = drawScoreCard(document.createElement('canvas'), result);
+            cardUrl = drawScoreCard(document.createElement('canvas'), result, skinId);
             // Prepare bytes before the tap to preserve browser share activation.
             const bytes = Uint8Array.from(atob(cardUrl.split(',')[1]), c => c.charCodeAt(0));
             cardFile = typeof File === 'function' ? new File([bytes], 'blink-stop-challenge.png', { type: 'image/png' }) : null;
