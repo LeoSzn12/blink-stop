@@ -1,5 +1,5 @@
-const modes = { CLASSIC: 'Classic', PRECISION: 'Precision', ENDURANCE: 'Endurance', DAILY: 'Daily', SURPRISE: 'Surprise' };
-const codes = { C: 'CLASSIC', P: 'PRECISION', E: 'ENDURANCE', S: 'SURPRISE' };
+const modes = { CLASSIC: 'Classic', PRECISION: 'Precision', ENDURANCE: 'Endurance', DAILY: 'Daily', SURPRISE: 'Surprise', DISTRACT: 'Distraction' };
+const codes = { C: 'CLASSIC', P: 'PRECISION', E: 'ENDURANCE', S: 'SURPRISE', J: 'DISTRACT' };
 export const PUBLIC_PLAY_URL = 'https://www.playblinkstop.com/';
 
 export function resultDetails(result) {
@@ -26,7 +26,7 @@ export function challengeCode(result) {
 
 export function parseChallenge(text) {
     if (typeof text !== 'string' || text.length > 1000) throw new Error('Paste a Blink Stop challenge code.');
-    const found = [...text.toUpperCase().matchAll(/\bBS1-([CPES])-(0|5|10|15)-(\d{1,8})\b/g)];
+    const found = [...text.toUpperCase().matchAll(/\bBS1-([CPESJ])-(0|5|10|15)-(\d{1,8})\b/g)];
     const matches = [...new Map(found.map(match => [match[0], match])).values()];
     if (matches.length !== 1) throw new Error('Paste one valid Blink Stop challenge code.');
     const [, key, target, value] = matches[0];

@@ -12,11 +12,11 @@ test('web and Capacitor gameplay assets are identical', () => {
 
 test('service worker updates its cache and precaches imported gameplay modules', () => {
     const worker = readFileSync(new URL('../service-worker.js', import.meta.url), 'utf8');
-    assert.match(worker, /blink-stop-v13/);
+    assert.match(worker, /blink-stop-v14/);
     for (const page of ['index.html', 'privacy.html', 'tos.html', 'how-to-play.html']) {
         assert.ok(worker.includes(`./${page}`), page);
     }
-    for (const file of ['gameRules.mjs', 'inference.mjs', 'leaderboard.mjs', 'roundLifecycle.mjs', 'share.mjs', 'surprise.mjs', 'social.mjs', 'scoreCard.mjs', 'skins.mjs']) {
+    for (const file of ['gameRules.mjs', 'inference.mjs', 'leaderboard.mjs', 'roundLifecycle.mjs', 'share.mjs', 'surprise.mjs', 'social.mjs', 'scoreCard.mjs', 'skins.mjs', 'versus.mjs', 'party.mjs', 'reel.mjs']) {
         assert.ok(worker.includes(`./src/${file}`), file);
     }
 });

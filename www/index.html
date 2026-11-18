@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Blink Stop - Don't Blink Challenge</title>
-    <link rel="stylesheet" href="src/style.css?v=8">
+    <link rel="stylesheet" href="src/style.css?v=9">
 
     <link rel="manifest" href="manifest.json">
 
@@ -52,6 +52,21 @@
                                 Challenge</span></button>
                         <button class="neon-btn mode-btn" data-mode="DAILY" style="border-color: var(--neon-pink); color: var(--neon-pink)">DAILY<span class="btn-sub" style="color: var(--neon-pink)">Mystery Modifiers</span></button>
                         <button class="neon-btn mode-btn surprise-btn" data-mode="SURPRISE">SURPRISE<span class="btn-sub">30s • Expect the unexpected</span></button>
+                        <button class="neon-btn mode-btn party-mode-btn" data-mode="VERSUS">HEAD-TO-HEAD<span class="btn-sub">2 faces • First blink loses</span></button>
+                        <button class="neon-btn mode-btn party-mode-btn" data-mode="PARTY">PARTY<span class="btn-sub">2-8 players • Crown a champion</span></button>
+                        <button class="neon-btn mode-btn party-mode-btn" data-mode="DISTRACT">DISTRACTION<span class="btn-sub">Jokes try to break you</span></button>
+                    </div>
+
+                    <div id="party-options" class="options-container prototype-options hidden">
+                        <h2>PARTY</h2>
+                        <p>Everyone takes a turn. The top two meet in a head-to-head final, and the champion gets the crown.</p>
+                        <label for="party-names">Players, one per line (2 to 8)</label>
+                        <textarea id="party-names" rows="4" maxlength="200" placeholder="Mom&#10;Dad&#10;Priya" spellcheck="false"></textarea>
+                        <p id="party-setup-status" class="social-note" role="status" aria-live="polite"></p>
+                        <div class="prototype-actions">
+                            <button id="party-start-btn" class="neon-btn-small" type="button">Start party</button>
+                            <button id="party-back-btn" class="neon-btn-small" type="button">Back</button>
+                        </div>
                     </div>
 
                     <div id="surprise-options" class="options-container prototype-options hidden">
@@ -99,6 +114,27 @@
 
 
                 </div>
+
+                <!-- Party: pass the phone, standings, final and champion -->
+                <div id="party-screen" class="screen hidden">
+                    <h2 id="party-title" class="party-title">PASS THE PHONE</h2>
+                    <p id="party-message" class="party-message" role="status" aria-live="polite"></p>
+                    <ol id="party-standings" class="party-standings"></ol>
+                    <section id="party-dare-box" class="dare-box hidden" aria-label="Forfeit">
+                        <p id="party-dare" class="dare-text"></p>
+                        <button id="party-new-dare-btn" class="neon-btn-small" type="button">New dare</button>
+                    </section>
+                    <div class="party-actions">
+                        <button id="party-go-btn" class="neon-btn" type="button">START MY TURN</button>
+                        <button id="party-skip-btn" class="neon-btn-small hidden" type="button">Skip final (top score wins)</button>
+                        <button id="party-reel-btn" class="neon-btn-small hidden" type="button">Share Blink Reel</button>
+                        <button id="party-end-btn" class="neon-btn-small" type="button">End party</button>
+                    </div>
+                    <p id="party-reel-status" class="social-note" role="status" aria-live="polite"></p>
+                </div>
+
+                <!-- Distraction round joke card -->
+                <div id="joke-card" class="joke-card hidden" aria-live="polite"></div>
 
                 <!-- Calibration Screen -->
                 <div id="calibration-screen" class="screen hidden">
@@ -201,6 +237,12 @@
                         <img id="selfie-preview" style="width: 100%; display: block;" />
                     </div>
 
+                    <section id="dare-box" class="dare-box hidden" aria-label="Forfeit">
+                        <p id="dare-text" class="dare-text"></p>
+                        <button id="new-dare-btn" class="neon-btn-small" type="button">New dare</button>
+                    </section>
+                    <button id="party-next-btn" class="neon-btn hidden" type="button">NEXT PLAYER</button>
+
                     <div class="game-over-btns">
                         <button id="restart-btn" class="neon-btn">RETRY</button>
                         <button id="share-btn" class="neon-btn" aria-label="Share result and friend challenge caption">SHARE CHALLENGE</button>
@@ -253,7 +295,7 @@
         <a href="support.html" class="footer-link">Support</a>
     </footer>
 
-    <script type="module" src="src/main.js?v=71"></script>
+    <script type="module" src="src/main.js?v=72"></script>
 </body>
 
 </html>

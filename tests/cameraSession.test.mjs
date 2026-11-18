@@ -7,6 +7,9 @@ import { createCalibrationTracker, createTrackingFreshness, createFaceLossTracke
 import { createSerializedInference } from '../src/inference.mjs';
 import { createSurpriseRound, createRewardedDemo } from '../src/surprise.mjs';
 import * as skins from '../src/skins.mjs';
+import * as versus from '../src/versus.mjs';
+import * as party from '../src/party.mjs';
+import * as reel from '../src/reel.mjs';
 
 const source = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8').replace(/^import .*;\s*$/gm, '');
 function harness(storage = { getItem: () => null, setItem() {} }, clipboard) {
@@ -24,7 +27,7 @@ function harness(storage = { getItem: () => null, setItem() {} }, clipboard) {
       const classes = new Set();
       els.set(key, { style: {}, dataset: {}, value: '', innerText: '', textContent: '', src: '', readyState: 1, paused: false, ended: false, videoWidth: 640, videoHeight: 480,
         classList: { add(...xs) { xs.forEach(x => classes.add(x)); }, remove(...xs) { xs.forEach(x => classes.delete(x)); }, contains(x) { return classes.has(x); } },
-        addEventListener(type, fn) { listeners.set(`${key}:${type}`, fn); }, removeAttribute(name) { if (name === 'src') this.src = ''; }, focus() {}, querySelector: () => el('digital-text-sm'), getContext: () => canvas,
+        addEventListener(type, fn) { listeners.set(`${key}:${type}`, fn); }, appendChild() {}, append() {}, removeAttribute(name) { if (name === 'src') this.src = ''; }, focus() {}, querySelector: () => el('digital-text-sm'), getContext: () => canvas,
         play: async () => {}, getTracks: () => [{ stop() {} }], toDataURL: () => { jpegCount++; return 'data:image/jpeg;base64,abc'; },
       });
     }
@@ -37,12 +40,13 @@ function harness(storage = { getItem: () => null, setItem() {} }, clipboard) {
   class FaceMesh { constructor() { this.closes = 0; meshes.push(this); } onResults(fn) { this.resultHandler = fn; } setOptions() {} send() { return new Promise(resolve => { const emit = () => this.resultHandler({ image: {}, multiFaceLandmarks: [{}] }); pending.push(() => { lastDelivered = emit; emit(); resolve(); }); }); } close() { this.closes++; } }
   const context = { document, window: { innerWidth: 500, addEventListener() {} }, navigator: { clipboard, mediaDevices: { getUserMedia: () => permission || Promise.resolve(stream()) } },
     FaceMesh, console: { log() {}, warn() {}, error() {} }, performance: { now: () => clock }, Date,
-    createCalibrationTracker, createTrackingFreshness, createFaceLossTracker, createSerializedInference, createSurpriseRound, createRewardedDemo, ...skins,
+    createCalibrationTracker, createTrackingFreshness, createFaceLossTracker, createSerializedInference, createSurpriseRound, createRewardedDemo, ...skins, ...versus, ...party, ...reel,
     checkBlink: () => eyeValue === null ? null : ({ minEar: eyeValue, ear: eyeValue, blinking: false }), setBlinkThreshold(value) { threshold = value; }, resetBlinkState() {}, getBlinkThreshold: () => threshold,
     audioManager: { startDrone() {}, stopDrone() {}, playGlitch() {}, playWin() {}, playHeartbeat() {}, playSurprise() {} },
     appendScore() {}, cameraErrorMessage: () => '', createGameOverCameraStop: fn => ({ cancel() {}, schedule() {} }), sharePayload() {}, shareClipboardText() {}, createSocialUI: () => ({ reset() {}, render() {} }),
     localStorage: storage,
     setInterval: fn => { const n = ++id; intervals.set(n, fn); return n; }, clearInterval: n => intervals.delete(n), setTimeout: fn => { const n = ++id; timers.set(n, fn); return n; }, clearTimeout: n => timers.delete(n),
+    Image: class { set src(value) { this._src = value; queueMicrotask(() => this.onload?.()); } get src() { return this._src; } },
     requestAnimationFrame: fn => { const n = ++id; raf.set(n, fn); return n; }, cancelAnimationFrame: n => raf.delete(n), confirm: () => true };
   vm.runInNewContext(source + '\n globalThis.debug = { startGame, showMenu, startCalibration, endGame, startDemoAd, finishDemoAd, updateDemoAd, calibration, inference, Leaderboard, getState: () => gameState };', context);
   return { debug: context.debug, el, setEye: value => { eyeValue = value; }, threshold: () => threshold, click: key => listeners.get(`${key}:click`)(), jpegCount: () => jpegCount, tracks, meshes, document, visibility: () => documentEvents.get('visibilitychange')(), deferPermission() { let resolve; permission = new Promise(r => { resolve = r; }); return () => resolve(stream()); }, setClock: n => { clock = n; }, deliver: () => pending.shift()(), lateCallback: () => lastDelivered(), pendingSend: () => pending.length, tickInference() { for (const fn of intervals.values()) fn(); }, async settle() { for (let i = 0; i < 10; i++) await Promise.resolve(); }, async timers() { for (const [n,fn] of [...timers]) { timers.delete(n); fn(); } await this.settle(); }, raf() { for (const [n,fn] of [...raf]) { raf.delete(n); fn(); } }, pendingRaf: () => raf.size };
@@ -325,4 +329,67 @@ test('demo cannot interrupt calibration or disqualified results', async () => {
   assert.equal(h.debug.getState(), 'CALIBRATING');
   h.debug.endGame('DISQUALIFIED'); h.debug.startDemoAd();
   assert.equal(h.debug.getState(), 'GAME_OVER');
+});
+
+test('party: every player takes a turn, photos go to the reel, and the champion gets crowned', async () => {
+  const h = harness();
+  h.el('party-names').value = 'Ana\nBen';
+  h.click('party-start-btn');
+  assert.equal(h.debug.getState(), 'PARTY');
+  assert.match(h.el('party-message').textContent, /Ana, you're up/);
+  h.click('party-go-btn'); await h.settle();
+  h.debug.endGame('BLINK');
+  assert.equal(h.el('party-next-btn').classList.contains('hidden'), false);
+  assert.match(h.el('party-next-btn').textContent, /BEN/);
+  assert.equal(h.el('player-name-input').value, 'ANA');
+  assert.equal(h.el('game-over-screen').classList.contains('party-turn'), true);
+  h.click('party-next-btn');
+  assert.equal(h.debug.getState(), 'PARTY');
+  h.click('party-go-btn'); await h.settle();
+  h.debug.endGame('BLINK');
+  assert.match(h.el('party-next-btn').textContent, /FINAL/);
+  h.click('party-next-btn');
+  assert.equal(h.el('party-title').textContent, 'THE FINAL');
+  h.click('party-skip-btn');
+  await h.settle();
+  assert.match(h.el('party-title').textContent, /WINS!/);
+  assert.equal(h.el('party-reel-btn').classList.contains('hidden'), false);
+  assert.match(h.el('party-reel-status').textContent, /2 caught-blinking photos/);
+  h.click('party-end-btn');
+  assert.equal(h.debug.getState(), 'MENU');
+  assert.equal(h.el('party-screen').classList.contains('hidden'), true);
+});
+
+test('party needs two names, and backgrounding mid-turn keeps the party', async () => {
+  const h = harness();
+  h.el('party-names').value = 'Solo';
+  h.click('party-start-btn');
+  assert.match(h.el('party-setup-status').textContent, /at least 2/);
+  h.el('party-names').value = 'Ana, Ben';
+  h.click('party-start-btn');
+  h.click('party-go-btn'); await h.settle(); await h.timers();
+  h.document.hidden = true; h.visibility(); h.document.hidden = false;
+  assert.equal(h.debug.getState(), 'PARTY');
+  assert.match(h.el('party-message').textContent, /Turn 1 of 2: Ana/);
+  assert.equal(h.tracks[0].stops, 1);
+});
+
+test('head-to-head asks for both faces, then times out to the menu with guidance', async () => {
+  const h = harness();
+  h.debug.startGame('VERSUS'); await h.settle(); await h.timers();
+  assert.equal(h.debug.getState(), 'VERSUS_CALIBRATING');
+  h.setClock(1000); h.tickInference(); h.deliver(); await h.settle(); h.raf();
+  assert.match(h.el('calibration-status').innerText, /BOTH OF YOU IN VIEW/);
+  h.setClock(20000); h.raf();
+  assert.equal(h.debug.getState(), 'MENU');
+  assert.match(h.el('camera-error').textContent, /both faces/i);
+  assert.equal(h.tracks[0].stops, 1);
+});
+
+test('distraction round shows jokes while playing and hides them at the end', () => {
+  const h = harness();
+  h.debug.startGame('DISTRACT');
+  h.debug.endGame('BLINK');
+  assert.equal(h.el('joke-card').classList.contains('hidden'), true);
+  assert.equal(h.el('final-score-label').innerText, 'JOKES SURVIVED FOR');
 });

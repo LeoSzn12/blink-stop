@@ -1,4 +1,4 @@
-const CACHE_NAME = 'blink-stop-v13';
+const CACHE_NAME = 'blink-stop-v14';
 const ASSETS_TO_CACHE = [
     './',
     './index.html',
@@ -24,6 +24,9 @@ const ASSETS_TO_CACHE = [
     './src/social.mjs',
     './src/scoreCard.mjs',
     './src/skins.mjs',
+    './src/versus.mjs',
+    './src/party.mjs',
+    './src/reel.mjs',
     './src/surprise.mjs',
     './src/deviceActions.mjs',
     './src/clearData.mjs',

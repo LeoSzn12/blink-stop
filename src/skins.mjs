@@ -172,11 +172,13 @@ export function drawAmbient(ctx, skinId, width, height, timeMs = 0, area = null)
     return true;
 }
 
-// Called for every camera frame on the display canvas.
-export function drawSkinOverlay(ctx, skinId, landmarks, width, height, timeMs) {
+// Called for every camera frame on the display canvas. Accepts one face's
+// landmarks or Face Mesh's list of faces (head-to-head puts a hat on everyone).
+export function drawSkinOverlay(ctx, skinId, faces, width, height, timeMs) {
     if (!HEADWEAR[skinId]) return;
     drawAmbient(ctx, skinId, width, height, timeMs);
-    drawHeadwear(ctx, skinId, landmarks, width, height);
+    const list = Array.isArray(faces) && Array.isArray(faces[0]) ? faces : [faces];
+    for (const landmarks of list.slice(0, 2)) drawHeadwear(ctx, skinId, landmarks, width, height);
 }
 
 function roundRect(ctx, x, y, w, h, r) {
