@@ -62,9 +62,9 @@ check and simulator build are not an App Store privacy validation result.
 ## Reviewer instructions
 
 No credentials, payment, or external server are needed to play. Open the app, read
-the camera/local-data explanation, choose Classic, and allow front-camera access.
+the camera/local-data explanation, tap Endurance, and allow front-camera access.
 Keep your face visible and eyes open for calibration, then blink to finish. Precision
-offers 5/10/15-second targets; Endurance lasts up to 30 seconds; Daily changes visuals. Optional Surprise Mode adds a sudden illustrated face during a 30-second round after a clear opt-in screen; sound is off by default. Reassess fear/horror content answers for the final store rating.
+starts at a 10-second target (Change target time picks 5 or 15); 30 Seconds lasts up to 30 seconds; Daily changes visuals. Optional Surprise Mode adds a sudden illustrated face during a 30-second round after a clear opt-in screen; sound is off by default. Reassess fear/horror content answers for the final store rating.
 Menu/backgrounding releases the camera. Face loss invalidates a round. Scores stay
 on the device. Share Photo opens a system export sheet with a framed photo (holiday skins add drawn hats and decorations on the device), and Share Challenge shares mode-aware text and a friend code. Share Card exports a photo-free PNG. Codes contain a mode, target and reported score, without names or images. There is no authenticated ranking, contacts access or auto-posting.
 Support provides local-data deletion, troubleshooting, and policy/license links.
@@ -113,4 +113,4 @@ Requirements can change; re-check them immediately before the signed submission.
 
 ## October 10 prototype extension
 
-Surprise Mode and a session-only bonus-theme demo are now in the candidate. The demo is clearly labeled, uses a local placeholder, stops the camera, offers Skip, and never contacts an advertiser or earns revenue. Live ad SDKs, consent, targeting, privacy-label changes, and ad-unit approval are not implemented. Before live monetization, update these disclosures from the actual SDK and re-test. Add Surprise Mode and demo skip/completion/background cases to physical-device QA.
+November 18, 2026: the bonus-theme demo is hidden from version 1.0 (its code stays for later). Surprise Mode and a session-only bonus-theme demo were added in October. The demo is clearly labeled, uses a local placeholder, stops the camera, offers Skip, and never contacts an advertiser or earns revenue. Live ad SDKs, consent, targeting, privacy-label changes, and ad-unit approval are not implemented. Before live monetization, update these disclosures from the actual SDK and re-test. Add Surprise Mode and demo skip/completion/background cases to physical-device QA.

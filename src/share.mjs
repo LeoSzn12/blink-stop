@@ -48,10 +48,47 @@ export function challengeOutcome(result, challenge) {
     return won ? 'CHALLENGE BEATEN! Your friend is up next.' : 'FRIEND TAKES THIS ROUND. Rematch when ready?';
 }
 
-export function sharePayload(result) {
+// Skins that change how the brag reads ("as a turkey"). Classic adds nothing.
+const personas = { THANKSGIVING: 'as a turkey 🦃', CHRISTMAS: 'in a Santa hat 🎅', PARTY: 'in a party hat 🎉' };
+const linkSkins = ['CLASSIC', 'THANKSGIVING', 'CHRISTMAS', 'PARTY'];
+export function skinPersona(skinId) { return personas[skinId] || ''; }
+
+// The link a friend taps: opens straight onto this challenge, wearing the same skin.
+export function challengeUrl(result, skinId) {
+    let code = null;
+    try { code = challengeCode(result); } catch { code = null; }
+    if (!code) return PUBLIC_PLAY_URL;
+    return `${PUBLIC_PLAY_URL}#challenge=${code}${personas[skinId] ? `&skin=${skinId.toLowerCase()}` : ''}`;
+}
+
+// Reads "#challenge=BS1-C-0-14000&skin=thanksgiving". Returns null when the hash has no challenge.
+export function parseChallengeLink(hash) {
+    if (typeof hash !== 'string' || !hash.startsWith('#challenge=')) return null;
+    const parts = hash.slice(1).split('&');
+    let code = '', skin = null;
+    for (const part of parts) {
+        const [key, value = ''] = part.split('=');
+        let decoded = value;
+        try { decoded = decodeURIComponent(value); } catch { decoded = value; }
+        if (key === 'challenge') code = decoded;
+        if (key === 'skin' && linkSkins.includes(decoded.toUpperCase())) skin = decoded.toUpperCase();
+    }
+    return { code, skin, challenge: parseChallenge(code) };
+}
+
+// What the person opening the link sees: the number to beat, in one line.
+export function challengeHeadline(challenge, skinId) {
+    const persona = skinPersona(skinId);
+    const as = persona ? ` ${persona}` : '';
+    if (challenge.mode === 'PRECISION') return { title: `Beat ${challenge.score.toFixed(3)}s off ${challenge.target}s`, line: `Your friend blinked ${challenge.score.toFixed(3)}s off the ${challenge.target}-second mark${as}. Your turn.` };
+    if (challenge.mode === 'BALLOON') return { title: `Pop more than ${challenge.score}`, line: `Your friend popped ${formatScore('BALLOON', challenge.score).replace(' popped', '')} just by blinking${as}. Your turn.` };
+    return { title: `Beat ${formatScore(challenge.mode, challenge.score)}`, line: `Your friend kept their eyes open for ${formatScore(challenge.mode, challenge.score)} in ${modes[challenge.mode]}${as}. Your turn.` };
+}
+
+export function sharePayload(result, skinId) {
     const r = resultDetails(result), code = challengeCode(r);
-    const url = code ? `${PUBLIC_PLAY_URL}#challenge=${code}` : PUBLIC_PLAY_URL;
-    return { title: 'Blink Stop', url, text: `👁️ Blink Stop · ${r.label}: ${r.metric}. ${r.mode === 'PRECISION' ? r.detail + '. ' : ''}${r.invitation}\n${code ? `Challenge code: ${code}\nTap the link, then Accept challenge. Or paste this code under Got a challenge?\n` : 'Try the Daily modifier on your device.\n'}${url}\n#BlinkStop` };
+    const url = challengeUrl(r, skinId);
+    return { title: 'Blink Stop', url, text: `${inviteLine(r, skinId)}\n👁️ Blink Stop · ${r.label}: ${r.metric}. ${r.mode === 'PRECISION' ? r.detail + '. ' : ''}${r.invitation}\n${code ? `Challenge code: ${code}\nTap the link to take the challenge. Or paste this code under Got a challenge?\n` : 'Try the Daily modifier on your device.\n'}${url}\n#BlinkStop` };
 }
 
 export function shareClipboardText(result) { return sharePayload(result).text; }
@@ -64,12 +101,13 @@ export function formatScore(mode, score) {
 }
 
 // One friendly line that travels with a shared photo, ahead of the play link.
-export function inviteLine(result) {
+export function inviteLine(result, skinId) {
     try {
         const r = resultDetails(result);
-        if (r.mode === 'BALLOON') return `I popped ${r.metric.replace(' popped', '')} just by blinking 🎈 Can you beat me?`;
-        if (r.mode === 'PRECISION') return `I blinked ${r.metric} the ${r.target}-second mark 🎯 Can you get closer?`;
-        return `I kept my eyes open for ${r.metric} 👀 Can you beat me?`;
+        const persona = skinPersona(skinId);
+        if (r.mode === 'BALLOON') return `I popped ${r.metric.replace(' popped', '')} just by blinking${persona ? `, ${persona}` : ' 🎈'} Can you beat me?`;
+        if (r.mode === 'PRECISION') return `I blinked ${r.metric} the ${r.target}-second mark ${persona || '🎯'} Can you get closer?`;
+        return `I kept my eyes open for ${r.metric} ${persona || '👀'} Can you beat me?`;
     } catch {
         return 'Think you can beat me? 👀';
     }

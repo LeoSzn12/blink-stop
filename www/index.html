@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Blink Stop - Don't Blink Challenge</title>
-    <link rel="stylesheet" href="src/style.css?v=10">
+    <link rel="stylesheet" href="src/style.css?v=13">
 
     <link rel="manifest" href="manifest.json">
 
@@ -36,6 +36,14 @@
                     <h1 class="glitch" data-text="BLINK STOP">BLINK STOP</h1>
                     <p class="subtitle">The game you play with your eyes.</p>
 
+                    <section id="camera-problem" class="camera-problem hidden" aria-label="Camera problem">
+                        <p id="camera-error" role="alert" class="camera-error hidden"></p>
+                        <div class="camera-problem-actions">
+                            <button id="camera-retry-btn" class="neon-btn-small hidden" type="button">Try again</button>
+                            <button id="restart-camera-btn" class="neon-btn-small hidden" type="button">Restart camera</button>
+                        </div>
+                    </section>
+
                     <div class="skin-picker" role="radiogroup" aria-label="Photo skin">
                         <span class="label">SKIN</span>
                         <button type="button" class="skin-btn" role="radio" aria-checked="false" data-skin="CLASSIC">Classic</button>
@@ -45,9 +53,21 @@
                     </div>
                     <p id="skin-greeting" class="skin-greeting" aria-live="polite"></p>
 
+                    <section id="challenge-banner" class="challenge-banner hidden" aria-live="polite" aria-label="Friend challenge">
+                        <p class="challenge-banner-kicker">YOU'VE BEEN CHALLENGED</p>
+                        <p id="challenge-banner-title" class="challenge-banner-title"></p>
+                        <p id="challenge-banner-line" class="challenge-banner-line"></p>
+                        <button id="challenge-banner-play" class="neon-btn challenge-banner-play" type="button">TAKE THE CHALLENGE</button>
+                        <button id="challenge-banner-dismiss" class="neon-btn-small" type="button">Not now</button>
+                    </section>
+
+                    <p class="camera-promise">Uses your camera to see blinks. Nothing leaves your phone.</p>
+                    <p id="eye-tracking-status" class="eye-tracking-status" role="status" aria-live="polite"></p>
+
                     <div class="mode-selection">
                         <button class="neon-btn mode-btn main-mode-btn" data-mode="CLASSIC">ENDURANCE<span class="btn-sub">Who can keep their eyes open longest?</span></button>
-                        <button class="neon-btn mode-btn main-mode-btn precision-btn" data-mode="PRECISION">PRECISION<span class="btn-sub">Blink right on 5, 10 or 15 seconds</span></button>
+                        <button class="neon-btn mode-btn main-mode-btn precision-btn" data-mode="PRECISION">PRECISION<span class="btn-sub">Blink right at <span id="precision-target-label">10 seconds</span></span></button>
+                        <button id="precision-change-btn" class="neon-btn-small precision-change" type="button">Change target time</button>
                         <button class="neon-btn mode-btn main-mode-btn olympics-btn" data-mode="OLYMPICS">BLINK OLYMPICS<span class="btn-sub">Mini-games for family and friends</span></button>
                         <details id="more-modes" class="more-modes">
                             <summary>More ways to play</summary>
@@ -55,7 +75,8 @@
                                 <button class="neon-btn mode-btn" data-mode="ENDURANCE">30 SECONDS<span class="btn-sub">Make it to 30 without blinking</span></button>
                                 <button class="neon-btn mode-btn" data-mode="DAILY">DAILY<span class="btn-sub">A new twist every day</span></button>
                                 <button class="neon-btn mode-btn surprise-btn" data-mode="SURPRISE">SURPRISE<span class="btn-sub">30s • Can startle you</span></button>
-                                <button id="demo-menu-btn" class="neon-btn-small demo-link" type="button">Preview bonus theme demo</button>
+                                <!-- Hidden for version 1.0; the demo code stays for a later update. -->
+                    <button id="demo-menu-btn" class="neon-btn-small demo-link hidden" type="button" hidden>Preview bonus theme demo</button>
                             </div>
                         </details>
                     </div>
@@ -63,8 +84,8 @@
                     <div id="olympics-options" class="options-container prototype-options hidden">
                         <h2>BLINK OLYMPICS</h2>
                         <button class="neon-btn mode-btn balloon-btn" data-mode="BALLOON">BALLOON POP<span class="btn-sub">Blink when a balloon is in the zone</span></button>
-                        <button class="neon-btn mode-btn" data-mode="VERSUS">STARE-DOWN<span class="btn-sub">2 players side by side • First blink loses</span></button>
-                        <button class="neon-btn mode-btn" data-mode="PARTY">PASS THE PHONE<span class="btn-sub">2 to 8 players • Top two meet in a final</span></button>
+                        <button class="neon-btn mode-btn" data-mode="VERSUS">STARE-DOWN<span class="btn-sub">2 players, side by side. First to blink loses.</span></button>
+                        <button class="neon-btn mode-btn" data-mode="PARTY">PASS THE PHONE<span class="btn-sub">Group game for 2 to 8. Take turns on one phone.</span></button>
                         <button class="neon-btn mode-btn" data-mode="DISTRACT">DISTRACTION<span class="btn-sub">Jokes try to make you blink</span></button>
                         <button id="olympics-back-btn" class="neon-btn-small" type="button">Back</button>
                     </div>
@@ -94,17 +115,17 @@
 
                     <!-- Precision Options (Hidden by default) -->
                     <div id="precision-options" class="options-container hidden">
-                        <p class="label">SELECT TARGET</p>
+                        <p class="label">BLINK RIGHT AT</p>
                         <div class="option-btns">
-                            <button class="neon-btn-small option-btn active" data-time="5">5s</button>
-                            <button class="neon-btn-small option-btn" data-time="10">10s</button>
-                            <button class="neon-btn-small option-btn" data-time="15">15s</button>
+                            <button class="neon-btn-small option-btn" data-time="5">5 sec</button>
+                            <button class="neon-btn-small option-btn active" data-time="10">10 sec</button>
+                            <button class="neon-btn-small option-btn" data-time="15">15 sec</button>
                         </div>
                         <button id="precision-back-btn" class="neon-btn-small" type="button">Back</button>
                     </div>
 
                     <details class="challenge-entry">
-                        <summary>Got a challenge?</summary>
+                        <summary>Have a friend's code?</summary>
                         <form id="challenge-form">
                             <label for="challenge-input">Paste a friend's code or challenge caption</label>
                             <textarea id="challenge-input" maxlength="1000" rows="2" placeholder="BS1-C-0-12340" spellcheck="false"></textarea>
@@ -120,8 +141,6 @@
                     </div>
 
                     <p class="loading-text" id="loading-msg" style="display:none">INITIALIZING BLINK DETECTION...</p>
-                    <p id="camera-error" role="alert" class="camera-error hidden"></p>
-                    <button id="restart-camera-btn" class="neon-btn-small hidden" type="button">Restart camera</button>
 
 
                 </div>
@@ -178,6 +197,10 @@
                     </div>
                     <div class="hud-right">
                         <!-- World Record Display (Classic Mode) -->
+                        <div id="challenge-hud" class="world-record-hud challenge-hud hidden">
+                            <span class="label">TO BEAT</span>
+                            <span id="challenge-hud-value" class="digital-text-sm">--</span>
+                        </div>
                         <div id="world-record-display" class="world-record-hud hidden">
                             <span class="label">YOUR BEST</span>
                             <span id="wr-value" class="digital-text-sm">--</span>
@@ -185,7 +208,7 @@
 
                         <!-- New Eye Meter -->
                         <div class="meter-container">
-                            <span class="label">EYE STABILITY</span>
+                            <span class="label">EYES OPEN</span>
                             <div class="meter-bar-bg">
                                 <div class="meter-bar-fill" id="eye-meter-fill" style="width: 100%;"></div>
                             </div>
@@ -248,6 +271,8 @@
                         <img id="selfie-preview" style="width: 100%; display: block;" />
                     </div>
 
+                    <video id="clip-preview" class="clip-preview hidden" muted loop playsinline autoplay aria-label="Your blink clip"></video>
+
                     <section id="dare-box" class="dare-box hidden" aria-label="Forfeit">
                         <p id="dare-text" class="dare-text"></p>
                         <button id="new-dare-btn" class="neon-btn-small" type="button">New dare</button>
@@ -258,6 +283,7 @@
                         <button id="restart-btn" class="neon-btn">RETRY</button>
                         <button id="share-btn" class="neon-btn" aria-label="Share result and friend challenge caption">SHARE CHALLENGE</button>
                         <button id="selfie-btn" class="neon-btn" style="border-color: var(--neon-pink); color: var(--neon-pink)">SHARE PHOTO</button>
+                        <button id="clip-btn" class="neon-btn clip-btn hidden" type="button" disabled>MAKING YOUR CLIP...</button>
                     </div>
                     <section id="social-result" class="social-result hidden" aria-label="Your challenge card">
                         <p id="challenge-outcome" class="challenge-outcome" role="status"></p>
@@ -275,7 +301,8 @@
                         <p id="social-status" role="status" aria-live="polite"></p>
                     </section>
                     <button id="menu-btn" class="neon-btn-small">MENU</button>
-                    <button id="demo-bonus-btn" class="neon-btn-small demo-link" type="button">Preview bonus theme demo</button>
+                    <!-- Hidden for version 1.0; the demo code stays for a later update. -->
+                    <button id="demo-bonus-btn" class="neon-btn-small demo-link hidden" type="button" hidden>Preview bonus theme demo</button>
                 </div>
 
                 <div id="demo-ad-screen" class="screen hidden">
@@ -306,7 +333,7 @@
         <a href="support.html" class="footer-link">Support</a>
     </footer>
 
-    <script type="module" src="src/main.js?v=72"></script>
+    <script type="module" src="src/main.js?v=75"></script>
 </body>
 
 </html>

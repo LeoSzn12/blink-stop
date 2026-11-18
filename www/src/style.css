@@ -1123,3 +1123,37 @@ body.skin-party { --neon-cyan: #ffd23f; --neon-pink: #ff5fd2; --glass-bg: rgba(2
 #game-over-screen.versus-result #demo-bonus-btn,
 #game-over-screen.party-turn #restart-btn,
 #game-over-screen.party-turn #demo-bonus-btn { display: none; }
+
+/* Friend challenge link: the number to beat, one big button. */
+.challenge-banner { width: min(100%, 24rem); margin: 0 auto 1rem; padding: 1rem; text-align: center; border: 2px solid var(--neon-pink); border-radius: 12px; background: rgba(0, 0, 0, .55); box-shadow: 0 0 18px rgba(255, 0, 255, .35); }
+.challenge-banner.hidden { display: none; }
+.challenge-banner-kicker { font-size: .8rem; letter-spacing: .15em; color: #ccc; margin-bottom: .35rem; }
+.challenge-banner-title { font-size: 1.8rem; font-weight: bold; color: var(--neon-pink); margin-bottom: .4rem; overflow-wrap: anywhere; }
+.challenge-banner-line { font-size: .95rem; line-height: 1.4; margin-bottom: .8rem; }
+.challenge-banner-play { width: 100%; min-width: 0; margin-bottom: .5rem; }
+.challenge-hud .digital-text-sm { color: var(--neon-pink); }
+
+/* Blink clip preview on the result screen. */
+.clip-preview { width: 100%; max-width: 220px; margin: 0 auto 1rem; display: block; border: 2px solid var(--neon-pink); border-radius: 8px; background: #000; }
+.clip-preview.hidden { display: none; }
+.clip-btn { border-color: #39ff14; color: #39ff14; }
+.clip-btn.hidden { display: none; }
+.clip-btn:disabled { opacity: .7; cursor: progress; }
+
+/* Camera problems sit at the top of the home screen, where they are seen. */
+.camera-problem { width: min(100%, 25rem); margin: .5rem auto 1rem; display: flex; flex-direction: column; align-items: center; gap: .6rem; scroll-margin-top: calc(1rem + var(--safe-top)); }
+.camera-problem .camera-error { margin: 0; width: 100%; }
+.camera-problem-actions { display: flex; gap: .6rem; justify-content: center; flex-wrap: wrap; }
+.camera-promise { max-width: 25rem; margin: .4rem auto .8rem; text-align: center; color: #ddd; font-size: .9rem; line-height: 1.4; }
+.eye-tracking-status { min-height: 1.2em; margin: 0 auto .4rem; text-align: center; color: var(--neon-cyan); font-size: .8rem; }
+.eye-tracking-status:empty { min-height: 0; margin: 0; }
+.precision-change { align-self: center; margin-top: -.3rem; font-size: .8rem; }
+.option-btn { text-transform: none; }
+
+/* The footer follows the page instead of floating over its last buttons. */
+.footer, footer { position: static; }
+
+/* Small lines under button names stay readable on the dark button and when it fills
+   with color (hover, or the "sticky" hover a tap leaves behind on phones). */
+.btn-sub { color: #c4c4c4; }
+.neon-btn:hover .btn-sub, .neon-btn:active .btn-sub, .neon-btn:focus-visible .btn-sub { color: #111; }

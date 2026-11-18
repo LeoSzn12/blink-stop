@@ -6,7 +6,7 @@ import { createSerializedInference } from './inference.mjs';
 import { appendScore } from './leaderboard.mjs';
 import { cameraErrorMessage } from './cameraHelp.mjs';
 import { createGameOverCameraStop } from './roundLifecycle.mjs';
-import { sharePayload, shareClipboardText, formatScore, inviteLine } from './share.mjs';
+import { sharePayload, shareClipboardText, formatScore, inviteLine, challengeUrl, challengeHeadline, PUBLIC_PLAY_URL } from './share.mjs';
 import { createSurpriseRound, createRewardedDemo } from './surprise.mjs';
 import { createSocialUI } from './social.mjs';
 import { SKINS, SKIN_STORAGE_KEY, resolveSkin, storedSkinValue, drawSkinOverlay, composeSelfie, selfieCaption } from './skins.mjs';
@@ -14,6 +14,7 @@ import { createVersusMatch, largestFace } from './versus.mjs';
 import { parseNames, createParty, createDeck, forfeitCards, jokeCards } from './party.mjs';
 import { drawReel } from './reel.mjs';
 import { createBalloonRound, drawBalloons, BALLOON_MISSES } from './balloons.mjs';
+import { clipSupported, createClipBuffer, encodeClip, pickClipType, clipExtension } from './clip.mjs';
 
 // DOM Elements
 const videoElement = document.getElementsByClassName('input_video')[0];
@@ -51,6 +52,10 @@ const restartBtn = document.getElementById('restart-btn');
 const menuBtn = document.getElementById('menu-btn');
 const loadingMsg = document.getElementById('loading-msg');
 const cameraError = document.getElementById('camera-error');
+const cameraProblem = document.getElementById('camera-problem');
+const cameraRetryBtn = document.getElementById('camera-retry-btn');
+const eyeTrackingStatus = document.getElementById('eye-tracking-status');
+const precisionTargetLabel = document.getElementById('precision-target-label');
 const scoreDisplay = document.getElementById('score');
 const targetDisplay = document.getElementById('target-display');
 const hudLabel = document.getElementById('hud-label');
@@ -108,6 +113,7 @@ const balloonLayer = document.getElementById('balloon-layer');
 const balloonCtx = balloonLayer.getContext('2d');
 let balloonRound = null, balloonEyeClosed = false, balloonFrameId = null, balloonEnd = null;
 let shareLine = 'Think you can beat me?'; // invite text that travels with a shared photo
+let shareUrl = PUBLIC_PLAY_URL; // challenge link that travels with a shared photo or clip
 let party = null;            // active party tournament, in memory only
 let partyStage = null;       // NEXT_TURN | FINAL | CHAMPION
 let partyTurn = false;       // the current round is a party turn
@@ -120,6 +126,116 @@ let dareDeck = null, dareTarget = '', jokeDeck = null, jokeShownAt = -Infinity;
 // UI Elements (New - World Record & Precision)
 const worldRecordDisplay = document.getElementById('world-record-display');
 const wrValue = document.getElementById('wr-value');
+const challengeHud = document.getElementById('challenge-hud');
+const challengeHudValue = document.getElementById('challenge-hud-value');
+
+// ---------- Blink clip ----------
+// While a solo round runs, the last few seconds of the camera view are kept as small
+// frames in memory. After a blink they become a short video, made on this phone.
+const CLIP_MODES = ['CLASSIC', 'PRECISION', 'ENDURANCE', 'DAILY', 'SURPRISE', 'DISTRACT'];
+const clipBtn = document.getElementById('clip-btn');
+const clipPreview = document.getElementById('clip-preview');
+const clipCanMake = clipSupported(window);
+const clip = createClipBuffer({ makeCanvas: () => document.createElement('canvas') });
+let clipBlob = null, clipFile = null, clipUrl = '', clipMaking = false, clipEncoding = false;
+let clipCaption = null, clipSkin = 'CLASSIC', clipToken = 0, clipFinishTimer = null, lastFrameAt = 0;
+
+function updateClipButton() {
+    clipBtn.classList.toggle('hidden', !clipCanMake || (!clipMaking && !clipBlob));
+    clipBtn.disabled = !clipBlob;
+    clipBtn.innerText = clipBlob ? 'SHARE CLIP' : 'MAKING YOUR CLIP...';
+}
+
+function clearClip() {
+    clipToken++;
+    clearTimeout(clipFinishTimer);
+    clip.reset();
+    clipBlob = null; clipFile = null; clipMaking = false; clipEncoding = false;
+    if (clipUrl) URL.revokeObjectURL(clipUrl);
+    clipUrl = '';
+    clipPreview.removeAttribute('src');
+    clipPreview.classList.add('hidden');
+    updateClipButton();
+}
+
+function captureClipFrame(now) {
+    if (!clipCanMake || !CLIP_MODES.includes(currentMode)) return;
+    if (gameState !== 'PLAYING' && gameState !== 'ENDURANCE' && !clip.waiting) return;
+    clip.push(canvasElement, now);
+    if (clip.ready) makeClip();
+}
+
+// Called from endGame: only a real blink gets a clip.
+function startClip(reason, elapsed, score) {
+    if (reason !== 'BLINK' || !clipCanMake || !CLIP_MODES.includes(currentMode) || !clip.mark(lastFrameAt, elapsed)) {
+        clip.reset();
+        return;
+    }
+    clipMaking = true;
+    clipCaption = selfieCaption({ reason, mode: currentMode, elapsed, target: precisionTarget, score });
+    clipSkin = currentSkin;
+    clearTimeout(clipFinishTimer);
+    // If the camera stops before the after-blink frames arrive, make it from what we have.
+    clipFinishTimer = setTimeout(() => { if (clip.finish()) makeClip(); }, 2500);
+    updateClipButton();
+}
+
+function makeClip() {
+    if (!clipMaking || clipEncoding || !clip.ready) return;
+    clipEncoding = true;
+    clearTimeout(clipFinishTimer);
+    const token = clipToken;
+    encodeClip(clip, { skinId: clipSkin, caption: clipCaption, doc: document, Recorder: window.MediaRecorder, type: pickClipType(window.MediaRecorder) })
+        .then(blob => {
+            if (token !== clipToken) return;
+            clipBlob = blob;
+            const name = `blink-stop-clip.${clipExtension(blob.type)}`;
+            clipFile = typeof File === 'function' ? new File([blob], name, { type: blob.type }) : null;
+            clipUrl = URL.createObjectURL(blob);
+            clipPreview.src = clipUrl;
+            clipPreview.classList.remove('hidden');
+            clipPreview.play?.().catch(() => {});
+        })
+        .catch(err => console.warn('Blink clip skipped:', err))
+        .finally(() => {
+            if (token !== clipToken) return;
+            clip.reset(); // the finished video replaces the frames
+            clipMaking = false;
+            clipEncoding = false;
+            updateClipButton();
+        });
+}
+
+clipBtn.addEventListener('click', async () => {
+    if (!clipBlob || clipBtn.disabled) return;
+    const name = `blink-stop-clip.${clipExtension(clipBlob.type)}`;
+    const text = `${shareLine} Play free: ${shareUrl} #BlinkStop`;
+    if (window.Capacitor?.isNativePlatform?.()) {
+        clipBtn.disabled = true;
+        try {
+            const { exportNativeClip } = await import('./deviceActions.mjs');
+            await exportNativeClip(clipBlob, name, text);
+            clipBtn.innerText = 'SHARE CLIP';
+        } catch (error) {
+            clipBtn.innerText = 'SHARE CANCELLED — TRY AGAIN';
+        } finally {
+            clipBtn.disabled = false;
+        }
+        return;
+    }
+    if (clipFile && navigator.share && navigator.canShare?.({ files: [clipFile] })) {
+        try {
+            await navigator.share({ files: [clipFile], title: 'Blink Stop', text });
+            return;
+        } catch (error) {
+            if (error?.name === 'AbortError') return; // The clip stays here.
+        }
+    }
+    const link = document.createElement('a');
+    link.download = name;
+    link.href = clipUrl;
+    link.click();
+});
 const finalScoreSub = document.getElementById('final-score-sub');
 const gameOverWorldRecord = document.getElementById('game-over-world-record');
 
@@ -133,9 +249,12 @@ let currentMode = 'CLASSIC';
 let startTime = 0;
 let animationFrameId;
 let calibrationFrameId;
-let precisionTarget = 10.00; 
+let precisionTarget = 10.00;
+let precisionChoice = 10; // The player's own pick; Precision starts with it in one tap. 
 let calibrationStartTime = 0;
 let calibrationLastFrame = null;
+let calibrationFirstFrame = null;
+const calibrationHintText = 'Face the camera with your eyes comfortably open. Put a light in front of you, not behind you.';
 let calibrationLastEye = null;
 let lastScore = null;
 let lastResult = null;
@@ -152,8 +271,9 @@ let demoFrameId;
 const faceLoss = createFaceLossTracker();
 const calibration = createCalibrationTracker();
 const tracking = createTrackingFreshness();
-const social = createSocialUI(challenge => {
+function beginChallenge(challenge) {
     if (!['MENU', 'GAME_OVER'].includes(gameState)) return;
+    hideChallengeBanner();
     showMenu(); // Release the previous player's camera before the handoff.
     activeChallenge = challenge;
     precisionTarget = challenge.mode === 'PRECISION' ? challenge.target : precisionTarget;
@@ -164,21 +284,105 @@ const social = createSocialUI(challenge => {
         surpriseOptions.classList.remove('hidden');
         document.getElementById('surprise-start-btn').focus();
     } else startGame(challenge.mode);
-});
-
-// Service Worker Registration
-if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./service-worker.js')
-            .then(reg => console.log('Service Worker registered'))
-            .catch(err => console.log('Service Worker registration failed: ', err));
-    });
 }
+// A friend's challenge link: show the number to beat, in their skin. The camera stays
+// off until the player taps to play.
+const challengeBanner = document.getElementById('challenge-banner');
+let linkedChallenge = null;
+function hideChallengeBanner() {
+    linkedChallenge = null;
+    challengeBanner.classList.add('hidden');
+}
+function showChallengeBanner(challenge, skin) {
+    linkedChallenge = challenge;
+    if (skin) applySkin(skin);
+    const { title, line } = challengeHeadline(challenge, skin || currentSkin);
+    document.getElementById('challenge-banner-title').textContent = `${SKINS[currentSkin].icon} ${title}`;
+    document.getElementById('challenge-banner-line').textContent = line;
+    challengeBanner.classList.remove('hidden');
+}
+document.getElementById('challenge-banner-play').addEventListener('click', () => { if (linkedChallenge) beginChallenge(linkedChallenge); });
+document.getElementById('challenge-banner-dismiss').addEventListener('click', hideChallengeBanner);
+const social = createSocialUI(beginChallenge, { onLinkedChallenge: showChallengeBanner });
+
+// Eye tracking (about 10 MB) gets ready while the player is still on the home screen,
+// so a slow connection is spent here and not inside a round's calibration time.
+let eyeTrackingWarm = null;
+let eyeTrackingReady = false;
+function setEyeTrackingStatus(text) {
+    if (eyeTrackingStatus && eyeTrackingStatus.textContent !== text) eyeTrackingStatus.textContent = text;
+}
+function warmEyeTracking() {
+    if (eyeTrackingWarm) return eyeTrackingWarm;
+    if (typeof FaceMesh !== 'function') return (eyeTrackingWarm = Promise.resolve(false));
+    setEyeTrackingStatus('Getting eye tracking ready...');
+    const mesh = new FaceMesh({ locateFile: file => `vendor/face_mesh/${file}` });
+    mesh.setOptions({ maxNumFaces: 2, refineLandmarks: false, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+    eyeTrackingWarm = Promise.resolve()
+        .then(() => (typeof mesh.initialize === 'function' ? mesh.initialize() : undefined))
+        .then(() => {
+            eyeTrackingReady = true;
+            setEyeTrackingStatus('Eye tracking ready. Pick a game!');
+            setTimeout(() => { if (eyeTrackingReady) setEyeTrackingStatus(''); }, 4000);
+            return true;
+        })
+        .catch(err => {
+            console.warn('Eye tracking warm-up failed:', err);
+            setEyeTrackingStatus('');
+            return false;
+        })
+        .finally(() => { try { mesh.close(); } catch {} });
+    return eyeTrackingWarm;
+}
+
+// The offline copy is saved after the warm-up, so a first visit downloads the model
+// once instead of twice at the same time.
+function registerServiceWorker() {
+    if (!('serviceWorker' in navigator)) return;
+    navigator.serviceWorker.register('./service-worker.js')
+        .then(reg => console.log('Service Worker registered'))
+        .catch(err => console.log('Service Worker registration failed: ', err));
+}
+window.addEventListener('load', () => {
+    // Never hold the offline copy back for long if the warm-up is slow or stuck.
+    Promise.race([warmEyeTracking(), new Promise(resolve => setTimeout(resolve, 20000))]).finally(registerServiceWorker);
+});
 
 // Initialize Audio on user interaction
 document.addEventListener('click', () => {
     audioManager.resume();
 });
+
+// Camera problems show at the top of the home screen, with a way to try again.
+let retryMode = null;
+function showCameraProblem(message, { restart = false } = {}) {
+    cameraError.textContent = message;
+    cameraError.classList.remove('hidden');
+    restartCameraBtn.classList.toggle('hidden', !restart);
+    cameraRetryBtn.classList.toggle('hidden', restart || !retryMode);
+    cameraProblem.classList.remove('hidden');
+    try { cameraProblem.scrollIntoView?.({ block: 'start', behavior: 'smooth' }); } catch {}
+}
+function hideCameraProblem() {
+    cameraError.classList.add('hidden');
+    restartCameraBtn.classList.add('hidden');
+    cameraRetryBtn.classList.add('hidden');
+    cameraProblem.classList.add('hidden');
+}
+
+// A quick double tap must not open a menu and then start whatever sits under the
+// finger in it (Blink Olympics then Stare-down). Back buttons clear the guard.
+const TAP_GUARD_MS = 450;
+let lastMenuTapAt = -Infinity;
+function tapTooSoon() { return performance.now() - lastMenuTapAt < TAP_GUARD_MS; }
+function armTapGuard() { lastMenuTapAt = performance.now(); }
+function clearTapGuard() { lastMenuTapAt = -Infinity; }
+
+function setPrecisionChoice(seconds) {
+    precisionChoice = seconds;
+    if (precisionTargetLabel) precisionTargetLabel.textContent = `${seconds} seconds`;
+    optionBtns.forEach(b => b.classList.toggle('active', Number(b.dataset.time) === seconds));
+}
 
 // MediaPipe Setup
 function createSessionFaceMesh(session, maxNumFaces = 1) {
@@ -234,8 +438,7 @@ async function startCameraLoop(session) {
         stream.getTracks().forEach(track => track.addEventListener('ended', () => {
             if (session !== cameraSession || videoElement.srcObject !== stream) return;
             showMenu();
-            cameraError.textContent = 'Camera disconnected. Check your camera and try again.';
-            cameraError.classList.remove('hidden');
+            showCameraProblem('Camera disconnected. Check your camera and try again.');
         }));
 
         // Wait for video to actually play
@@ -249,7 +452,15 @@ async function startCameraLoop(session) {
         await videoElement.play();
         if (session !== cameraSession || document.hidden) return false;
 
-        // 2. Start Detection Loop (Decoupled)
+        // 2. If eye tracking is still downloading, finish that first (one download, and
+        // calibration time only starts once it can actually see eyes).
+        if (eyeTrackingWarm && !eyeTrackingReady) {
+            loadingMsg.innerText = 'LOADING EYE TRACKING...';
+            await eyeTrackingWarm;
+            if (session !== cameraSession || document.hidden) return false;
+        }
+
+        // 3. Start Detection Loop (Decoupled)
         startDetectionLoop(session);
         return true;
 
@@ -284,10 +495,16 @@ function stopDetectionLoop() {
 modeBtns.forEach(btn => {
     btn.addEventListener('click', (e) => {
         const mode = e.currentTarget.dataset.mode;
+        if (tapTooSoon()) return;
+        armTapGuard();
+        hideCameraProblem();
         activeChallenge = null;
 
         if (mode === 'CLASSIC') {
             startGame('CLASSIC');
+        } else if (mode === 'PRECISION') {
+            precisionTarget = precisionChoice;
+            startGame('PRECISION');
         } else if (mode === 'ENDURANCE') {
             startGame('ENDURANCE');
         } else if (mode === 'DAILY') {
@@ -312,11 +529,6 @@ modeBtns.forEach(btn => {
             modeSelection.classList.add('hidden');
             surpriseOptions.classList.remove('hidden');
             document.getElementById('surprise-start-btn').focus();
-        } else {
-            // Show options
-            modeSelection.classList.add('hidden');
-            precisionOptions.classList.remove('hidden');
-            optionBtns[0].focus();
         }
     });
 });
@@ -324,7 +536,21 @@ modeBtns.forEach(btn => {
 document.getElementById('surprise-start-btn').addEventListener('click', () => startGame('SURPRISE'));
 document.getElementById('calibration-cancel-btn').addEventListener('click', () => (party ? returnToParty() : showMenu()));
 restartCameraBtn.addEventListener('click', () => window.location.reload());
+cameraRetryBtn.addEventListener('click', () => {
+    if (!retryMode || gameState !== 'MENU') return;
+    if (retryMode === 'PRECISION') precisionTarget = precisionChoice;
+    startGame(retryMode);
+});
+document.getElementById('precision-change-btn').addEventListener('click', () => {
+    if (tapTooSoon()) return;
+    armTapGuard();
+    hideCameraProblem();
+    modeSelection.classList.add('hidden');
+    precisionOptions.classList.remove('hidden');
+    (precisionOptions.querySelector('.option-btn.active') || optionBtns[0])?.focus();
+});
 document.getElementById('surprise-back-btn').addEventListener('click', () => {
+    clearTapGuard();
     activeChallenge = null;
     document.getElementById('challenge-status').textContent = '';
     container.classList.remove('surprise-mode');
@@ -382,6 +608,7 @@ function finishDemoAd(claim) {
 }
 
 precisionBackBtn.addEventListener('click', () => {
+    clearTapGuard();
     precisionOptions.classList.add('hidden');
     modeSelection.classList.remove('hidden');
     document.querySelector('[data-mode="PRECISION"]').focus();
@@ -389,12 +616,10 @@ precisionBackBtn.addEventListener('click', () => {
 
 optionBtns.forEach(btn => {
     btn.addEventListener('click', (e) => {
-        // Set target
-        precisionTarget = parseFloat(e.target.dataset.time);
-
-        // Update active state
-        optionBtns.forEach(b => b.classList.remove('active'));
-        e.target.classList.add('active');
+        if (tapTooSoon()) return;
+        // The pick is remembered, so the Precision button starts it next time.
+        setPrecisionChoice(Number(e.currentTarget.dataset.time));
+        precisionTarget = precisionChoice;
 
         // Start Game
         startGame('PRECISION');
@@ -582,7 +807,7 @@ selfieBtn.addEventListener('click', async () => {
 async function shareJpegOnWeb(dataUrl, file, baseName) {
     if (file && navigator.share && navigator.canShare?.({ files: [file] })) {
         try {
-            await navigator.share({ files: [file], title: 'Blink Stop', text: `${shareLine} Play free: https://www.playblinkstop.com/ #BlinkStop` });
+            await navigator.share({ files: [file], title: 'Blink Stop', text: `${shareLine} Play free: ${shareUrl} #BlinkStop` });
             return 'shared';
         } catch (error) {
             if (error?.name === 'AbortError') return 'cancelled'; // The photo stays here.
@@ -735,11 +960,13 @@ function endBalloon(faceLost) {
 
 // ---------- Party tournament ----------
 document.getElementById('party-back-btn').addEventListener('click', () => {
+    clearTapGuard();
     partyOptions.classList.add('hidden');
     olympicsOptions.classList.remove('hidden');
     olympicsOptions.querySelector('[data-mode="PARTY"]').focus();
 });
 document.getElementById('olympics-back-btn').addEventListener('click', () => {
+    clearTapGuard();
     olympicsOptions.classList.add('hidden');
     modeSelection.classList.remove('hidden');
     document.querySelector('[data-mode="OLYMPICS"]').focus();
@@ -898,6 +1125,7 @@ async function buildReel(champion) {
         if (party !== reelParty) return;
         reelUrl = drawReel(photos, currentSkin, { champion, doc: document });
         shareLine = `Our Blink Stop party reel 🎉 ${champion} took the crown!`;
+        shareUrl = PUBLIC_PLAY_URL;
         reelFile = jpegFile(reelUrl, 'blink-stop-reel.jpg');
         partyReelStatus.textContent = `${photos.length} caught-blinking photo${photos.length === 1 ? '' : 's'} in one picture.`;
     } catch (error) {
@@ -960,7 +1188,7 @@ function updateVersusLoop() {
             back();
             const message = 'Could not see both faces clearly. Sit side by side, cheek to cheek, with a light in front of you, and hold the phone at eye level.';
             if (party) partyMessage.textContent = message;
-            else { cameraError.textContent = message; cameraError.classList.remove('hidden'); }
+            else showCameraProblem(message);
             return;
         }
         const stale = versusLastFrame === null || now - versusLastFrame >= 1000;
@@ -1035,6 +1263,7 @@ function endVersus(outcome) {
     finalScoreSub.innerText = detail;
     finalScoreSub.classList.remove('hidden');
     restartBtn.innerText = 'REMATCH';
+    shareUrl = PUBLIC_PLAY_URL;
     shareLine = outcome?.result === 'WIN' ? `${versusName(outcome.winner)} won our Blink Stop stare-down 👀 Who's next?` : 'Blink Stop stare-down 👀 Who can beat us?';
     const photo = makeSelfie({ headline, detail });
     if (party && versusNames) {
@@ -1078,11 +1307,17 @@ function startGame(mode) {
     stopCameraAndDetection();
     const session = cameraSession;
     faceMesh = createSessionFaceMesh(session, 2); // Two faces: Stare-down needs both; solo keeps the closest player.
-    cameraError.classList.add('hidden');
-    restartCameraBtn.classList.add('hidden');
+    hideCameraProblem();
+    retryMode = party ? null : mode;
     currentMode = mode;
     loadingMsg.style.display = 'block';
     loadingMsg.innerText = 'INITIALIZING BLINK DETECTION...';
+
+    // A friend's number to beat stays on screen during their challenge.
+    const toBeat = activeChallenge && activeChallenge.mode === mode ? activeChallenge : null;
+    challengeHud.classList.toggle('hidden', !toBeat);
+    if (toBeat) challengeHudValue.innerText = mode === 'PRECISION' ? `${toBeat.score.toFixed(3)}s off` : formatScore(mode, toBeat.score).replace(' popped', '');
+    clearClip();
 
     // UI Setup based on mode
     if (mode === 'PRECISION') {
@@ -1132,10 +1367,9 @@ function startGame(mode) {
             console.error("Camera error:", err);
             loadingMsg.style.display = 'none';
 
-            if (party) endParty();
+            if (party) { endParty(); retryMode = null; }
             showMenu();
-            cameraError.textContent = cameraErrorMessage(err);
-            cameraError.classList.remove('hidden');
+            showCameraProblem(cameraErrorMessage(err));
         });
 }
 
@@ -1148,9 +1382,10 @@ function startCalibration() {
     tracking.reset();
     calibrationStartTime = performance.now();
     calibrationLastFrame = null;
+    calibrationFirstFrame = null;
     calibrationLastEye = null;
     calibrationStatus.innerText = 'FINDING YOUR EYES';
-    calibrationHint.innerText = 'Face the camera with your eyes comfortably open. Put a light in front of you, not behind you.';
+    calibrationHint.innerText = calibrationHintText;
     calibrationLoader.style.width = '0%';
 
     menuScreen.classList.add('hidden');
@@ -1176,7 +1411,14 @@ function updateCalibrationLoop() {
         if (elapsed >= 3000 && calibration.ready(now)) {
             finishCalibration();
         } else {
-            if (elapsed >= 15000) {
+            // The clock that matters starts at the first eye-tracking frame: on a slow
+            // connection the first one can take a while, and that is not the player's fault.
+            if (calibrationFirstFrame === null && calibrationLastFrame !== null) calibrationFirstFrame = calibrationLastFrame;
+            const loading = calibrationFirstFrame === null;
+            const timedOut = loading
+                ? elapsed >= (eyeTrackingReady ? 15000 : 60000)
+                : elapsed >= 15000 && now - calibrationFirstFrame >= 10000;
+            if (timedOut) {
                 const stalled = calibrationLastFrame === null || now - calibrationLastFrame >= 2000;
                 if (party) {
                     returnToParty();
@@ -1184,11 +1426,10 @@ function updateCalibrationLoop() {
                     return;
                 }
                 showMenu();
-                cameraError.textContent = stalled
-                    ? 'Eye tracking could not start. Restart the camera below and try again in a well-lit room.'
-                    : 'Could not get a clear view of your eyes. Face a light, hold the phone at eye level, and try a mode again. You do not need to force your eyes wide open.';
-                cameraError.classList.remove('hidden');
-                restartCameraBtn.classList[stalled ? 'remove' : 'add']('hidden');
+                showCameraProblem(stalled
+                    ? 'Eye tracking could not start. Tap Restart camera and try again in a well-lit room.'
+                    : 'Could not get a clear view of your eyes. Face a light, hold the phone at eye level, and tap Try again. You do not need to force your eyes wide open.',
+                    { restart: stalled });
                 return;
             }
             let message = 'FINDING YOUR EYES';
@@ -1196,8 +1437,11 @@ function updateCalibrationLoop() {
                 message = calibrationLastEye === null ? 'FACE NOT FOUND — TRY MORE LIGHT'
                     : calibrationLastEye >= .14 && calibrationLastEye <= .6 && progress > 0
                         ? 'EYES FOUND — HOLD STEADY' : 'LOOK FORWARD, EYES OPEN NORMALLY';
-            } else if (elapsed >= 4000) message = 'WAITING FOR EYE TRACKING';
+            } else if (loading && elapsed >= 2000) message = 'LOADING EYE TRACKING...';
+            else if (elapsed >= 4000) message = 'WAITING FOR EYE TRACKING';
             if (calibrationStatus.innerText !== message) calibrationStatus.innerText = message;
+            const hint = loading && elapsed >= 6000 ? 'Slow connection? This only happens the first time. Hang on a moment.' : calibrationHintText;
+            if (calibrationHint.innerText !== hint) calibrationHint.innerText = hint;
             // Keep valid samples across the three-second warm-up. Slower cameras
             // must be able to reach the required sample count without restarting.
             calibrationFrameId = requestAnimationFrame(updateCalibrationLoop);
@@ -1324,6 +1568,7 @@ function showMenu() {
     surpriseOverlay.classList.add('hidden');
     audioManager.stopDrone();
     clearSelfie();
+    clearClip();
     endParty();
     hideJoke();
     versusMatch = null;
@@ -1388,6 +1633,8 @@ function onResults(results, session) {
     // Display canvas only; detection reads the video element, never these drawings.
     try { drawSkinOverlay(canvasCtx, currentSkin, results.multiFaceLandmarks, canvasElement.width, canvasElement.height, now); }
     catch (err) { console.warn('Skin overlay skipped:', err); }
+    lastFrameAt = now;
+    try { captureClipFrame(now); } catch (err) { console.warn('Clip frame skipped:', err); }
     if (gameState === 'VERSUS_CALIBRATING' || gameState === 'VERSUS') {
         handleVersusFrame(results.multiFaceLandmarks || [], now);
         canvasCtx.restore();
@@ -1626,9 +1873,9 @@ function endGame(reason = 'BLINK') {
             }
         } else if (reason === 'DISQUALIFIED') {
             scoreToSave = 0;
-            finalScoreText = "DQ";
-            finalScoreLabel.innerText = "FACE LOST";
-            gameOverTitle.innerText = "DISQUALIFIED";
+            finalScoreText = "OUT";
+            finalScoreLabel.innerText = "YOUR FACE LEFT THE CAMERA";
+            gameOverTitle.innerText = "ROUND OVER";
             gameOverTitle.style.color = "var(--neon-red)";
         } else if (currentMode === 'CLASSIC') {
             scoreToSave = elapsed;
@@ -1661,7 +1908,7 @@ function endGame(reason = 'BLINK') {
                 gameOverTitle.style.color = "var(--neon-cyan)";
                 audioManager.playWin();
             } else {
-                gameOverTitle.innerText = "TOO EARLY/LATE";
+                gameOverTitle.innerText = elapsed < precisionTarget ? "TOO EARLY" : "TOO LATE";
                 gameOverTitle.style.color = "var(--neon-red)";
             }
         } else if (currentMode === 'ENDURANCE') {
@@ -1685,7 +1932,9 @@ function endGame(reason = 'BLINK') {
         finalScoreVal.innerText = finalScoreText;
 
         // Shareable photo: the last camera frame (with the skin's hat) in a themed frame.
-        shareLine = inviteLine(lastResult);
+        shareLine = inviteLine(lastResult, currentSkin);
+        shareUrl = lastResult ? challengeUrl(lastResult, currentSkin) : PUBLIC_PLAY_URL;
+        startClip(reason, elapsed, scoreToSave);
         const photo = makeSelfie(selfieCaption({ reason, mode: currentMode, elapsed, target: precisionTarget, score: scoreToSave }));
         let namePrefill = '';
         if (party && partyTurn) {

@@ -1,20 +1,19 @@
-import { parseChallenge, challengeCode, challengeOutcome, sharePayload } from './share.mjs';
+import { parseChallenge, parseChallengeLink, challengeCode, challengeOutcome, sharePayload } from './share.mjs';
 import { drawScoreCard } from './scoreCard.mjs';
 import { exportNativeCard } from './deviceActions.mjs';
 
-export function createSocialUI(startChallenge) {
+export function createSocialUI(startChallenge, { onLinkedChallenge = () => {} } = {}) {
     const el = id => document.getElementById(id);
     const panel = el('social-result'), card = el('score-card'), status = el('social-status');
-    let result = null, cardUrl = '', cardFile = null, busy = false;
+    let result = null, cardUrl = '', cardFile = null, busy = false, skin = 'CLASSIC';
     // URL fragments stay out of the HTTP request. Never request a camera on arrival.
     function prepareLinkedChallenge() {
       if (window.location.hash.startsWith('#challenge=')) {
         try {
-            const code = decodeURIComponent(window.location.hash.slice(11));
-            const challenge = parseChallenge(code);
+            const { code, skin: linkSkin, challenge } = parseChallengeLink(window.location.hash);
             el('challenge-input').value = code;
-            document.querySelector('.challenge-entry').open = true;
-            el('challenge-status').textContent = `${challenge.mode} friend challenge ready. Tap Accept challenge to play. Camera is off until then.`;
+            el('challenge-status').textContent = `${challenge.mode} friend challenge ready. Camera is off until you tap to play.`;
+            onLinkedChallenge(challenge, linkSkin);
         } catch (error) { el('challenge-status').textContent = 'Invalid challenge link. Ask your friend for a new code.'; }
       }
     }
@@ -35,7 +34,7 @@ export function createSocialUI(startChallenge) {
     el('share-card-btn').addEventListener('click', async () => {
         if (!result || busy) return;
         busy = true; el('share-card-btn').disabled = true;
-        const payload = sharePayload(result), url = cardUrl, file = cardFile;
+        const payload = sharePayload(result, skin), url = cardUrl, file = cardFile;
         try {
             if (window.Capacitor?.isNativePlatform?.()) await exportNativeCard(url, payload);
             else if (file && navigator.share && navigator.canShare?.({ files: [file] })) await navigator.share({ ...payload, files: [file] });
@@ -57,12 +56,13 @@ export function createSocialUI(startChallenge) {
             this.reset();
             if (!value) return;
             result = value;
+            skin = skinId;
             cardUrl = drawScoreCard(document.createElement('canvas'), result, skinId);
             // Prepare bytes before the tap to preserve browser share activation.
             const bytes = Uint8Array.from(atob(cardUrl.split(',')[1]), c => c.charCodeAt(0));
             cardFile = typeof File === 'function' ? new File([bytes], 'blink-stop-challenge.png', { type: 'image/png' }) : null;
             card.src = cardUrl;
-            el('challenge-caption').value = sharePayload(result).text;
+            el('challenge-caption').value = sharePayload(result, skinId).text;
             el('friend-turn-btn').disabled = !challengeCode(result);
             el('challenge-outcome').textContent = challengeOutcome(result, challenge);
             panel.classList.remove('hidden');

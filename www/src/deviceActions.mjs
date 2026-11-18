@@ -34,3 +34,28 @@ export async function exportNativeSelfie(dataUrl, load = loadNative) {
     // The selected recipient may read after the share sheet closes. Keep this single
     // cache file until the next explicit export or OS/app-data cleanup.
 }
+
+function blobToBase64(blob) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result).split(',')[1] || '');
+        reader.onerror = () => reject(reader.error || new Error('Clip unreadable'));
+        reader.readAsDataURL(blob);
+    });
+}
+
+// Blink clip: one replaceable cache file, handed to the share sheet the player opens.
+export async function exportNativeClip(blob, name, text, load = loadNative, toBase64 = blobToBase64) {
+    if (!blob || !/^video\/(mp4|webm)$/.test(blob.type) || !/^blink-stop-clip\.(mp4|webm)$/.test(name)) throw new Error('Clip unavailable');
+    const data = await toBase64(blob);
+    if (!data) throw new Error('Clip unavailable');
+    const { Filesystem, Directory, Share } = await load();
+    const file = { path: name, directory: Directory.Cache };
+    const { uri } = await Filesystem.writeFile({ ...file, data });
+    try {
+        await Share.share({ title: 'Blink Stop clip', text, files: [uri], dialogTitle: 'Save or share your blink clip' });
+    } catch (error) {
+        await Filesystem.deleteFile(file).catch(() => {});
+        throw error;
+    }
+}

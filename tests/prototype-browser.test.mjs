@@ -90,6 +90,10 @@ test('Surprise consent, reward demo, portrait export and friend challenge work t
         await page.locator('#player-name-input').fill('TEST');
         await page.locator('#save-score-btn').click();
         assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('blink_lb_SURPRISE'))[0].score), 30);
+        // Version 1.0 hides the bonus theme demo; its code is kept and still checked here.
+        assert.equal(await page.locator('#demo-bonus-btn').isVisible(), false);
+        assert.equal(await page.locator('#demo-menu-btn').isVisible(), false);
+        await page.evaluate(() => { const btn = document.querySelector('#demo-bonus-btn'); btn.hidden = false; btn.classList.remove('hidden'); });
         await page.locator('#demo-bonus-btn').click();
         assert.equal(await page.evaluate(() => document.querySelector('.input_video').srcObject), null);
         assert.equal(await page.locator('#demo-claim-btn').isEnabled(), false);
@@ -143,9 +147,12 @@ test('Surprise consent, reward demo, portrait export and friend challenge work t
         await page.waitForFunction(() => document.querySelector('#challenge-input').value === 'BS1-P-10-5000');
         assert.equal(await page.locator('#challenge-input').inputValue(), 'BS1-P-10-5000');
         assert.equal(await page.evaluate(() => document.querySelector('.input_video').srcObject), null);
-        await page.locator('#challenge-form button').click();
+        assert.match(await page.locator('#challenge-banner-title').innerText(), /Beat 5\.000s off 10s/);
+        await page.locator('#challenge-banner-play').click();
+        assert.equal(await page.locator('#challenge-banner').isVisible(), false);
         await page.locator('#game-hud').waitFor({ state: 'visible' });
         assert.equal(await page.locator('#target-display .digital-text-sm').innerText(), '10.00s');
+        assert.equal(await page.locator('#challenge-hud-value').innerText(), '5.000s off');
         await page.evaluate(() => { window.testTimeOffset += 10000; window.testBlink = true; });
         await page.locator('#game-over-screen').waitFor({ state: 'visible' });
         assert.match(await page.locator('#challenge-caption').inputValue(), /Precision: .*s off.*Target 10s/);
