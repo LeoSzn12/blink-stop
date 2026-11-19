@@ -1017,6 +1017,8 @@ function handleBalloonEye(eye, now) {
                 scoreDisplay.innerText = String(result.score);
                 faceStatusText.innerText = 'POP!';
                 if (navigator.vibrate) navigator.vibrate(25);
+            } else if (result?.kind === 'FREE') {
+                faceStatusText.innerText = 'Wait for the zone. That one was free!';
             } else if (result) {
                 faceStatusText.innerText = 'Too early!';
                 renderBalloonLives();

@@ -31,6 +31,8 @@ export function difficulty(score) {
 export function createBalloonRound({ random = Math.random, firstBalloonMs = 600 } = {}) {
     let balloons = [], score = 0, misses = 0, over = false;
     let started = null, last = null, nextSpawn = null, lastBlink = -Infinity, nextId = 1;
+    // Everyone blinks without meaning to: one stray blink per balloon is free.
+    let freeStray = true;
 
     const live = () => balloons.filter(b => !b.poppedAt && !b.escaped);
     const inZone = b => b.y >= POP_ZONE.top && b.y <= POP_ZONE.bottom;
@@ -47,6 +49,7 @@ export function createBalloonRound({ random = Math.random, firstBalloonMs = 600 
         let x = 0.18 + random() * 0.64;
         if (previous && Math.abs(previous.x - x) < 0.2) x = x > 0.5 ? x - 0.25 : x + 0.25;
         const { speed } = difficulty(score);
+        freeStray = true;
         balloons.push({ id: nextId++, x, y: 1.12, speed, color: Math.floor(random() * 4), wobble: random() * Math.PI * 2, bornAt: now });
     }
 
@@ -82,7 +85,10 @@ export function createBalloonRound({ random = Math.random, firstBalloonMs = 600 
             if (over || now - lastBlink < BLINK_COOLDOWN_MS) return null;
             lastBlink = now;
             const target = live().filter(inZone).sort((a, b) => Math.abs(a.y - 0.43) - Math.abs(b.y - 0.43))[0];
-            if (!target) return miss(now, 'EMPTY');
+            if (!target) {
+                if (freeStray) { freeStray = false; return { hit: false, kind: 'FREE', misses, over, now }; }
+                return miss(now, 'EMPTY');
+            }
             target.poppedAt = now;
             score++;
             return { hit: true, balloon: target, score };

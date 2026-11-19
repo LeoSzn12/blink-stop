@@ -28,7 +28,10 @@ test('blinking too early or letting balloons escape costs a miss; three misses e
     const early = createBalloonRound({ random: () => 0.5 });
     early.update(0);
     early.update(800); // a balloon is rising but still below the zone
-    assert.equal(early.blink(800).kind, 'EMPTY');
+    // The first stray blink for this balloon is free; the next one costs a life.
+    assert.equal(early.blink(800).kind, 'FREE');
+    assert.equal(early.livesLeft(), BALLOON_MISSES);
+    assert.equal(early.blink(1200).kind, 'EMPTY');
     assert.equal(early.livesLeft(), BALLOON_MISSES - 1);
 
     const lazy = createBalloonRound({ random: () => 0.3 });

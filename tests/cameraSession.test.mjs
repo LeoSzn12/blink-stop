@@ -450,9 +450,10 @@ test('Blink Olympics: Balloon Pop counts blinks as pops, ends on misses and shar
   assert.equal(h.el('balloon-layer').classList.contains('hidden'), false);
   assert.equal(h.el('hud-label').innerText, 'POPPED');
   assert.equal(h.el('lives-display').classList.contains('hidden'), false);
-  // Blink while nothing is in the zone: three times is out.
-  for (let i = 0; i < 3; i++) {
+  // Blink while nothing is in the zone: the first is free, then three more is out.
+  for (let i = 0; i < 4; i++) {
     h.setBlinking(true); h.setClock(4000 + i * 600); h.tickInference(); h.deliver(); await h.settle();
+    if (i === 0) assert.match(h.el('face-status-text').innerText, /free/);
     h.setBlinking(false); h.setClock(4300 + i * 600); h.tickInference(); h.deliver(); await h.settle();
   }
   assert.equal(h.debug.getState(), 'GAME_OVER');

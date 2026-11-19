@@ -1251,3 +1251,8 @@ body.home-fab-on .screen { padding-top: calc(4.25rem + var(--safe-top)); }
 .top-scores > summary, .caption-details > summary { display: flex; align-items: center; justify-content: center; cursor: pointer; padding: .5rem 1rem; border-radius: 12px; background: rgba(12, 14, 22, .94); color: #fff; font: 700 1rem var(--font-main); list-style: none; }
 .top-scores > summary::-webkit-details-marker, .caption-details > summary::-webkit-details-marker { display: none; }
 .top-scores[open] > summary, .caption-details[open] > summary { margin-bottom: .5rem; }
+
+/* Home: friend codes and the about text sit well below the games, out of the way. */
+#menu-screen .challenge-entry { margin-top: 4.5rem; padding-top: 1rem; border-top: 1px solid rgba(255, 255, 255, .15); width: min(100%, 26rem); }
+#menu-screen .challenge-entry > summary { font-size: .95rem; color: #cfd6de; }
+#menu-screen .about-text { margin-top: 2.5rem; }
