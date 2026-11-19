@@ -541,8 +541,11 @@ modeBtns.forEach(btn => {
         if (mode === 'CLASSIC') {
             startGame('CLASSIC');
         } else if (mode === 'PRECISION') {
-            precisionTarget = precisionChoice;
-            startGame('PRECISION');
+            // Pick the target time first, then the look, then play.
+            modeSelection.classList.add('hidden');
+            precisionOptions.classList.remove('hidden');
+            optionBtns.forEach(b => b.classList.toggle('active', Number(b.dataset.time) === precisionChoice));
+            (precisionOptions.querySelector('.option-btn.active') || optionBtns[0])?.focus();
         } else if (mode === 'ENDURANCE') {
             startGame('ENDURANCE');
         } else if (mode === 'DAILY') {
@@ -578,14 +581,6 @@ cameraRetryBtn.addEventListener('click', () => {
     if (!retryMode || gameState !== 'MENU') return;
     if (retryMode === 'PRECISION') precisionTarget = precisionChoice;
     startGame(retryMode);
-});
-document.getElementById('precision-change-btn').addEventListener('click', () => {
-    if (tapTooSoon()) return;
-    armTapGuard();
-    hideCameraProblem();
-    modeSelection.classList.add('hidden');
-    precisionOptions.classList.remove('hidden');
-    (precisionOptions.querySelector('.option-btn.active') || optionBtns[0])?.focus();
 });
 document.getElementById('surprise-back-btn').addEventListener('click', () => {
     clearTapGuard();

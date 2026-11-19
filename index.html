@@ -44,14 +44,6 @@
                         </div>
                     </section>
 
-                    <div class="skin-picker" role="radiogroup" aria-label="Photo skin">
-                        <span class="label">SKIN</span>
-                        <button type="button" class="skin-btn" role="radio" aria-checked="false" data-skin="CLASSIC">Classic</button>
-                        <button type="button" class="skin-btn" role="radio" aria-checked="false" data-skin="THANKSGIVING">🦃 Thanksgiving</button>
-                        <button type="button" class="skin-btn" role="radio" aria-checked="false" data-skin="CHRISTMAS">🎄 Christmas</button>
-                        <button type="button" class="skin-btn" role="radio" aria-checked="false" data-skin="PARTY">🎉 Party</button>
-                    </div>
-                    <p id="skin-greeting" class="skin-greeting" aria-live="polite"></p>
 
                     <section id="challenge-banner" class="challenge-banner hidden" aria-live="polite" aria-label="Friend challenge">
                         <p class="challenge-banner-kicker">YOU'VE BEEN CHALLENGED</p>
@@ -66,8 +58,7 @@
 
                     <div class="mode-selection">
                         <button class="neon-btn mode-btn main-mode-btn play-hero" data-mode="CLASSIC">▶ PLAY<span class="btn-sub">Endurance: keep your eyes open longest</span></button>
-                        <button class="neon-btn mode-btn main-mode-btn precision-btn" data-mode="PRECISION">PRECISION<span class="btn-sub">Blink right at <span id="precision-target-label">10 seconds</span></span></button>
-                        <button id="precision-change-btn" class="neon-btn-small precision-change" type="button">Change target time</button>
+                        <button class="neon-btn mode-btn main-mode-btn precision-btn" data-mode="PRECISION">PRECISION<span class="btn-sub">Blink right on a target time you pick</span></button>
                         <button class="neon-btn mode-btn main-mode-btn olympics-btn" data-mode="OLYMPICS">QUICK GAMES<span class="btn-sub">Fast games for friends</span></button>
                         <details id="more-modes" class="more-modes">
                             <summary>More ways to play</summary>
@@ -117,7 +108,8 @@
 
                     <!-- Precision Options (Hidden by default) -->
                     <div id="precision-options" class="options-container hidden">
-                        <p class="label">BLINK RIGHT AT</p>
+                        <h2>PRECISION</h2>
+                        <p class="label">PICK YOUR TARGET: BLINK RIGHT AT</p>
                         <div class="option-btns">
                             <button class="neon-btn-small option-btn" data-time="5">5 sec</button>
                             <button class="neon-btn-small option-btn active" data-time="10">10 sec</button>
@@ -184,6 +176,7 @@
                             <button type="button" class="skin-btn" role="radio" aria-checked="false" data-skin="CHRISTMAS">🎄 Christmas</button>
                             <button type="button" class="skin-btn" role="radio" aria-checked="false" data-skin="PARTY">🎉 Party</button>
                         </div>
+                        <p id="skin-greeting" class="skin-greeting" aria-live="polite"></p>
                         <button id="skin-pick-play" class="neon-btn pick-play" type="button">PLAY</button>
                     </div>
                 </div>

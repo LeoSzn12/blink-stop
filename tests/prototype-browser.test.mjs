@@ -43,11 +43,9 @@ test('Surprise consent, reward demo, portrait export and friend challenge work t
                 }
             };` }));
         await page.goto(server.url);
-        await page.locator('#menu-screen > .skin-picker [data-skin="CHRISTMAS"]').click();
-        assert.equal(await page.evaluate(() => document.body.classList.contains('skin-christmas')), true);
-        assert.equal(await page.locator('#menu-screen > .skin-picker [data-skin="CHRISTMAS"]').getAttribute('aria-checked'), 'true');
+        // Skins live on the game's own start screen now, not on the home screen.
+        assert.equal(await page.locator('#menu-screen .skin-picker').count(), 0);
         assert.equal(await page.locator('#home-fab').isVisible(), false);
-        assert.match(await page.evaluate(() => localStorage.getItem('blink_skin')), /^CHRISTMAS@\d{4}-\d{2}$/);
         await page.locator('#more-modes > summary').click();
         await page.locator('[data-mode="SURPRISE"]').click();
         assert.equal(await page.locator('#surprise-sound').isChecked(), false);
@@ -63,7 +61,10 @@ test('Surprise consent, reward demo, portrait export and friend challenge work t
         await page.locator('#surprise-start-btn').click();
         // Pick your look over the live camera, right before the round.
         await page.locator('#skin-pick-screen').waitFor({ state: 'visible' });
+        await page.locator('#skin-pick-screen [data-skin="CHRISTMAS"]').click();
+        assert.equal(await page.evaluate(() => document.body.classList.contains('skin-christmas')), true);
         assert.equal(await page.locator('#skin-pick-screen [data-skin="CHRISTMAS"]').getAttribute('aria-checked'), 'true');
+        assert.match(await page.evaluate(() => localStorage.getItem('blink_skin')), /^CHRISTMAS@\d{4}-\d{2}$/);
         assert.equal(await page.locator('#skin-pick-mode').innerText(), 'SURPRISE');
         if (process.env.PROTOTYPE_SCREENSHOTS) await page.screenshot({ path: `${process.env.PROTOTYPE_SCREENSHOTS}/pick-your-look.png` });
         await page.locator('#skin-pick-play').click();
