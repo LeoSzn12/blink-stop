@@ -1157,3 +1157,66 @@ body.skin-party { --neon-cyan: #ffd23f; --neon-pink: #ff5fd2; --glass-bg: rgba(2
    with color (hover, or the "sticky" hover a tap leaves behind on phones). */
 .btn-sub { color: #c4c4c4; }
 .neon-btn:hover .btn-sub, .neon-btn:active .btn-sub, .neon-btn:focus-visible .btn-sub { color: #111; }
+
+/* ---------- Readability over the camera (playtest, Nov 2026) ----------
+   Text sits on solid dark panels, in a bold sans font with high contrast, so it reads
+   over any camera frame or face filter. */
+body { font-family: var(--font-main); }
+#menu-screen, #game-over-screen { background: rgba(6, 8, 14, .9); }
+#party-screen { background: rgba(6, 8, 14, .92); }
+#calibration-screen { background: rgba(0, 0, 0, .45); }
+#calibration-screen h2, #calibration-screen .subtitle, .calibration-hint, #calibration-status {
+    background: rgba(6, 8, 14, .88); padding: .4rem .9rem; border-radius: 12px; }
+.calibration-hint { color: #fff; font-weight: 600; }
+
+.subtitle { color: #f1f1f1; font-family: var(--font-main); font-weight: 700; font-size: clamp(.95rem, 4vw, 1.15rem); letter-spacing: .06em; margin-bottom: 1.25rem; }
+.label { color: #e6e6e6; font-weight: 700; }
+
+.neon-btn, .neon-btn-small, .menu-btn-hud { background: rgba(10, 12, 20, .94); font-family: var(--font-main); font-weight: 800; letter-spacing: .02em; border-radius: 14px; text-shadow: none; }
+.neon-btn { border-width: 3px; }
+.neon-btn-small { min-height: 44px; }
+.btn-sub { font-family: var(--font-main); font-size: 1rem; font-weight: 600; color: #f4f4f4; text-transform: none; letter-spacing: 0; line-height: 1.3; margin-top: .35rem; }
+
+.options-container, .prototype-options { background: rgba(10, 12, 20, .96); border-radius: 16px; padding: 1rem; }
+#olympics-options h2, .prototype-options h2 { font-family: var(--font-main); font-weight: 900; color: #fff; letter-spacing: .04em; }
+.prototype-options p, .prototype-options label { color: #f1f1f1; }
+.more-modes summary { color: #fff; font-weight: 700; }
+
+.skin-picker .label { color: #fff; }
+.skin-btn { background: rgba(12, 14, 22, .94); color: #fff; font-family: var(--font-main); font-weight: 700; font-size: .95rem; }
+.skin-greeting { display: inline-block; background: rgba(0, 0, 0, .8); padding: .35rem .8rem; border-radius: 999px; font-family: var(--font-main); font-weight: 700; }
+.skin-greeting:empty { display: none; }
+.camera-promise { color: #fff; font-weight: 600; background: rgba(0, 0, 0, .75); padding: .45rem .9rem; border-radius: 10px; }
+.about-text { max-width: 400px; margin-top: 1.5rem; text-align: center; color: #cfd6de; font-size: .8rem; line-height: 1.4; }
+.social-note { color: #e3e8ee; }
+.challenge-entry summary { font-weight: 700; }
+
+/* While a Quick Games or other sub-menu is open, keep only what matters on screen. */
+body.menu-sub #menu-screen .subtitle,
+body.menu-sub #menu-screen > .skin-picker,
+body.menu-sub #skin-greeting,
+body.menu-sub #menu-screen .challenge-entry,
+body.menu-sub #menu-screen .about-text { display: none; }
+
+/* In game */
+.face-status { font-family: var(--font-main); font-size: 1rem; font-weight: 700; padding: .6rem 1.1rem; background: rgba(0, 0, 0, .88); }
+.world-record-hud, .score-container, .meter-container, .target-container { background: rgba(0, 0, 0, .8); border-radius: 12px; padding: .4rem .7rem; }
+.joke-card { background: rgba(0, 0, 0, .9); font-family: var(--font-main); font-weight: 700; }
+.lives-hud { display: flex; gap: .25rem; justify-content: flex-end; font-size: 1.9rem; line-height: 1; padding: .3rem .5rem; background: rgba(0, 0, 0, .8); border-radius: 12px; margin-bottom: .4rem; }
+.lives-hud .life { transition: opacity .3s, filter .3s; }
+.lives-hud .life.lost { opacity: .25; filter: grayscale(1); }
+
+/* Home: always one clear way back. */
+.menu-btn-hud { color: #fff; border: 2px solid var(--neon-cyan); border-radius: 999px; font-size: 1rem; letter-spacing: 0; padding: .55rem 1rem; }
+.home-fab { position: fixed; top: calc(.6rem + var(--safe-top)); left: calc(.6rem + var(--safe-left)); z-index: 200; display: flex; align-items: center; gap: .35rem; min-height: 44px; padding: .55rem 1rem; border-radius: 999px; background: rgba(8, 10, 16, .96); color: #fff; border: 2px solid var(--neon-cyan); font: 800 1rem var(--font-main); box-shadow: 0 4px 14px rgba(0, 0, 0, .5); cursor: pointer; }
+.home-fab:focus-visible, .menu-btn-hud:focus-visible { outline: 3px solid var(--neon-pink); outline-offset: 2px; }
+body.home-fab-on .screen { padding-top: calc(4.25rem + var(--safe-top)); }
+
+/* Pick your look: the camera stays visible above, choices sit on a panel at the bottom. */
+#skin-pick-screen { justify-content: flex-end; padding-bottom: calc(2rem + var(--safe-bottom)); }
+.pick-panel { width: min(100%, 26rem); padding: 1.1rem 1rem 1.25rem; border-radius: 20px; background: rgba(8, 10, 16, .94); border: 2px solid var(--neon-cyan); text-align: center; display: flex; flex-direction: column; align-items: center; gap: .5rem; }
+.pick-mode { color: var(--neon-cyan); font-weight: 800; font-size: .95rem; letter-spacing: .08em; text-transform: uppercase; }
+.pick-mode:empty { display: none; }
+.pick-title { color: #fff; font-weight: 900; font-size: 1.5rem; letter-spacing: .04em; }
+.pick-skins { margin: .25rem 0 .5rem; }
+.pick-play { width: 100%; min-width: 0; font-size: 1.6rem; padding: .9rem 1rem; }

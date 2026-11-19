@@ -426,6 +426,7 @@ test('Blink Olympics: Balloon Pop counts blinks as pops, ends on misses and shar
   assert.equal(h.debug.getState(), 'BALLOON');
   assert.equal(h.el('balloon-layer').classList.contains('hidden'), false);
   assert.equal(h.el('hud-label').innerText, 'POPPED');
+  assert.equal(h.el('lives-display').classList.contains('hidden'), false);
   // Blink while nothing is in the zone: three times is out.
   for (let i = 0; i < 3; i++) {
     h.setBlinking(true); h.setClock(4000 + i * 600); h.tickInference(); h.deliver(); await h.settle();
@@ -434,7 +435,9 @@ test('Blink Olympics: Balloon Pop counts blinks as pops, ends on misses and shar
   assert.equal(h.debug.getState(), 'GAME_OVER');
   assert.equal(h.el('final-score-val').innerText, '0');
   assert.equal(h.el('final-score-label').innerText, 'BALLOONS POPPED');
+  assert.equal(h.el('final-score-sub').innerText, 'Out of lives');
   assert.equal(h.el('balloon-layer').classList.contains('hidden'), true);
+  assert.equal(h.el('lives-display').classList.contains('hidden'), true);
   assert.equal(h.jpegCount(), 1);
 });
 
@@ -487,4 +490,30 @@ test('blink clip: a Classic blink becomes a shareable clip made on the phone; Ba
   h.debug.endGame('DISQUALIFIED');
   assert.equal(h.el('clip-btn').classList.contains('hidden'), true);
   assert.equal(FakeRecorder.made.length, 1);
+});
+
+test('a game started from the menu shows the live camera to pick a look, then calibrates; Home goes back', async () => {
+  const h = harness();
+  h.el('game-hud').classList.add('hidden'); // as in index.html
+  h.click('surprise-start-btn'); await h.settle(); await h.timers();
+  assert.equal(h.debug.getState(), 'SKIN_PICK');
+  assert.equal(h.el('skin-pick-screen').classList.contains('hidden'), false);
+  assert.equal(h.el('menu-screen').classList.contains('hidden'), true);
+  assert.equal(h.el('skin-pick-mode').textContent, 'Surprise');
+  assert.equal(h.el('home-fab').classList.contains('hidden'), false);
+  h.click('skin-pick-play');
+  assert.equal(h.debug.getState(), 'CALIBRATING');
+  assert.equal(h.el('skin-pick-screen').classList.contains('hidden'), true);
+
+  // Home from the pick screen stops the camera and lands on the main menu.
+  h.click('surprise-start-btn'); await h.settle(); await h.timers();
+  assert.equal(h.debug.getState(), 'SKIN_PICK');
+  h.click('home-fab');
+  assert.equal(h.debug.getState(), 'MENU');
+  assert.equal(h.el('skin-pick-screen').classList.contains('hidden'), true);
+  assert.equal(h.el('home-fab').classList.contains('hidden'), true);
+
+  // Retry and direct starts skip the pick.
+  h.debug.startGame('CLASSIC'); await h.settle(); await h.timers();
+  assert.equal(h.debug.getState(), 'CALIBRATING');
 });

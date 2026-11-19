@@ -19,9 +19,13 @@ export function balloonColors(skinId) {
 }
 
 // Rising speed (play heights per second) and gap between balloons both ramp with the score.
+// The first handful of pops stay easy; by about 20 pops a balloon crosses the zone in
+// roughly half a second, which is where most players start losing lives.
+export const MAX_SPEED = 0.55;
+export const MIN_GAP_MS = 600;
 export function difficulty(score) {
     const s = Math.max(0, score | 0);
-    return { speed: Math.min(0.17 + s * 0.012, 0.42), gapMs: Math.max(1500 - s * 45, 700) };
+    return { speed: Math.min(0.17 + s * 0.018, MAX_SPEED), gapMs: Math.max(1500 - s * 50, MIN_GAP_MS) };
 }
 
 export function createBalloonRound({ random = Math.random, firstBalloonMs = 600 } = {}) {

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createBalloonRound, difficulty, POP_ZONE, BALLOON_MISSES, balloonColors, drawBalloons } from '../src/balloons.mjs';
+import { createBalloonRound, difficulty, POP_ZONE, BALLOON_MISSES, MAX_SPEED, MIN_GAP_MS, balloonColors, drawBalloons } from '../src/balloons.mjs';
 import { resultDetails, challengeCode, parseChallenge, inviteLine, formatScore, challengeOutcome } from '../src/share.mjs';
 import { selfieCaption } from '../src/skins.mjs';
 
@@ -43,8 +43,13 @@ test('blinking too early or letting balloons escape costs a miss; three misses e
 test('balloons speed up and come faster as the score grows, within limits', () => {
     assert.ok(difficulty(10).speed > difficulty(0).speed);
     assert.ok(difficulty(10).gapMs < difficulty(0).gapMs);
-    assert.equal(difficulty(1000).speed, 0.42);
-    assert.equal(difficulty(1000).gapMs, 700);
+    assert.equal(difficulty(1000).speed, MAX_SPEED);
+    assert.equal(difficulty(1000).gapMs, MIN_GAP_MS);
+    // Starts gentle: the first balloon takes over a second to cross the pop zone.
+    assert.ok((POP_ZONE.bottom - POP_ZONE.top) / difficulty(0).speed > 1.4);
+    // Gets hard: by 20 pops it crosses in about half a second.
+    assert.ok((POP_ZONE.bottom - POP_ZONE.top) / difficulty(20).speed < 0.55);
+    assert.equal(BALLOON_MISSES, 3);
     for (const skin of ['CLASSIC', 'THANKSGIVING', 'CHRISTMAS', 'PARTY', 'UNKNOWN']) assert.equal(balloonColors(skin).length, 4);
 });
 

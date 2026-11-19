@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Blink Stop - Don't Blink Challenge</title>
-    <link rel="stylesheet" href="src/style.css?v=13">
+    <link rel="stylesheet" href="src/style.css?v=14">
 
     <link rel="manifest" href="manifest.json">
 
@@ -65,14 +65,14 @@
                     <p id="eye-tracking-status" class="eye-tracking-status" role="status" aria-live="polite"></p>
 
                     <div class="mode-selection">
-                        <button class="neon-btn mode-btn main-mode-btn" data-mode="CLASSIC">ENDURANCE<span class="btn-sub">Who can keep their eyes open longest?</span></button>
+                        <button class="neon-btn mode-btn main-mode-btn" data-mode="CLASSIC">ENDURANCE<span class="btn-sub">Keep your eyes open longest</span></button>
                         <button class="neon-btn mode-btn main-mode-btn precision-btn" data-mode="PRECISION">PRECISION<span class="btn-sub">Blink right at <span id="precision-target-label">10 seconds</span></span></button>
                         <button id="precision-change-btn" class="neon-btn-small precision-change" type="button">Change target time</button>
-                        <button class="neon-btn mode-btn main-mode-btn olympics-btn" data-mode="OLYMPICS">BLINK OLYMPICS<span class="btn-sub">Mini-games for family and friends</span></button>
+                        <button class="neon-btn mode-btn main-mode-btn olympics-btn" data-mode="OLYMPICS">QUICK GAMES<span class="btn-sub">Fast games for friends</span></button>
                         <details id="more-modes" class="more-modes">
                             <summary>More ways to play</summary>
                             <div class="more-modes-list">
-                                <button class="neon-btn mode-btn" data-mode="ENDURANCE">30 SECONDS<span class="btn-sub">Make it to 30 without blinking</span></button>
+                                <button class="neon-btn mode-btn" data-mode="ENDURANCE">30 SECONDS<span class="btn-sub">Last 30 seconds, no blinking</span></button>
                                 <button class="neon-btn mode-btn" data-mode="DAILY">DAILY<span class="btn-sub">A new twist every day</span></button>
                                 <button class="neon-btn mode-btn surprise-btn" data-mode="SURPRISE">SURPRISE<span class="btn-sub">30s • Can startle you</span></button>
                                 <!-- Hidden for version 1.0; the demo code stays for a later update. -->
@@ -82,10 +82,10 @@
                     </div>
 
                     <div id="olympics-options" class="options-container prototype-options hidden">
-                        <h2>BLINK OLYMPICS</h2>
-                        <button class="neon-btn mode-btn balloon-btn" data-mode="BALLOON">BALLOON POP<span class="btn-sub">Blink when a balloon is in the zone</span></button>
-                        <button class="neon-btn mode-btn" data-mode="VERSUS">STARE-DOWN<span class="btn-sub">2 players, side by side. First to blink loses.</span></button>
-                        <button class="neon-btn mode-btn" data-mode="PARTY">PASS THE PHONE<span class="btn-sub">Group game for 2 to 8. Take turns on one phone.</span></button>
+                        <h2>QUICK GAMES</h2>
+                        <button class="neon-btn mode-btn balloon-btn" data-mode="BALLOON">BALLOON POP<span class="btn-sub">Blink to pop balloons. 3 lives.</span></button>
+                        <button class="neon-btn mode-btn" data-mode="VERSUS">STARE-DOWN<span class="btn-sub">2 players. First to blink loses.</span></button>
+                        <button class="neon-btn mode-btn" data-mode="PARTY">PASS THE PHONE<span class="btn-sub">2 to 8 players, one phone</span></button>
                         <button class="neon-btn mode-btn" data-mode="DISTRACT">DISTRACTION<span class="btn-sub">Jokes try to make you blink</span></button>
                         <button id="olympics-back-btn" class="neon-btn-small" type="button">Back</button>
                     </div>
@@ -136,7 +136,7 @@
                     <p id="challenge-status" class="social-note" role="status" aria-live="polite"></p>
 
                     <!-- SEO About Text -->
-                    <div style="max-width: 400px; margin-top: 1.5rem; text-align: center; color: #888; font-size: 0.8rem; line-height: 1.4;">
+                    <div class="about-text">
                         Blink Stop detects blinks on your device. Camera frames stay on your device; scores are saved locally only. A framed photo preview is created after a round; saving or sharing it is your choice. Ages 13+. Blink normally and stop if uncomfortable.
                     </div>
 
@@ -166,6 +166,21 @@
                 <!-- Distraction round joke card -->
                 <div id="joke-card" class="joke-card hidden" aria-live="polite"></div>
 
+                <!-- Pick a face filter right before a game, over the live camera -->
+                <div id="skin-pick-screen" class="screen hidden">
+                    <div class="pick-panel">
+                        <p id="skin-pick-mode" class="pick-mode"></p>
+                        <h2 class="pick-title">PICK YOUR LOOK</h2>
+                        <div class="skin-picker pick-skins" role="radiogroup" aria-label="Face filter">
+                            <button type="button" class="skin-btn" role="radio" aria-checked="false" data-skin="CLASSIC">Classic</button>
+                            <button type="button" class="skin-btn" role="radio" aria-checked="false" data-skin="THANKSGIVING">🦃 Thanksgiving</button>
+                            <button type="button" class="skin-btn" role="radio" aria-checked="false" data-skin="CHRISTMAS">🎄 Christmas</button>
+                            <button type="button" class="skin-btn" role="radio" aria-checked="false" data-skin="PARTY">🎉 Party</button>
+                        </div>
+                        <button id="skin-pick-play" class="neon-btn pick-play" type="button">PLAY</button>
+                    </div>
+                </div>
+
                 <!-- Calibration Screen -->
                 <div id="calibration-screen" class="screen hidden">
                     <h2 class="glitch" data-text="CALIBRATING">CALIBRATING</h2>
@@ -175,7 +190,7 @@
                         <div class="loader-bar"></div>
                     </div>
                     <p id="calibration-status" class="digital-text-sm" role="status" aria-live="polite">FINDING YOUR EYES</p>
-                    <button id="calibration-cancel-btn" class="neon-btn-small" type="button">Back to menu</button>
+                    <button id="calibration-cancel-btn" class="neon-btn-small" type="button">⌂ Home</button>
                 </div>
 
                 <!-- Endurance Mode Screen (Video Player) -->
@@ -193,7 +208,7 @@
                 <!-- HUD -->
                 <div id="game-hud" class="screen hidden">
                     <div class="hud-left">
-                        <button id="home-btn" class="menu-btn-hud">MENU</button>
+                        <button id="home-btn" class="menu-btn-hud" aria-label="Home">⌂ HOME</button>
                     </div>
                     <div class="hud-right">
                         <!-- World Record Display (Classic Mode) -->
@@ -213,6 +228,8 @@
                                 <div class="meter-bar-fill" id="eye-meter-fill" style="width: 100%;"></div>
                             </div>
                         </div>
+
+                        <div id="lives-display" class="lives-hud hidden" role="img" aria-label="3 lives left"></div>
 
                         <div class="score-container">
                             <span class="label" id="hud-label">TIME</span>
@@ -300,7 +317,7 @@
                         <p class="social-note">Friend's turn starts the same challenge on this phone. Daily has no comparison code because modifiers depend on the local date. Blink normally; stop if uncomfortable.</p>
                         <p id="social-status" role="status" aria-live="polite"></p>
                     </section>
-                    <button id="menu-btn" class="neon-btn-small">MENU</button>
+                    <button id="menu-btn" class="neon-btn-small">⌂ HOME</button>
                     <!-- Hidden for version 1.0; the demo code stays for a later update. -->
                     <button id="demo-bonus-btn" class="neon-btn-small demo-link hidden" type="button" hidden>Preview bonus theme demo</button>
                 </div>
@@ -322,6 +339,8 @@
     </div>
 
 
+    <button id="home-fab" class="home-fab hidden" type="button" aria-label="Home">⌂ Home</button>
+
     <!-- Footer -->
     <footer class="footer">
         <a href="how-to-play.html" class="footer-link">How to Play & FAQ</a>
@@ -333,7 +352,7 @@
         <a href="support.html" class="footer-link">Support</a>
     </footer>
 
-    <script type="module" src="src/main.js?v=75"></script>
+    <script type="module" src="src/main.js?v=76"></script>
 </body>
 
 </html>
