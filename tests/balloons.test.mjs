@@ -50,8 +50,10 @@ test('balloons speed up and come faster as the score grows, within limits', () =
     assert.equal(difficulty(1000).gapMs, MIN_GAP_MS);
     // Starts gentle: the first balloon takes over a second to cross the pop zone.
     assert.ok((POP_ZONE.bottom - POP_ZONE.top) / difficulty(0).speed > 1.4);
-    // Gets hard: by 20 pops it crosses in about half a second.
-    assert.ok((POP_ZONE.bottom - POP_ZONE.top) / difficulty(20).speed < 0.55);
+    // Gets harder: by 20 pops it crosses the tall zone in under a second.
+    assert.ok((POP_ZONE.bottom - POP_ZONE.top) / difficulty(20).speed < 0.95);
+    // The zone is tall enough that a blink near a balloon still counts.
+    assert.ok(POP_ZONE.bottom - POP_ZONE.top >= 0.4);
     assert.equal(BALLOON_MISSES, 3);
     for (const skin of ['CLASSIC', 'THANKSGIVING', 'CHRISTMAS', 'PARTY', 'UNKNOWN']) assert.equal(balloonColors(skin).length, 4);
 });

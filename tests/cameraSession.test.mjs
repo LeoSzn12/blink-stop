@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import { readFileSync } from 'node:fs';
 
-import { createCalibrationTracker, createTrackingFreshness, createFaceLossTracker } from '../src/gameRules.mjs';
+import { createCalibrationTracker, createTrackingFreshness, createFaceLossTracker, createTapBlink } from '../src/gameRules.mjs';
 import { createSerializedInference } from '../src/inference.mjs';
 import { createSurpriseRound, createRewardedDemo } from '../src/surprise.mjs';
 import * as skins from '../src/skins.mjs';
@@ -45,7 +45,7 @@ function harness(storage = { getItem: () => null, setItem() {} }, clipboard, { w
   class FaceMesh { constructor() { this.closes = 0; meshes.push(this); } onResults(fn) { this.resultHandler = fn; } setOptions() {} send() { return new Promise(resolve => { const emit = () => this.resultHandler({ image: {}, multiFaceLandmarks: [{}] }); pending.push(() => { lastDelivered = emit; emit(); resolve(); }); }); } close() { this.closes++; } }
   const context = { document, window: { innerWidth: 500, addEventListener() {}, ...win }, navigator: { clipboard, mediaDevices: { getUserMedia: () => permission || Promise.resolve(stream()) } },
     FaceMesh, console: { log() {}, warn: (...a) => process.env.HARNESS_LOG && process.stderr.write(a.join(' ') + '\n'), error() {} }, performance: { now: () => clock }, Date,
-    createCalibrationTracker, createTrackingFreshness, createFaceLossTracker, createSerializedInference, createSurpriseRound, createRewardedDemo, ...skins, ...versus, ...party, ...reel, ...balloons, ...flash, ...beat, ...clipModule, formatScore, LOWER_WINS, inviteLine, challengeUrl, challengeHeadline, PUBLIC_PLAY_URL,
+    createCalibrationTracker, createTrackingFreshness, createFaceLossTracker, createTapBlink, createSerializedInference, createSurpriseRound, createRewardedDemo, ...skins, ...versus, ...party, ...reel, ...balloons, ...flash, ...beat, ...clipModule, formatScore, LOWER_WINS, inviteLine, challengeUrl, challengeHeadline, PUBLIC_PLAY_URL,
     checkBlink: () => eyeValue === null ? null : ({ minEar: eyeValue, ear: eyeValue, blinking }), setBlinkThreshold(value) { threshold = value; }, resetBlinkState() {}, getBlinkThreshold: () => threshold,
     audioManager: { startDrone() {}, stopDrone() {}, playGlitch() {}, playWin() {}, playHeartbeat() {}, playSurprise() {} },
     appendScore() {}, cameraErrorMessage: () => '', createGameOverCameraStop: fn => ({ cancel() {}, schedule() {} }), sharePayload() {}, shareClipboardText() {}, createSocialUI: () => ({ reset() {}, render() {} }),
