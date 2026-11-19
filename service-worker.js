@@ -1,4 +1,4 @@
-const CACHE_NAME = 'blink-stop-v22';
+const CACHE_NAME = 'blink-stop-v23';
 // The 10+ MB face model rarely changes, so it lives in its own cache: app updates
 // re-download only the small files, not the model. Bump only when vendor/face_mesh changes.
 const MODEL_CACHE = 'blink-stop-model-v1';
@@ -56,7 +56,10 @@ const ASSETS_TO_CACHE = [
     './manifest.json'
 ];
 
+// A new version takes over straight away instead of waiting for every tab to close,
+// which on phones can be never.
 self.addEventListener('install', (event) => {
+    self.skipWaiting();
     event.waitUntil(Promise.all([
         caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS_TO_CACHE)),
         // Fetch only model files this device doesn't already have.
@@ -68,26 +71,52 @@ self.addEventListener('install', (event) => {
     ]));
 });
 
+// The app's own files come from the network first, so a phone never keeps playing an old
+// version; the saved copy is used when offline or when the network is too slow. The large
+// face model rarely changes, so it stays cache-first.
+const NETWORK_WAIT_MS = 4000;
+function fromCache(request) {
+    return caches.open(CACHE_NAME).then(cache => cache.match(request, { ignoreSearch: true }))
+        .then(response => response || caches.open(MODEL_CACHE).then(cache => cache.match(request, { ignoreSearch: true })));
+}
+function networkFirst(request) {
+    const url = new URL(request.url);
+    const network = fetch(request).then(response => {
+        if (response.ok && response.type === 'basic') {
+            const copy = response.clone();
+            caches.open(CACHE_NAME).then(cache => cache.put(url.origin + url.pathname, copy)).catch(() => {});
+        }
+        return response;
+    });
+    const slow = new Promise(resolve => setTimeout(resolve, NETWORK_WAIT_MS)).then(() => fromCache(request));
+    return Promise.race([network.catch(() => null), slow])
+        .then(response => response || network.catch(() => fromCache(request)))
+        .then(response => response || fromCache(request))
+        .then(response => response || Response.error());
+}
+
 self.addEventListener('fetch', (event) => {
-    if (event.request.method !== 'GET' || new URL(event.request.url).origin !== self.location.origin) return;
-    event.respondWith(
-        caches.open(CACHE_NAME).then(cache => cache.match(event.request, { ignoreSearch: true }))
-            .then(response => response || caches.open(MODEL_CACHE).then(cache => cache.match(event.request, { ignoreSearch: true })))
-            .then(response => response || fetch(event.request))
-    );
+    if (event.request.method !== 'GET') return;
+    const url = new URL(event.request.url);
+    if (url.origin !== self.location.origin) return;
+    if (url.pathname.includes('/vendor/face_mesh/')) {
+        event.respondWith(fromCache(event.request).then(response => response || fetch(event.request)));
+        return;
+    }
+    event.respondWith(networkFirst(event.request));
 });
 
 self.addEventListener('activate', (event) => {
     const cacheWhitelist = [CACHE_NAME, MODEL_CACHE];
     event.waitUntil(
         caches.keys().then((cacheNames) => {
-            return Promise.all(
+            return Promise.all([self.clients.claim()].concat(
                 cacheNames.map((cacheName) => {
                     if (cacheWhitelist.indexOf(cacheName) === -1) {
                         return caches.delete(cacheName);
                     }
                 })
-            );
+            ));
         })
     );
 });

@@ -358,8 +358,22 @@ function warmEyeTracking() {
 
 // The offline copy is saved after the warm-up, so a first visit downloads the model
 // once instead of twice at the same time.
+// When a new version takes over, reload once at the menu so the player gets it now;
+// never mid-round, where it waits until the next time the menu shows.
+let updateWaiting = false;
+function reloadForUpdate() {
+    if (!updateWaiting || IN_ROUND_STATES.includes(gameState) || gameState !== 'MENU') return;
+    try { if (sessionStorage.getItem('blink_sw_reloaded')) return; sessionStorage.setItem('blink_sw_reloaded', '1'); } catch { return; }
+    location.reload();
+}
 function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
+    const hadController = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.addEventListener?.('controllerchange', () => {
+        if (!hadController) return;
+        updateWaiting = true;
+        reloadForUpdate();
+    });
     navigator.serviceWorker.register('./service-worker.js')
         .then(reg => console.log('Service Worker registered'))
         .catch(err => console.log('Service Worker registration failed: ', err));
@@ -680,6 +694,9 @@ function updateHomeFab() {
     const hudUp = !gameHud.classList.contains('hidden');
     const show = !atHome && !hudUp;
     homeFab.classList.toggle('hidden', !show);
+    // During a game the camera fills the screen: no footer, no page scroll.
+    if (hudUp && !document.body.classList.contains('in-game')) { try { window.scrollTo?.(0, 0); } catch { /* not scrollable */ } }
+    document.body.classList.toggle('in-game', hudUp);
     document.body.classList.toggle('home-fab-on', show);
     document.body.classList.toggle('menu-sub', onMenu && !atHome);
 }
@@ -940,7 +957,7 @@ function stopBalloons() {
     balloonCtx.clearRect(0, 0, balloonLayer.width, balloonLayer.height);
     balloonLayer.classList.add('hidden');
     livesDisplay.classList.add('hidden');
-    gameHud.classList.remove('balloon-mode');
+    gameHud.classList.remove('balloon-mode', 'tap-mode');
 }
 
 function hideJoke() {
@@ -1008,7 +1025,7 @@ function startBalloonRound() {
     hudLabel.innerText = 'POPPED';
     scoreDisplay.innerText = '0';
     gameHud.classList.remove('hidden');
-    gameHud.classList.add('active', 'balloon-mode');
+    gameHud.classList.add('active', 'balloon-mode', 'tap-mode');
     livesDisplay.classList.remove('hidden');
     renderBalloonLives();
     faceStatus.classList.remove('hidden', 'not-detected');
@@ -1078,6 +1095,7 @@ function stopQuick() {
     quickStage.classList.add('hidden');
     quickStage.classList.remove('go', 'early');
     quickLight.classList.remove('lit', 'tap', 'right', 'wrong');
+    gameHud.classList.remove('tap-mode');
 }
 
 function renderQuickDots(filled, total, cls = 'on') {
@@ -1112,7 +1130,7 @@ function startQuickRound(mode) {
     quickStage.classList.remove('hidden', 'go', 'early');
     quickLight.classList.remove('lit', 'tap', 'right', 'wrong');
     gameHud.classList.remove('hidden');
-    gameHud.classList.add('active');
+    gameHud.classList.add('active', 'tap-mode');
     faceStatus.classList.remove('hidden', 'not-detected');
     if (mode === 'FLASH') {
         hudLabel.innerText = 'TRY';
@@ -1975,6 +1993,7 @@ function showMenu() {
 
     loadingMsg.style.display = 'none';
     updateHomeFab();
+    reloadForUpdate();
 }
 
 document.addEventListener('visibilitychange', () => {
