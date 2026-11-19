@@ -432,7 +432,7 @@ let detectionInterval = null;
 async function startCameraLoop(session) {
     // 1. Start Video Stream First (Independent of FaceMesh)
     try {
-        const stream = await navigator.mediaDevices.getUserMedia({
+        const stream = takeWarmCamera() || await navigator.mediaDevices.getUserMedia({
             video: {
                 width: { ideal: window.innerWidth < 768 ? 480 : 640 },
                 height: { ideal: window.innerWidth < 768 ? 360 : 480 },
@@ -683,8 +683,31 @@ if (typeof MutationObserver === 'function') {
 }
 updateHomeFab();
 
-// Stop camera and detection helper function
-function stopCameraAndDetection() {
+// Camera permission is asked once: between games the stream is parked (detached from
+// the video, detection off) instead of stopped, and the next game reuses it. A parked
+// camera is released after a minute on the menu, and right away when the app is hidden.
+const CAMERA_WARM_MS = 60000;
+let warmStream = null, warmTimer = null;
+function releaseWarmCamera() {
+    clearTimeout(warmTimer);
+    warmTimer = null;
+    if (!warmStream) return;
+    warmStream.getTracks().forEach(track => track.stop());
+    warmStream = null;
+    console.log('Camera stopped');
+}
+function takeWarmCamera() {
+    const stream = warmStream;
+    clearTimeout(warmTimer);
+    warmTimer = null;
+    warmStream = null;
+    if (stream && stream.getTracks().every(track => track.readyState !== 'ended')) return stream;
+    stream?.getTracks().forEach(track => track.stop());
+    return null;
+}
+
+// Stop camera and detection helper function. keepWarm parks the stream for the next game.
+function stopCameraAndDetection({ keepWarm = false } = {}) {
     cameraSession++;
     stopDetectionLoop();
     // Retire the instance now, but never close a send still in progress.
@@ -692,16 +715,24 @@ function stopCameraAndDetection() {
     faceMesh = null;
     if (mesh && mesh !== activeMesh) closeFaceMesh(mesh);
 
-    // Stop video stream to release camera
-    if (videoElement.srcObject) {
-        videoElement.srcObject.getTracks().forEach(track => track.stop());
+    // Stop video stream to release camera, or park it for the next game.
+    const stream = videoElement.srcObject;
+    if (stream) {
         videoElement.srcObject = null;
-        console.log('Camera stopped');
+        if (keepWarm && !document.hidden) {
+            releaseWarmCamera();
+            warmStream = stream;
+            warmTimer = setTimeout(releaseWarmCamera, CAMERA_WARM_MS);
+        } else {
+            stream.getTracks().forEach(track => track.stop());
+            console.log('Camera stopped');
+        }
     }
+    if (!keepWarm || document.hidden) releaseWarmCamera();
 }
 
 
-const gameOverCameraStop = createGameOverCameraStop(stopCameraAndDetection);
+const gameOverCameraStop = createGameOverCameraStop(() => stopCameraAndDetection({ keepWarm: true }));
 
 // Leaderboard System
 const Leaderboard = {
@@ -1089,7 +1120,7 @@ function returnToParty() {
     gameOverCameraStop.cancel();
     cancelAnimationFrame(animationFrameId);
     cancelAnimationFrame(calibrationFrameId);
-    stopCameraAndDetection();
+    stopCameraAndDetection({ keepWarm: true });
     audioManager.stopDrone();
     hideJoke();
     clearSelfie();
@@ -1357,8 +1388,8 @@ function startGame(mode) {
     gameOverCameraStop.cancel();
     cancelAnimationFrame(calibrationFrameId);
     cancelAnimationFrame(animationFrameId);
-    // Abandon any previous camera permission prompt or pending startup.
-    stopCameraAndDetection();
+    // Abandon any previous camera permission prompt or pending startup; keep a running camera.
+    stopCameraAndDetection({ keepWarm: true });
     const session = cameraSession;
     faceMesh = createSessionFaceMesh(session, 2); // Two faces: Stare-down needs both; solo keeps the closest player.
     hideCameraProblem();
@@ -1658,7 +1689,7 @@ function showMenu() {
     gameState = 'MENU';
     cancelAnimationFrame(animationFrameId);
     cancelAnimationFrame(calibrationFrameId);
-    stopCameraAndDetection();
+    stopCameraAndDetection({ keepWarm: true });
     skinPickScreen.classList.add('hidden');
     skinPickScreen.classList.remove('active');
     // The camera has stopped: clear its last frame so the menu sits on a clean background.
@@ -1698,6 +1729,7 @@ document.addEventListener('visibilitychange', () => {
     // Mid-party, backgrounding releases the camera but keeps the party and its scores.
     if (party) { if (videoElement.srcObject || gameState !== 'PARTY' || loadingMsg.style.display === 'block') returnToParty(); }
     else if (videoElement.srcObject || gameState !== 'MENU' || loadingMsg.style.display === 'block') showMenu();
+    releaseWarmCamera();
 });
 
 function onResults(results, session) {

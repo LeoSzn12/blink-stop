@@ -74,6 +74,10 @@ test('missing face gives guidance, times out, and releases the camera instead of
   assert.match(h.el('calibration-status').innerText,/FACE NOT FOUND.*LIGHT/);
   h.setClock(15000); h.tickInference(); h.deliver(); await h.settle(); h.raf();
   assert.equal(h.debug.getState(),'MENU');
+  // The camera is parked for the next game (no second permission prompt), then released.
+  assert.equal(h.el('input_video').srcObject, null);
+  assert.equal(h.tracks[0].stops,0);
+  await h.timers();
   assert.equal(h.tracks[0].stops,1);
   assert.equal(h.pendingRaf(),0);
   assert.match(h.el('camera-error').textContent,/light.*eye level/i);
@@ -112,7 +116,8 @@ test('stalled inference exits calibration with a camera restart action; cancel a
   assert.equal(h.el('restart-camera-btn').classList.contains('hidden'),true);
   h.click('calibration-cancel-btn');
   assert.equal(h.debug.getState(),'MENU');
-  assert.equal(h.tracks[1].stops,1);
+  await h.timers();
+  assert.equal(h.tracks.at(-1).stops,1);
 });
 test('privacy copy names the persisted theme preference and calibration guidance avoids intentional blinking', () => {
   const privacy = readFileSync(new URL('../privacy.html', import.meta.url), 'utf8');
@@ -408,7 +413,25 @@ test('head-to-head asks for both faces, then times out to the menu with guidance
   h.setClock(20000); h.raf();
   assert.equal(h.debug.getState(), 'MENU');
   assert.match(h.el('camera-error').textContent, /both faces/i);
+  await h.timers();
   assert.equal(h.tracks[0].stops, 1);
+});
+
+test('camera permission is asked once: the next game reuses the parked camera; hiding the app releases it', async () => {
+  const h = harness();
+  h.debug.startGame('CLASSIC'); await h.settle(); await h.timers();
+  assert.equal(h.tracks.length, 1);
+  h.debug.showMenu();
+  assert.equal(h.el('input_video').srcObject, null, 'detached from the screen on the menu');
+  assert.equal(h.tracks[0].stops, 0);
+  h.debug.startGame('BALLOON'); await h.settle();
+  assert.equal(h.tracks.length, 1, 'no second getUserMedia call, so no second prompt');
+  assert.ok(h.el('input_video').srcObject);
+  h.debug.showMenu();
+  h.document.hidden = true; h.visibility(); h.document.hidden = false;
+  assert.equal(h.tracks[0].stops, 1, 'backgrounding releases the camera right away');
+  h.debug.startGame('CLASSIC'); await h.settle();
+  assert.equal(h.tracks.length, 2);
 });
 
 test('distraction round shows jokes while playing and hides them at the end', () => {
