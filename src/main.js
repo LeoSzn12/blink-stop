@@ -112,6 +112,15 @@ const olympicsOptions = document.getElementById('olympics-options');
 const balloonLayer = document.getElementById('balloon-layer');
 const balloonCtx = balloonLayer.getContext('2d');
 let balloonRound = null, balloonEyeClosed = false, balloonFrameId = null, balloonEnd = null;
+const livesDisplay = document.getElementById('lives-display');
+
+// Face filter pick: a game started from the menu first shows the live camera with the
+// skin on your face, so you choose your look right before playing. Retry skips it.
+const skinPickScreen = document.getElementById('skin-pick-screen');
+const skinPickMode = document.getElementById('skin-pick-mode');
+const SKIN_PICK_MODES = ['CLASSIC', 'PRECISION', 'ENDURANCE', 'DAILY', 'VERSUS', 'DISTRACT', 'BALLOON', 'SURPRISE'];
+const MODE_NAMES = { CLASSIC: 'Endurance', PRECISION: 'Precision', ENDURANCE: '30 Seconds', DAILY: 'Daily', VERSUS: 'Stare-down', DISTRACT: 'Distraction', BALLOON: 'Balloon Pop', SURPRISE: 'Surprise' };
+let pickSkinNext = false;
 let shareLine = 'Think you can beat me?'; // invite text that travels with a shared photo
 let shareUrl = PUBLIC_PLAY_URL; // challenge link that travels with a shared photo or clip
 let party = null;            // active party tournament, in memory only
@@ -423,7 +432,7 @@ let detectionInterval = null;
 async function startCameraLoop(session) {
     // 1. Start Video Stream First (Independent of FaceMesh)
     try {
-        const stream = await navigator.mediaDevices.getUserMedia({
+        const stream = takeWarmCamera() || await navigator.mediaDevices.getUserMedia({
             video: {
                 width: { ideal: window.innerWidth < 768 ? 480 : 640 },
                 height: { ideal: window.innerWidth < 768 ? 360 : 480 },
@@ -499,6 +508,7 @@ modeBtns.forEach(btn => {
         armTapGuard();
         hideCameraProblem();
         activeChallenge = null;
+        pickSkinNext = SKIN_PICK_MODES.includes(mode);
 
         if (mode === 'CLASSIC') {
             startGame('CLASSIC');
@@ -533,7 +543,7 @@ modeBtns.forEach(btn => {
     });
 });
 
-document.getElementById('surprise-start-btn').addEventListener('click', () => startGame('SURPRISE'));
+document.getElementById('surprise-start-btn').addEventListener('click', () => { pickSkinNext = true; startGame('SURPRISE'); });
 document.getElementById('calibration-cancel-btn').addEventListener('click', () => (party ? returnToParty() : showMenu()));
 restartCameraBtn.addEventListener('click', () => window.location.reload());
 cameraRetryBtn.addEventListener('click', () => {
@@ -620,6 +630,7 @@ optionBtns.forEach(btn => {
         // The pick is remembered, so the Precision button starts it next time.
         setPrecisionChoice(Number(e.currentTarget.dataset.time));
         precisionTarget = precisionChoice;
+        pickSkinNext = true;
 
         // Start Game
         startGame('PRECISION');
@@ -646,8 +657,57 @@ if (homeBtn) {
     });
 }
 
-// Stop camera and detection helper function
-function stopCameraAndDetection() {
+// Home: one clear way back from every screen. In-game screens with the HUD use its own
+// Home button; everywhere else a floating Home button sits at the top left.
+const homeFab = document.getElementById('home-fab');
+function updateHomeFab() {
+    const onMenu = !menuScreen.classList.contains('hidden');
+    const atHome = onMenu && !modeSelection.classList.contains('hidden');
+    const hudUp = !gameHud.classList.contains('hidden');
+    const show = !atHome && !hudUp;
+    homeFab.classList.toggle('hidden', !show);
+    document.body.classList.toggle('home-fab-on', show);
+    document.body.classList.toggle('menu-sub', onMenu && !atHome);
+}
+homeFab.addEventListener('click', () => {
+    if (['PLAYING', 'ENDURANCE', 'VERSUS', 'BALLOON'].includes(gameState)) {
+        if (!confirm('Go home? Your current game will end.')) return;
+    } else if (party && !confirm('Go home? This ends the party.')) return;
+    clearTapGuard();
+    showMenu();
+    try { window.scrollTo?.(0, 0); } catch { /* not scrollable */ }
+    updateHomeFab();
+});
+if (typeof MutationObserver === 'function') {
+    new MutationObserver(updateHomeFab).observe(document.getElementById('ui-layer'), { subtree: true, attributes: true, attributeFilter: ['class'] });
+}
+updateHomeFab();
+
+// Camera permission is asked once: between games the stream is parked (detached from
+// the video, detection off) instead of stopped, and the next game reuses it. A parked
+// camera is released after a minute on the menu, and right away when the app is hidden.
+const CAMERA_WARM_MS = 60000;
+let warmStream = null, warmTimer = null;
+function releaseWarmCamera() {
+    clearTimeout(warmTimer);
+    warmTimer = null;
+    if (!warmStream) return;
+    warmStream.getTracks().forEach(track => track.stop());
+    warmStream = null;
+    console.log('Camera stopped');
+}
+function takeWarmCamera() {
+    const stream = warmStream;
+    clearTimeout(warmTimer);
+    warmTimer = null;
+    warmStream = null;
+    if (stream && stream.getTracks().every(track => track.readyState !== 'ended')) return stream;
+    stream?.getTracks().forEach(track => track.stop());
+    return null;
+}
+
+// Stop camera and detection helper function. keepWarm parks the stream for the next game.
+function stopCameraAndDetection({ keepWarm = false } = {}) {
     cameraSession++;
     stopDetectionLoop();
     // Retire the instance now, but never close a send still in progress.
@@ -655,16 +715,24 @@ function stopCameraAndDetection() {
     faceMesh = null;
     if (mesh && mesh !== activeMesh) closeFaceMesh(mesh);
 
-    // Stop video stream to release camera
-    if (videoElement.srcObject) {
-        videoElement.srcObject.getTracks().forEach(track => track.stop());
+    // Stop video stream to release camera, or park it for the next game.
+    const stream = videoElement.srcObject;
+    if (stream) {
         videoElement.srcObject = null;
-        console.log('Camera stopped');
+        if (keepWarm && !document.hidden) {
+            releaseWarmCamera();
+            warmStream = stream;
+            warmTimer = setTimeout(releaseWarmCamera, CAMERA_WARM_MS);
+        } else {
+            stream.getTracks().forEach(track => track.stop());
+            console.log('Camera stopped');
+        }
     }
+    if (!keepWarm || document.hidden) releaseWarmCamera();
 }
 
 
-const gameOverCameraStop = createGameOverCameraStop(stopCameraAndDetection);
+const gameOverCameraStop = createGameOverCameraStop(() => stopCameraAndDetection({ keepWarm: true }));
 
 // Leaderboard System
 const Leaderboard = {
@@ -857,6 +925,7 @@ function stopBalloons() {
     balloonEyeClosed = false;
     balloonCtx.clearRect(0, 0, balloonLayer.width, balloonLayer.height);
     balloonLayer.classList.add('hidden');
+    livesDisplay.classList.add('hidden');
 }
 
 function hideJoke() {
@@ -885,9 +954,18 @@ function sizeBalloonLayer() {
     }
 }
 
-function balloonLives() {
+// Lives are shown as three balloons at the top of the screen; a lost one fades out.
+function renderBalloonLives() {
     const left = balloonRound ? balloonRound.livesLeft() : BALLOON_MISSES;
-    return `${'●'.repeat(left)}${'○'.repeat(BALLOON_MISSES - left)}`;
+    const icons = [];
+    for (let i = 0; i < BALLOON_MISSES; i++) {
+        const icon = document.createElement('span');
+        icon.textContent = '🎈';
+        icon.className = i < left ? 'life' : 'life lost';
+        icons.push(icon);
+    }
+    livesDisplay.replaceChildren?.(...icons);
+    livesDisplay.setAttribute('aria-label', `${left} ${left === 1 ? 'life' : 'lives'} left`);
 }
 
 function startBalloonRound() {
@@ -902,8 +980,10 @@ function startBalloonRound() {
     scoreDisplay.innerText = '0';
     gameHud.classList.remove('hidden');
     gameHud.classList.add('active');
+    livesDisplay.classList.remove('hidden');
+    renderBalloonLives();
     faceStatus.classList.remove('hidden', 'not-detected');
-    faceStatusText.innerText = `Blink when a balloon is in the zone ${balloonLives()}`;
+    faceStatusText.innerText = 'Blink when a balloon is in the zone';
     updateBalloonLoop();
 }
 
@@ -913,7 +993,8 @@ function updateBalloonLoop() {
     if (tracking.stale(now)) return endBalloon(true);
     if (balloonRound.update(now).length) {
         if (navigator.vibrate) navigator.vibrate(60);
-        faceStatusText.innerText = `One got away! ${balloonLives()}`;
+        faceStatusText.innerText = 'One got away!';
+        renderBalloonLives();
     }
     sizeBalloonLayer();
     drawBalloons(balloonCtx, balloonRound, currentSkin, balloonLayer.width, balloonLayer.height, now);
@@ -934,10 +1015,13 @@ function handleBalloonEye(eye, now) {
             const result = balloonRound.blink(now);
             if (result?.hit) {
                 scoreDisplay.innerText = String(result.score);
-                faceStatusText.innerText = `POP! ${balloonLives()}`;
+                faceStatusText.innerText = 'POP!';
                 if (navigator.vibrate) navigator.vibrate(25);
+            } else if (result?.kind === 'FREE') {
+                faceStatusText.innerText = 'Wait for the zone. That one was free!';
             } else if (result) {
-                faceStatusText.innerText = `Too early! ${balloonLives()}`;
+                faceStatusText.innerText = 'Too early!';
+                renderBalloonLives();
                 if (navigator.vibrate) navigator.vibrate(60);
             }
             if (balloonRound.over) return endBalloon(false);
@@ -1038,7 +1122,7 @@ function returnToParty() {
     gameOverCameraStop.cancel();
     cancelAnimationFrame(animationFrameId);
     cancelAnimationFrame(calibrationFrameId);
-    stopCameraAndDetection();
+    stopCameraAndDetection({ keepWarm: true });
     audioManager.stopDrone();
     hideJoke();
     clearSelfie();
@@ -1147,6 +1231,8 @@ function startVersusCalibration() {
     versusLastFrame = null;
     calibrationStartTime = performance.now();
     calibrationStatus.innerText = 'FINDING BOTH FACES';
+    roundTip.textContent = roundTipFor('VERSUS');
+    countdownEl.textContent = '';
     calibrationHint.innerText = versusNames
         ? `${versusNames[0]} on the left, ${versusNames[1]} on the right, cheek to cheek. Light in front of you, eyes open normally.`
         : 'Two players side by side, both faces in view. Light in front of you, eyes open normally.';
@@ -1169,6 +1255,7 @@ function beginVersusPlay() {
     gameState = 'VERSUS';
     calibrationScreen.classList.add('hidden');
     calibrationScreen.classList.remove('active');
+    showGo();
     startTime = Date.now();
     versusStartedAt = performance.now();
     if (soundEnabled) audioManager.startDrone();
@@ -1282,7 +1369,10 @@ function endVersus(outcome) {
 }
 
 function startGame(mode) {
+    const pickSkin = pickSkinNext && !party;
+    pickSkinNext = false;
     if (gameState === 'AD_DEMO') return;
+    skinPickScreen.classList.add('hidden');
     social.reset();
     lastResult = null;
     container.className = 'container';
@@ -1296,15 +1386,15 @@ function startGame(mode) {
     dareBox.classList.add('hidden');
     partyNextBtn.classList.add('hidden');
     gameOverScreen.classList.remove('versus-result', 'party-turn');
-    restartBtn.innerText = 'RETRY';
+    restartBtn.innerText = 'PLAY AGAIN';
     partyScreen.classList.add('hidden');
     partyScreen.classList.remove('active');
     if (mode !== 'CLASSIC') partyTurn = false;
     gameOverCameraStop.cancel();
     cancelAnimationFrame(calibrationFrameId);
     cancelAnimationFrame(animationFrameId);
-    // Abandon any previous camera permission prompt or pending startup.
-    stopCameraAndDetection();
+    // Abandon any previous camera permission prompt or pending startup; keep a running camera.
+    stopCameraAndDetection({ keepWarm: true });
     const session = cameraSession;
     faceMesh = createSessionFaceMesh(session, 2); // Two faces: Stare-down needs both; solo keeps the closest player.
     hideCameraProblem();
@@ -1358,6 +1448,7 @@ function startGame(mode) {
         .then(started => {
             if (!started || session !== cameraSession) return;
             loadingMsg.innerText = 'CAMERA READY...';
+            if (pickSkin) { showSkinPick(mode); return; }
             setTimeout(() => {
                 if (session === cameraSession && !document.hidden) (mode === 'VERSUS' ? startVersusCalibration : startCalibration)();
             }, 500);
@@ -1373,6 +1464,60 @@ function startGame(mode) {
         });
 }
 
+// One line before each game says what to do, while a 3-2-1 runs over calibration.
+const roundTip = document.getElementById('round-tip');
+const countdownEl = document.getElementById('countdown');
+const goFlash = document.getElementById('go-flash');
+let goFlashTimer = null;
+function roundTipFor(mode) {
+    switch (mode) {
+        case 'PRECISION': return `Blink right at ${precisionTarget} seconds.`;
+        case 'ENDURANCE': return "Don't blink for 30 seconds.";
+        case 'DAILY': return "Today's twist is on. Don't blink!";
+        case 'SURPRISE': return "Something may startle you. Don't blink!";
+        case 'DISTRACT': return "Jokes are coming. Don't blink!";
+        case 'BALLOON': return 'Blink when a balloon is in the green zone.';
+        case 'VERSUS': return 'First to blink loses.';
+        default: return 'Keep your eyes open as long as you can.';
+    }
+}
+function showGo() {
+    clearTimeout(goFlashTimer);
+    goFlash.classList.remove('hidden');
+    goFlashTimer = setTimeout(() => goFlash.classList.add('hidden'), 700);
+}
+
+// Best score per mode, kept on this device without needing a name.
+function bestKey(mode) { return `blink_best_${mode}`; }
+function recordBest(mode, score) {
+    let best = null;
+    try { const stored = Number.parseFloat(localStorage.getItem(bestKey(mode))); if (Number.isFinite(stored)) best = stored; } catch { return { best: null, isNew: false }; }
+    const better = best === null || (mode.startsWith('PRECISION') ? score < best : score > best);
+    if (better) {
+        try { localStorage.setItem(bestKey(mode), String(score)); } catch { /* storage unavailable */ }
+    }
+    return { best: better ? score : best, isNew: better && best !== null };
+}
+
+function showSkinPick(mode) {
+    gameState = 'SKIN_PICK';
+    loadingMsg.style.display = 'none';
+    menuScreen.classList.add('hidden');
+    menuScreen.classList.remove('active');
+    gameOverScreen.classList.add('hidden');
+    skinPickMode.textContent = MODE_NAMES[mode] || '';
+    skinPickScreen.classList.remove('hidden');
+    skinPickScreen.classList.add('active');
+    document.getElementById('skin-pick-play').focus();
+    updateHomeFab();
+}
+document.getElementById('skin-pick-play').addEventListener('click', () => {
+    if (gameState !== 'SKIN_PICK') return;
+    skinPickScreen.classList.add('hidden');
+    skinPickScreen.classList.remove('active');
+    (currentMode === 'VERSUS' ? startVersusCalibration : startCalibration)();
+});
+
 function startCalibration() {
     cancelAnimationFrame(calibrationFrameId);
     gameState = 'CALIBRATING';
@@ -1387,6 +1532,8 @@ function startCalibration() {
     calibrationStatus.innerText = 'FINDING YOUR EYES';
     calibrationHint.innerText = calibrationHintText;
     calibrationLoader.style.width = '0%';
+    roundTip.textContent = roundTipFor(currentMode);
+    countdownEl.textContent = '3';
 
     menuScreen.classList.add('hidden');
     menuScreen.classList.remove('active');
@@ -1407,6 +1554,8 @@ function updateCalibrationLoop() {
         const elapsed = now - calibrationStartTime;
         const progress = calibration.progress(now);
         calibrationLoader.style.width = `${progress * 100}%`;
+        const count = String(Math.max(1, Math.ceil((3000 - elapsed) / 1000)));
+        if (countdownEl.textContent !== count) countdownEl.textContent = count;
 
         if (elapsed >= 3000 && calibration.ready(now)) {
             finishCalibration();
@@ -1469,6 +1618,7 @@ function finishCalibration() {
 
     calibrationScreen.classList.add('hidden');
     calibrationScreen.classList.remove('active');
+    showGo();
 
     // Start Audio Drone
     if (soundEnabled) audioManager.startDrone();
@@ -1579,12 +1729,16 @@ function showMenu() {
     dareBox.classList.add('hidden');
     partyNextBtn.classList.add('hidden');
     gameOverScreen.classList.remove('versus-result', 'party-turn');
-    restartBtn.innerText = 'RETRY';
+    restartBtn.innerText = 'PLAY AGAIN';
     gameOverCameraStop.cancel();
     gameState = 'MENU';
     cancelAnimationFrame(animationFrameId);
     cancelAnimationFrame(calibrationFrameId);
-    stopCameraAndDetection();
+    stopCameraAndDetection({ keepWarm: true });
+    skinPickScreen.classList.add('hidden');
+    skinPickScreen.classList.remove('active');
+    // The camera has stopped: clear its last frame so the menu sits on a clean background.
+    try { canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height); } catch { /* display only */ }
     calibrationScreen.classList.add('hidden');
     calibrationScreen.classList.remove('active');
     enduranceScreen.classList.add('hidden');
@@ -1612,6 +1766,7 @@ function showMenu() {
     container.className = 'container';
 
     loadingMsg.style.display = 'none';
+    updateHomeFab();
 }
 
 document.addEventListener('visibilitychange', () => {
@@ -1619,6 +1774,7 @@ document.addEventListener('visibilitychange', () => {
     // Mid-party, backgrounding releases the camera but keeps the party and its scores.
     if (party) { if (videoElement.srcObject || gameState !== 'PARTY' || loadingMsg.style.display === 'block') returnToParty(); }
     else if (videoElement.srcObject || gameState !== 'MENU' || loadingMsg.style.display === 'block') showMenu();
+    releaseWarmCamera();
 });
 
 function onResults(results, session) {
@@ -1803,7 +1959,7 @@ function endGame(reason = 'BLINK') {
     gameOverScreen.classList.remove('versus-result', 'party-turn');
     dareBox.classList.add('hidden');
     partyNextBtn.classList.add('hidden');
-    restartBtn.innerText = 'RETRY';
+    restartBtn.innerText = 'PLAY AGAIN';
     if (reason === 'MENU_EXIT') {
         showMenu();
         return;
@@ -1847,7 +2003,7 @@ function endGame(reason = 'BLINK') {
             finalScoreLabel.innerText = balloonEnd.score === 1 ? 'BALLOON POPPED' : 'BALLOONS POPPED';
             gameOverTitle.innerText = balloonEnd.score >= 15 ? 'BALLOON CHAMPION!' : balloonEnd.score >= 5 ? 'NICE POPPING!' : 'GAME OVER';
             gameOverTitle.style.color = 'var(--neon-cyan)';
-            finalScoreSub.innerText = balloonEnd.faceLost ? 'Your face left the frame' : `${BALLOON_MISSES} misses and you're out`;
+            finalScoreSub.innerText = balloonEnd.faceLost ? 'Your face left the frame' : `Out of lives`;
             finalScoreSub.classList.remove('hidden');
         } else if (reason === 'WIN_SURPRISE') {
             scoreToSave = 30;
@@ -1883,8 +2039,8 @@ function endGame(reason = 'BLINK') {
             finalScoreLabel.innerText = "YOU SURVIVED";
             gameOverTitle.innerText = "BLINK DETECTED";
 
-            // Show World Record
-            gameOverWorldRecord.classList.remove('hidden');
+            // The automatic best-score line below replaces the old saved-score line.
+            gameOverWorldRecord.classList.add('hidden');
             if (window.currentWorldRecord) {
                 gameOverWorldRecord.innerText = `Your Best: ${window.currentWorldRecord.toFixed(2)}s`;
             } else {
@@ -1928,6 +2084,15 @@ function endGame(reason = 'BLINK') {
         lastScore = reason === 'DISQUALIFIED' ? null : scoreToSave;
         if (lastScore !== null && ['ENDURANCE', 'SURPRISE'].includes(currentMode)) lastScore = Math.min(30, lastScore);
         lastResult = lastScore === null ? null : { mode: currentMode, score: lastScore, elapsed, target: precisionTarget };
+        // Your best in this mode, saved on this device; Precision's best is the smallest miss.
+        const bestScoreEl = document.getElementById('best-score');
+        if (lastResult) {
+            const bestKeyMode = currentMode === 'PRECISION' ? `PRECISION_${precisionTarget}` : currentMode;
+            const { best, isNew } = recordBest(bestKeyMode, lastScore);
+            bestScoreEl.innerText = isNew ? 'NEW BEST!' : best !== null && best !== lastScore ? `Your best: ${formatScore(currentMode, best)}` : '';
+            bestScoreEl.classList.toggle('new-best', isNew);
+            bestScoreEl.classList.toggle('hidden', !bestScoreEl.innerText);
+        } else bestScoreEl.classList.add('hidden');
         social.render(lastResult, activeChallenge, currentSkin);
         finalScoreVal.innerText = finalScoreText;
 

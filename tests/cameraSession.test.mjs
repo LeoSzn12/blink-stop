@@ -74,6 +74,10 @@ test('missing face gives guidance, times out, and releases the camera instead of
   assert.match(h.el('calibration-status').innerText,/FACE NOT FOUND.*LIGHT/);
   h.setClock(15000); h.tickInference(); h.deliver(); await h.settle(); h.raf();
   assert.equal(h.debug.getState(),'MENU');
+  // The camera is parked for the next game (no second permission prompt), then released.
+  assert.equal(h.el('input_video').srcObject, null);
+  assert.equal(h.tracks[0].stops,0);
+  await h.timers();
   assert.equal(h.tracks[0].stops,1);
   assert.equal(h.pendingRaf(),0);
   assert.match(h.el('camera-error').textContent,/light.*eye level/i);
@@ -112,7 +116,8 @@ test('stalled inference exits calibration with a camera restart action; cancel a
   assert.equal(h.el('restart-camera-btn').classList.contains('hidden'),true);
   h.click('calibration-cancel-btn');
   assert.equal(h.debug.getState(),'MENU');
-  assert.equal(h.tracks[1].stops,1);
+  await h.timers();
+  assert.equal(h.tracks.at(-1).stops,1);
 });
 test('privacy copy names the persisted theme preference and calibration guidance avoids intentional blinking', () => {
   const privacy = readFileSync(new URL('../privacy.html', import.meta.url), 'utf8');
@@ -175,7 +180,7 @@ test('Classic starts calibration when local score reads throw', async () => {
 });
 test('corrupt score data remains untouched and cannot be reported saved', () => {
   let writes = 0;
-  const h = harness({ getItem: key => key.startsWith('blink_lb_') ? '{broken' : null, setItem() { writes++; } });
+  const h = harness({ getItem: key => key.startsWith('blink_lb_') ? '{broken' : null, setItem(key) { if (key.startsWith('blink_lb_')) writes++; } });
   h.debug.endGame('BLINK');
   assert.match(h.el('leaderboard-list').textContent, /unavailable/i);
   h.el('player-name-input').value = 'LEO';
@@ -408,7 +413,25 @@ test('head-to-head asks for both faces, then times out to the menu with guidance
   h.setClock(20000); h.raf();
   assert.equal(h.debug.getState(), 'MENU');
   assert.match(h.el('camera-error').textContent, /both faces/i);
+  await h.timers();
   assert.equal(h.tracks[0].stops, 1);
+});
+
+test('camera permission is asked once: the next game reuses the parked camera; hiding the app releases it', async () => {
+  const h = harness();
+  h.debug.startGame('CLASSIC'); await h.settle(); await h.timers();
+  assert.equal(h.tracks.length, 1);
+  h.debug.showMenu();
+  assert.equal(h.el('input_video').srcObject, null, 'detached from the screen on the menu');
+  assert.equal(h.tracks[0].stops, 0);
+  h.debug.startGame('BALLOON'); await h.settle();
+  assert.equal(h.tracks.length, 1, 'no second getUserMedia call, so no second prompt');
+  assert.ok(h.el('input_video').srcObject);
+  h.debug.showMenu();
+  h.document.hidden = true; h.visibility(); h.document.hidden = false;
+  assert.equal(h.tracks[0].stops, 1, 'backgrounding releases the camera right away');
+  h.debug.startGame('CLASSIC'); await h.settle();
+  assert.equal(h.tracks.length, 2);
 });
 
 test('distraction round shows jokes while playing and hides them at the end', () => {
@@ -426,15 +449,19 @@ test('Blink Olympics: Balloon Pop counts blinks as pops, ends on misses and shar
   assert.equal(h.debug.getState(), 'BALLOON');
   assert.equal(h.el('balloon-layer').classList.contains('hidden'), false);
   assert.equal(h.el('hud-label').innerText, 'POPPED');
-  // Blink while nothing is in the zone: three times is out.
-  for (let i = 0; i < 3; i++) {
+  assert.equal(h.el('lives-display').classList.contains('hidden'), false);
+  // Blink while nothing is in the zone: the first is free, then three more is out.
+  for (let i = 0; i < 4; i++) {
     h.setBlinking(true); h.setClock(4000 + i * 600); h.tickInference(); h.deliver(); await h.settle();
+    if (i === 0) assert.match(h.el('face-status-text').innerText, /free/);
     h.setBlinking(false); h.setClock(4300 + i * 600); h.tickInference(); h.deliver(); await h.settle();
   }
   assert.equal(h.debug.getState(), 'GAME_OVER');
   assert.equal(h.el('final-score-val').innerText, '0');
   assert.equal(h.el('final-score-label').innerText, 'BALLOONS POPPED');
+  assert.equal(h.el('final-score-sub').innerText, 'Out of lives');
   assert.equal(h.el('balloon-layer').classList.contains('hidden'), true);
+  assert.equal(h.el('lives-display').classList.contains('hidden'), true);
   assert.equal(h.jpegCount(), 1);
 });
 
@@ -487,4 +514,42 @@ test('blink clip: a Classic blink becomes a shareable clip made on the phone; Ba
   h.debug.endGame('DISQUALIFIED');
   assert.equal(h.el('clip-btn').classList.contains('hidden'), true);
   assert.equal(FakeRecorder.made.length, 1);
+});
+
+test('a game started from the menu shows the live camera to pick a look, then calibrates; Home goes back', async () => {
+  const h = harness();
+  h.el('game-hud').classList.add('hidden'); // as in index.html
+  h.click('surprise-start-btn'); await h.settle(); await h.timers();
+  assert.equal(h.debug.getState(), 'SKIN_PICK');
+  assert.equal(h.el('skin-pick-screen').classList.contains('hidden'), false);
+  assert.equal(h.el('menu-screen').classList.contains('hidden'), true);
+  assert.equal(h.el('skin-pick-mode').textContent, 'Surprise');
+  assert.equal(h.el('home-fab').classList.contains('hidden'), false);
+  h.click('skin-pick-play');
+  assert.equal(h.debug.getState(), 'CALIBRATING');
+  assert.equal(h.el('skin-pick-screen').classList.contains('hidden'), true);
+
+  // Home from the pick screen stops the camera and lands on the main menu.
+  h.click('surprise-start-btn'); await h.settle(); await h.timers();
+  assert.equal(h.debug.getState(), 'SKIN_PICK');
+  h.click('home-fab');
+  assert.equal(h.debug.getState(), 'MENU');
+  assert.equal(h.el('skin-pick-screen').classList.contains('hidden'), true);
+  assert.equal(h.el('home-fab').classList.contains('hidden'), true);
+
+  // Retry and direct starts skip the pick.
+  h.debug.startGame('CLASSIC'); await h.settle(); await h.timers();
+  assert.equal(h.debug.getState(), 'CALIBRATING');
+});
+test('results show your saved best, and NEW BEST when you beat it', () => {
+  const store = new Map([['blink_best_CLASSIC', '1e12']]);
+  const h = harness({ getItem: key => store.get(key) ?? null, setItem(key, value) { store.set(key, value); } });
+  h.debug.endGame('BLINK');
+  assert.equal(h.el('restart-btn').innerText, 'PLAY AGAIN');
+  assert.match(h.el('best-score').innerText, /^Your best: /);
+  assert.equal(store.get('blink_best_CLASSIC'), '1e12');
+  store.set('blink_best_CLASSIC', '-1');
+  h.debug.endGame('BLINK');
+  assert.equal(h.el('best-score').innerText, 'NEW BEST!');
+  assert.ok(Number(store.get('blink_best_CLASSIC')) >= 0);
 });
