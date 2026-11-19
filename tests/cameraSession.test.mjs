@@ -167,7 +167,8 @@ test('Classic starts calibration with corrupt score data without overwriting it'
   await h.settle(); await h.timers();
   assert.equal(h.debug.getState(), 'CALIBRATING');
   assert.equal(h.tracks.length, 1, 'camera startup must be reached');
-  assert.equal(h.el('wr-value').innerText, 'Unavailable');
+  // The chip shows the automatic best (blink_best_CLASSIC), not the named list.
+  assert.equal(h.el('wr-value').innerText, 'None yet');
   assert.equal(writes, 0, 'do not replace corrupt stored scores');
 });
 test('Classic starts calibration when local score reads throw', async () => {
@@ -520,7 +521,7 @@ test('blink clip: a Classic blink becomes a shareable clip made on the phone; Ba
 
 test('a game started from the menu shows the live camera to pick a look, then calibrates; Home goes back', async () => {
   const h = harness();
-  h.el('game-hud').classList.add('hidden'); // as in index.html
+  for (const id of ['game-hud', 'calibration-screen', 'game-over-screen']) h.el(id).classList.add('hidden'); // as in index.html
   h.click('surprise-start-btn'); await h.settle(); await h.timers();
   assert.equal(h.debug.getState(), 'SKIN_PICK');
   assert.equal(h.el('skin-pick-screen').classList.contains('hidden'), false);
@@ -599,4 +600,38 @@ test('Quick Games: Blink Beat ends after three missed notes and counts hits', as
   assert.equal(h.el('final-score-label').innerText, 'NOTES HIT');
   assert.equal(h.el('lives-display').classList.contains('hidden'), true);
   assert.equal(h.el('balloon-layer').classList.contains('hidden'), true);
+});
+
+test('cancelling Home mid-round carries on instead of ending the round', async () => {
+  let onConfirm = () => true;
+  const h = harness(undefined, undefined, { extra: { confirm: (...a) => onConfirm(...a) } });
+  h.debug.startGame('BALLOON'); await h.settle(); await h.timers();
+  let t = 0;
+  const frame = async () => { h.setClock(t); h.tickInference(); h.deliver(); await h.settle(); h.raf(); t += 100; };
+  while (h.debug.getState() !== 'BALLOON' && t < 8000) await frame();
+  assert.equal(h.debug.getState(), 'BALLOON');
+  // The question stays open for five seconds, then the player taps Cancel.
+  onConfirm = () => { t += 5000; h.setClock(t); return false; };
+  h.click('home-btn');
+  for (let i = 0; i < 5; i++) await frame();
+  assert.equal(h.debug.getState(), 'BALLOON', 'the pause is not a face lost');
+  onConfirm = () => true;
+  h.click('home-btn');
+  assert.equal(h.debug.getState(), 'MENU');
+});
+
+test('Flash shows no green GO, and a round with every try timed out saves no best', async () => {
+  const saved = [];
+  const h = harness({ getItem: () => null, setItem(key, value) { saved.push(key); } });
+  h.el('go-flash').classList.add('hidden');
+  h.debug.startGame('FLASH'); await h.settle(); await h.timers();
+  let t = 0;
+  const frame = async () => { h.setClock(t); h.tickInference(); h.deliver(); await h.settle(); h.raf(); t += 100; };
+  while (h.debug.getState() !== 'FLASH' && t < 8000) await frame();
+  assert.equal(h.debug.getState(), 'FLASH');
+  assert.equal(h.el('go-flash').classList.contains('hidden'), true, 'green means blink in Flash, so no GO flash');
+  while (h.debug.getState() === 'FLASH' && t < 60000) await frame();
+  assert.equal(h.debug.getState(), 'GAME_OVER');
+  assert.equal(h.el('final-score-label').innerText, 'NO BLINK IN TIME');
+  assert.equal(saved.includes('blink_best_FLASH'), false);
 });

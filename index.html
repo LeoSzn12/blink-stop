@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Blink Stop - Don't Blink Challenge</title>
-    <link rel="stylesheet" href="src/style.css?v=19">
+    <link rel="stylesheet" href="src/style.css?v=21">
 
     <link rel="manifest" href="manifest.json">
 
@@ -169,6 +169,7 @@
                 <div id="skin-pick-screen" class="screen hidden">
                     <div class="pick-panel">
                         <p id="skin-pick-mode" class="pick-mode"></p>
+                        <p id="skin-pick-tip" class="pick-tip"></p>
                         <h2 class="pick-title">PICK YOUR LOOK</h2>
                         <div class="skin-picker pick-skins" role="radiogroup" aria-label="Face filter">
                             <button type="button" class="skin-btn" role="radio" aria-checked="false" data-skin="CLASSIC">Classic</button>
@@ -177,7 +178,9 @@
                             <button type="button" class="skin-btn" role="radio" aria-checked="false" data-skin="PARTY">🎉 Party</button>
                         </div>
                         <p id="skin-greeting" class="skin-greeting" aria-live="polite"></p>
+                        <button id="sound-toggle" class="neon-btn-small sound-toggle" type="button" aria-pressed="true">Sound: on</button>
                         <button id="skin-pick-play" class="neon-btn pick-play" type="button">PLAY</button>
+                        <button id="skin-pick-back" class="neon-btn-small pick-back" type="button">Back</button>
                     </div>
                 </div>
 
@@ -199,7 +202,8 @@
 
                 <!-- Endurance Mode Screen (Video Player) -->
                 <div id="endurance-screen" class="screen hidden">
-                    <h2 class="glitch" data-text="ENDURANCE TEST">ENDURANCE TEST</h2>
+                    <h2 class="glitch" data-text="30 SECONDS">30 SECONDS</h2>
+                    <div id="endurance-left" class="digital-text-lg endurance-left" role="timer" aria-label="Seconds left">30</div>
                     <div class="video-container">
                         <div class="endurance-void" aria-hidden="true">◉</div>
                         <div class="upload-progress-bar">
@@ -274,13 +278,6 @@
                         <div id="best-score" class="best-score hidden" role="status"></div>
                     </div>
 
-                    <!-- Selfie Preview -->
-                    <div id="selfie-container" class="hidden" style="margin-bottom: 1rem; width: 100%; max-width: 300px; border: 2px solid var(--neon-cyan); border-radius: 8px; overflow: hidden;">
-                        <img id="selfie-preview" style="width: 100%; display: block;" />
-                    </div>
-
-                    <video id="clip-preview" class="clip-preview hidden" muted loop playsinline autoplay aria-label="Your blink clip"></video>
-
                     <section id="dare-box" class="dare-box hidden" aria-label="Forfeit">
                         <p id="dare-text" class="dare-text"></p>
                         <button id="new-dare-btn" class="neon-btn-small" type="button">New dare</button>
@@ -294,6 +291,13 @@
                         <button id="share-btn" class="neon-btn" aria-label="Share result and friend challenge caption">SHARE CHALLENGE</button>
                     </div>
                     <button id="menu-btn" class="neon-btn-small results-home-btn">⌂ HOME</button>
+                    <!-- Photo and clip sit under the buttons, so Play Again never moves -->
+                    <div class="result-media">
+                        <div id="selfie-container" class="selfie-container hidden">
+                            <img id="selfie-preview" alt="Your framed photo from this round" />
+                        </div>
+                        <video id="clip-preview" class="clip-preview hidden" muted loop playsinline autoplay aria-label="Your blink clip"></video>
+                    </div>
                     <section id="social-result" class="social-result hidden" aria-label="Your challenge card">
                         <p id="challenge-outcome" class="challenge-outcome" role="status"></p>
                         <h3>MAKE IT A FRIEND CHALLENGE</h3>
@@ -359,7 +363,7 @@
         <a href="support.html" class="footer-link">Support</a>
     </footer>
 
-    <script type="module" src="src/main.js?v=81"></script>
+    <script type="module" src="src/main.js?v=83"></script>
 </body>
 
 </html>

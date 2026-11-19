@@ -203,6 +203,21 @@ h1.glitch {
     animation: pulse 1.5s infinite;
 }
 
+/* Starting the camera after a game is picked: shown over the whole screen, not at the
+   bottom of the menu, so the tap visibly did something. */
+#loading-msg {
+    position: fixed;
+    inset: 0;
+    z-index: 900;
+    margin: 0;
+    padding: 45vh 1.5rem 0;
+    text-align: center;
+    font-size: 1.1rem;
+    letter-spacing: 0.08em;
+    background: rgba(5, 5, 16, 0.88);
+    pointer-events: none;
+}
+
 /* HUD */
 #game-hud {
     display: flex;
@@ -696,6 +711,8 @@ body.theme-demo { --neon-cyan: #e0b36c; --neon-pink: #f5cc8d; }
     opacity: 0.8;
 }
 
+.endurance-left { font-size: min(3.4rem, 15vw); color: var(--neon-cyan); text-align: center; margin: .25rem 0 .5rem; }
+
 .upload-progress-bar {
     position: absolute;
     bottom: 0;
@@ -1121,6 +1138,9 @@ body.skin-party { --neon-cyan: #ffd23f; --neon-pink: #ff5fd2; --glass-bg: rgba(2
 #game-over-screen.versus-result .leaderboard-container,
 #game-over-screen.versus-result #share-btn,
 #game-over-screen.versus-result #demo-bonus-btn,
+#game-over-screen.versus-result #top-scores,
+#game-over-screen.versus-result #best-score,
+#game-over-screen.party-turn #social-result,
 #game-over-screen.party-turn #restart-btn,
 #game-over-screen.party-turn #demo-bonus-btn { display: none; }
 
@@ -1134,7 +1154,13 @@ body.skin-party { --neon-cyan: #ffd23f; --neon-pink: #ff5fd2; --glass-bg: rgba(2
 .challenge-hud .digital-text-sm { color: var(--neon-pink); }
 
 /* Blink clip preview on the result screen. */
-.clip-preview { width: 100%; max-width: 220px; margin: 0 auto 1rem; display: block; border: 2px solid var(--neon-pink); border-radius: 8px; background: #000; }
+/* Results: photo and clip side by side under the buttons. */
+.result-media { display: flex; justify-content: center; align-items: flex-start; gap: .75rem; width: 100%; max-width: 22rem; margin: 1rem auto; }
+.result-media:not(:has(> :not(.hidden))) { display: none; }
+.selfie-container { flex: 1 1 0; max-width: 11rem; border: 2px solid var(--neon-cyan); border-radius: 8px; overflow: hidden; }
+.selfie-container.hidden { display: none; }
+.selfie-container img { width: 100%; display: block; }
+.clip-preview { flex: 1 1 0; width: 100%; max-width: 9rem; display: block; border: 2px solid var(--neon-pink); border-radius: 8px; background: #000; }
 .clip-preview.hidden { display: none; }
 .clip-btn { border-color: #39ff14; color: #39ff14; }
 .clip-btn.hidden { display: none; }
@@ -1356,3 +1382,8 @@ body.in-game .footer, body.in-game footer { display: none; }
 #game-hud.balloon-mode #score.bump { animation: score-bump .35s ease-out; }
 @keyframes score-bump { 0% { transform: scale(1); } 35% { transform: scale(1.45); color: #fff; } 100% { transform: scale(1); } }
 @media (prefers-reduced-motion: reduce) { #game-hud.balloon-mode #score.bump { animation: none; } }
+
+/* Pick Your Look: what this game asks of you, and a way back one step. */
+.pick-tip { color: var(--text-muted, #bfc7d5); font-size: .95rem; line-height: 1.35; margin: .25rem auto .75rem; max-width: 22rem; text-align: center; }
+.pick-back { display: block; margin: .75rem auto 0; }
+.sound-toggle { display: block; margin: .25rem auto .75rem; }

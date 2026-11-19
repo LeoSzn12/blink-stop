@@ -14,7 +14,7 @@ import { createVersusMatch, largestFace } from './versus.mjs';
 import { parseNames, createParty, createDeck, forfeitCards, jokeCards } from './party.mjs';
 import { drawReel } from './reel.mjs';
 import { createBalloonRound, drawBalloons, BALLOON_MISSES } from './balloons.mjs';
-import { createFlashRound } from './flash.mjs';
+import { createFlashRound, FLASH_TIMEOUT_MS } from './flash.mjs';
 import { createBeatRound, BEAT_LIVES, drawBeat } from './beat.mjs';
 import { clipSupported, createClipBuffer, encodeClip, pickClipType, clipExtension } from './clip.mjs';
 
@@ -268,6 +268,22 @@ const faceStatusText = document.getElementById('face-status-text');
 let gameState = 'MENU'; 
 let currentMode = 'CLASSIC'; 
 let startTime = 0;
+// Round clock: stops while a "leave the game?" question is open, so cancelling it carries
+// on where the round was instead of counting the pause as a face lost or notes missed.
+let pausedMs = 0;
+function clock() { return performance.now() - pausedMs; }
+function confirmDuringRound(message) {
+    const askedAt = performance.now();
+    const ok = confirm(message);
+    if (!ok) {
+        const away = performance.now() - askedAt;
+        pausedMs += away;
+        startTime += away;
+        faceLoss.reset();
+        tapBlink.reset();
+    }
+    return ok;
+}
 let animationFrameId;
 let calibrationFrameId;
 let precisionTarget = 10.00;
@@ -286,6 +302,22 @@ let minEARValue = 0.3;
 let cameraSession = 0;
 let surpriseRound = null;
 let soundEnabled = true;
+// One remembered sound switch (on Pick Your Look) for the beat, heartbeat and drone.
+let soundPref = true;
+try { soundPref = localStorage.getItem('blink_sound') !== 'off'; } catch { /* storage unavailable */ }
+const soundToggle = document.getElementById('sound-toggle');
+function renderSoundToggle() {
+    if (!soundToggle) return;
+    soundToggle.innerText = soundPref ? 'Sound: on' : 'Sound: off';
+    soundToggle.setAttribute('aria-pressed', String(soundPref));
+}
+soundToggle?.addEventListener('click', () => {
+    soundPref = !soundPref;
+    try { localStorage.setItem('blink_sound', soundPref ? 'on' : 'off'); } catch { /* storage unavailable */ }
+    soundEnabled = soundPref && (currentMode !== 'SURPRISE' || surpriseSound.checked);
+    renderSoundToggle();
+});
+renderSoundToggle();
 let demoRound = null;
 let demoReturnState = 'MENU';
 let demoFrameId;
@@ -293,7 +325,8 @@ const faceLoss = createFaceLossTracker();
 const calibration = createCalibrationTracker();
 const tracking = createTrackingFreshness();
 function beginChallenge(challenge) {
-    if (!['MENU', 'GAME_OVER'].includes(gameState)) return;
+    // A friend challenge mid-party would wipe the party's standings.
+    if (party || !['MENU', 'GAME_OVER'].includes(gameState)) return;
     hideChallengeBanner();
     showMenu(); // Release the previous player's camera before the handoff.
     activeChallenge = challenge;
@@ -668,7 +701,7 @@ const homeBtn = document.getElementById('home-btn');
 if (homeBtn) {
     homeBtn.addEventListener('click', () => {
         if (IN_ROUND_STATES.includes(gameState)) {
-            if (confirm(party ? 'Stop this round? The turn will start over.' : 'Return to menu? Your current game will end.')) {
+            if (confirmDuringRound(party ? 'Stop this round? The turn will start over.' : 'Return to menu? Your current game will end.')) {
                 if (party) returnToParty();
                 else endGame('MENU_EXIT');
             }
@@ -687,17 +720,21 @@ function updateHomeFab() {
     const onMenu = !menuScreen.classList.contains('hidden');
     const atHome = onMenu && !modeSelection.classList.contains('hidden');
     const hudUp = !gameHud.classList.contains('hidden');
-    const show = !atHome && !hudUp;
+    // Calibration and results have their own Home button; one is enough.
+    const ownHome = !calibrationScreen.classList.contains('hidden') || !gameOverScreen.classList.contains('hidden');
+    const show = !atHome && !hudUp && !ownHome;
     homeFab.classList.toggle('hidden', !show);
-    // During a game the camera fills the screen: no footer, no page scroll.
-    if (hudUp && !document.body.classList.contains('in-game')) { try { window.scrollTo?.(0, 0); } catch { /* not scrollable */ } }
-    document.body.classList.toggle('in-game', hudUp);
+    // During a game the camera fills the screen: no footer, no page scroll. 30 Seconds has
+    // no HUD (the floating Home stays) but is a game all the same.
+    const playing = hudUp || !enduranceScreen.classList.contains('hidden');
+    if (playing && !document.body.classList.contains('in-game')) { try { window.scrollTo?.(0, 0); } catch { /* not scrollable */ } }
+    document.body.classList.toggle('in-game', playing);
     document.body.classList.toggle('home-fab-on', show);
     document.body.classList.toggle('menu-sub', onMenu && !atHome);
 }
 homeFab.addEventListener('click', () => {
     if (IN_ROUND_STATES.includes(gameState)) {
-        if (!confirm('Go home? Your current game will end.')) return;
+        if (!confirmDuringRound('Go home? Your current game will end.')) return;
     } else if (party && !confirm('Go home? This ends the party.')) return;
     clearTapGuard();
     showMenu();
@@ -840,7 +877,7 @@ saveScoreBtn.addEventListener('click', () => {
 // Share Logic
 shareBtn.addEventListener('click', async () => {
     if (lastScore === null || !lastResult) return;
-    const payload = sharePayload(lastResult);
+    const payload = sharePayload(lastResult, currentSkin);
 
     if (window.Capacitor?.isNativePlatform?.()) {
         try {
@@ -1030,7 +1067,7 @@ function startBalloonRound() {
 
 function updateBalloonLoop() {
     if (gameState !== 'BALLOON' || !balloonRound) return;
-    const now = performance.now();
+    const now = clock();
     if (tracking.stale(now)) return endBalloon(true);
     if (balloonRound.update(now).length) {
         if (navigator.vibrate) navigator.vibrate(60);
@@ -1078,7 +1115,7 @@ function handleBalloonEye(eye, now) {
 
 function endBalloon(faceLost) {
     if (gameState !== 'BALLOON' || !balloonRound) return;
-    balloonEnd = { score: balloonRound.score, elapsed: balloonRound.elapsed(performance.now()), faceLost };
+    balloonEnd = { score: balloonRound.score, elapsed: balloonRound.elapsed(clock()), faceLost };
     endGame('BALLOON_OVER');
 }
 
@@ -1157,7 +1194,7 @@ function startQuickRound(mode) {
 
 function updateQuickLoop() {
     if ((gameState !== 'FLASH' && gameState !== 'BEAT') || !quickRound) return;
-    const now = performance.now();
+    const now = clock();
     if (tracking.stale(now)) return endQuick(true);
     const event = quickRound.update(now);
     if (gameState === 'FLASH') showFlashEvent(event);
@@ -1443,7 +1480,7 @@ function startVersusCalibration() {
     versusMatch = createVersusMatch();
     versusEvent = null;
     versusLastFrame = null;
-    calibrationStartTime = performance.now();
+    calibrationStartTime = clock();
     calibrationStatus.innerText = 'FINDING BOTH FACES';
     roundTip.textContent = roundTipFor('VERSUS');
     countdownEl.textContent = '';
@@ -1471,7 +1508,7 @@ function beginVersusPlay() {
     calibrationScreen.classList.remove('active');
     showGo();
     startTime = Date.now();
-    versusStartedAt = performance.now();
+    versusStartedAt = clock();
     if (soundEnabled) audioManager.startDrone();
     gameHud.classList.remove('hidden');
     gameHud.classList.add('active');
@@ -1480,7 +1517,7 @@ function beginVersusPlay() {
 }
 
 function updateVersusLoop() {
-    const now = performance.now();
+    const now = clock();
     if (gameState === 'VERSUS_CALIBRATING') {
         const elapsed = now - calibrationStartTime;
         calibrationLoader.style.width = `${(versusEvent?.progress || 0) * 100}%`;
@@ -1516,6 +1553,8 @@ function updateVersusLoop() {
 function endVersus(outcome) {
     if (gameState !== 'VERSUS') return;
     gameState = 'GAME_OVER';
+    menuBtn.innerText = party ? '⌂ BACK TO PARTY' : '⌂ HOME';
+    document.getElementById('best-score').classList.add('hidden');
     cancelAnimationFrame(animationFrameId);
     gameOverCameraStop.schedule();
     audioManager.stopDrone();
@@ -1593,7 +1632,7 @@ function startGame(mode) {
     if (mode === 'SURPRISE') container.classList.add('surprise-mode');
     surpriseOverlay.classList.add('hidden');
     surpriseRound = null;
-    soundEnabled = mode !== 'SURPRISE' || surpriseSound.checked;
+    soundEnabled = soundPref && (mode !== 'SURPRISE' || surpriseSound.checked);
     clearSelfie();
     hideJoke();
     jokeDeck = null;
@@ -1614,6 +1653,11 @@ function startGame(mode) {
     hideCameraProblem();
     retryMode = party ? null : mode;
     currentMode = mode;
+    // Nothing from the last round's look carries over (label glow, meter colour).
+    hudLabel.style.color = '';
+    hudLabel.style.textShadow = '';
+    const meterFill = document.getElementById('eye-meter-fill');
+    if (meterFill) { meterFill.style.background = ''; meterFill.style.boxShadow = ''; meterFill.style.width = '100%'; }
     loadingMsg.style.display = 'block';
     loadingMsg.innerText = 'INITIALIZING BLINK DETECTION...';
 
@@ -1637,10 +1681,10 @@ function startGame(mode) {
         worldRecordDisplay.classList.remove('hidden');
         wrValue.innerText = "--";
 
-        const scores = Leaderboard.get('CLASSIC');
-        const record = scores?.[0];
-        wrValue.innerText = scores === null ? 'Unavailable' : record ? `${record.score.toFixed(2)}s` : 'None';
-        window.currentWorldRecord = record?.score ?? null;
+        // Same best the results screen shows, saved automatically (no name needed).
+        let best = null, readable = true;
+        try { best = Number.parseFloat(localStorage.getItem(bestKey('CLASSIC'))); } catch { readable = false; }
+        wrValue.innerText = !readable ? 'Unavailable' : Number.isFinite(best) ? `${best.toFixed(2)}s` : 'None yet';
     } else {
         // Endurance, Daily, Surprise, Distraction and Head-to-head
         hudLabel.innerText = mode === 'VERSUS' ? 'STARE-DOWN' : "TIME";
@@ -1648,15 +1692,7 @@ function startGame(mode) {
         worldRecordDisplay.classList.add('hidden');
     }
 
-    if (mode === 'DAILY') {
-        const today = new Date().getDay();
-        loadingMsg.innerText = `LOADING DAILY MODIFIER #${today}...`;
-        if (today % 2 === 0) {
-            container.classList.add('chaos-invert');
-        } else {
-            container.classList.add('chaos-glitch');
-        }
-    }
+    if (mode === 'DAILY') loadingMsg.innerText = "LOADING TODAY'S TWIST...";
 
     startCameraLoop(session)
         .then(started => {
@@ -1687,15 +1723,25 @@ function roundTipFor(mode) {
     switch (mode) {
         case 'PRECISION': return `Blink right at ${precisionTarget} seconds.`;
         case 'ENDURANCE': return "Don't blink for 30 seconds.";
-        case 'DAILY': return "Today's twist is on. Don't blink!";
+        case 'DAILY': return `Today's twist: ${dailyTwist().name}. Don't blink!`;
         case 'SURPRISE': return "Something may startle you. Don't blink!";
         case 'DISTRACT': return "Jokes are coming. Don't blink!";
-        case 'BALLOON': return 'Blink when a balloon is in the green zone.';
+        case 'BALLOON': return 'Blink when a balloon is in the zone and it turns green.';
         case 'FLASH': return 'Wait for green, then blink as fast as you can.';
         case 'BEAT': return 'Notes slide down to the line with the beat. Blink as each one hits it.';
         case 'VERSUS': return 'First to blink loses.';
         default: return 'Keep your eyes open as long as you can.';
     }
+}
+// Daily's twist changes each day and only starts with the round, not on the setup screens.
+const DAILY_TWISTS = [
+    { cls: 'chaos-invert', name: 'inverted colours' },
+    { cls: 'chaos-glitch', name: 'glitchy screen' },
+    { cls: 'chaos-blur', name: 'blurry screen' },
+];
+function dailyTwist(date = new Date()) {
+    const day = Math.floor((date.getTime() - date.getTimezoneOffset() * 60000) / 86400000);
+    return DAILY_TWISTS[day % DAILY_TWISTS.length];
 }
 function showGo() {
     clearTimeout(goFlashTimer);
@@ -1722,11 +1768,23 @@ function showSkinPick(mode) {
     menuScreen.classList.remove('active');
     gameOverScreen.classList.add('hidden');
     skinPickMode.textContent = MODE_NAMES[mode] || '';
+    document.getElementById('skin-pick-tip').textContent = roundTipFor(mode);
     skinPickScreen.classList.remove('hidden');
     skinPickScreen.classList.add('active');
     document.getElementById('skin-pick-play').focus();
     updateHomeFab();
 }
+// Back goes one step: to Precision's target times, otherwise to the game list.
+document.getElementById('skin-pick-back').addEventListener('click', () => {
+    if (gameState !== 'SKIN_PICK') return;
+    const mode = currentMode;
+    showMenu();
+    if (mode === 'PRECISION') {
+        modeSelection.classList.add('hidden');
+        precisionOptions.classList.remove('hidden');
+    }
+    updateHomeFab();
+});
 document.getElementById('skin-pick-play').addEventListener('click', () => {
     if (gameState !== 'SKIN_PICK') return;
     skinPickScreen.classList.add('hidden');
@@ -1737,11 +1795,12 @@ document.getElementById('skin-pick-play').addEventListener('click', () => {
 function startCalibration() {
     cancelAnimationFrame(calibrationFrameId);
     gameState = 'CALIBRATING';
+    loadingMsg.style.display = 'none';
     faceLoss.reset();
     resetBlinkState();
     calibration.reset();
     tracking.reset();
-    calibrationStartTime = performance.now();
+    calibrationStartTime = clock();
     calibrationLastFrame = null;
     calibrationFirstFrame = null;
     calibrationLastEye = null;
@@ -1766,11 +1825,12 @@ function startCalibration() {
 
 function updateCalibrationLoop() {
     if (gameState === 'CALIBRATING') {
-        const now = performance.now();
+        const now = clock();
         const elapsed = now - calibrationStartTime;
         const progress = calibration.progress(now);
         calibrationLoader.style.width = `${progress * 100}%`;
-        const count = String(Math.max(1, Math.ceil((3000 - elapsed) / 1000)));
+        // No countdown until the eyes are found, so it never sits frozen on 1.
+        const count = progress > 0 ? String(Math.max(1, Math.ceil((3000 - elapsed) / 1000))) : '';
         if (countdownEl.textContent !== count) countdownEl.textContent = count;
 
         if (elapsed >= 3000 && calibration.ready(now)) {
@@ -1834,14 +1894,17 @@ function finishCalibration() {
 
     calibrationScreen.classList.add('hidden');
     calibrationScreen.classList.remove('active');
-    showGo();
+    // Flash and Blink Beat use green to mean "blink now", so no green GO there.
+    if (currentMode !== 'FLASH' && currentMode !== 'BEAT') showGo();
 
     // Start Audio Drone
     if (soundEnabled) audioManager.startDrone();
 
+    if (currentMode === 'DAILY') container.classList.add(dailyTwist().cls);
+
     // Reset blink detection state before starting game
     resetBlinkState();
-    tracking.reset(performance.now());
+    tracking.reset(clock());
 
     if (currentMode === 'BALLOON') {
         startBalloonRound();
@@ -1866,6 +1929,7 @@ function finishCalibration() {
     }
 }
 
+const enduranceLeft = document.getElementById('endurance-left');
 function startEnduranceMode() {
     gameState = 'ENDURANCE';
     startTime = Date.now();
@@ -1881,7 +1945,7 @@ function startEnduranceMode() {
 
 function updateEnduranceLoop() {
     if (gameState === 'ENDURANCE') {
-        if (tracking.stale(performance.now())) {
+        if (tracking.stale(clock())) {
             endGame('DISQUALIFIED');
             return;
         }
@@ -1890,6 +1954,7 @@ function updateEnduranceLoop() {
         const progress = Math.min((elapsed / duration) * 100, 100);
 
         uploadProgress.style.width = `${progress}%`;
+        if (enduranceLeft) enduranceLeft.textContent = String(Math.max(0, Math.ceil(duration - elapsed)));
 
         // Update Eye Openness Meter and add tension effects
         const threshold = getBlinkThreshold();
@@ -1999,7 +2064,7 @@ document.addEventListener('visibilitychange', () => {
 function onResults(results, session) {
     // A retired instance cannot borrow the current send's identity, even after its send settles.
     if (session !== resultSession || session !== cameraSession || !videoElement.srcObject) return;
-    const now = performance.now();
+    const now = clock();
     canvasCtx.save();
     canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
     canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
@@ -2108,7 +2173,7 @@ function updateClassicVisualStage(elapsedSeconds) {
 
 function updateGameLoop() {
     if (gameState === 'PLAYING') {
-        if (tracking.stale(performance.now())) {
+        if (tracking.stale(clock())) {
             endGame('DISQUALIFIED');
             return;
         }
@@ -2177,6 +2242,7 @@ function updateGameLoop() {
 }
 
 function endGame(reason = 'BLINK') {
+    menuBtn.innerText = party ? '⌂ BACK TO PARTY' : '⌂ HOME';
     surpriseRound = null;
     surpriseOverlay.classList.add('hidden');
     hideJoke();
@@ -2190,6 +2256,7 @@ function endGame(reason = 'BLINK') {
     }
     clearSelfie();
     gameState = 'GAME_OVER';
+    gameOverTitle.style.color = 'var(--neon-red)'; // each result below sets its own colour
     faceLoss.reset();
     resetBlinkState();
     cancelAnimationFrame(animationFrameId);
@@ -2216,6 +2283,7 @@ function endGame(reason = 'BLINK') {
         const elapsed = (Date.now() - startTime) / 1000;
         let finalScoreText = '';
         let scoreToSave = 0;
+        let noResult = false;
 
         // Reset Sub-details
         finalScoreSub.classList.add('hidden');
@@ -2225,10 +2293,19 @@ function endGame(reason = 'BLINK') {
             scoreToSave = quickEnd.score;
             gameOverTitle.style.color = 'var(--neon-cyan)';
             finalScoreSub.classList.remove('hidden');
-            if (quickEnd.mode === 'FLASH') {
+            if (quickEnd.mode === 'FLASH' && quickEnd.score >= FLASH_TIMEOUT_MS) {
+                // Every try timed out: there is no reaction time to save as a best.
+                noResult = true;
+                finalScoreText = '--';
+                finalScoreLabel.innerText = 'NO BLINK IN TIME';
+                gameOverTitle.innerText = 'TOO SLOW';
+                gameOverTitle.style.color = 'var(--neon-pink)';
+                finalScoreSub.innerText = quickEnd.faceLost ? 'Your face left the frame' : 'Blink as soon as the screen turns green';
+            } else if (quickEnd.mode === 'FLASH') {
                 finalScoreText = formatScore('FLASH', quickEnd.score);
                 finalScoreLabel.innerText = 'FASTEST BLINK';
-                gameOverTitle.innerText = quickEnd.score < 300 ? 'LIGHTNING EYES!' : quickEnd.score < 450 ? 'QUICK!' : 'NICE TRY';
+                // Times include the camera's own delay (about a tenth of a second).
+                gameOverTitle.innerText = quickEnd.score < 380 ? 'LIGHTNING EYES!' : quickEnd.score < 520 ? 'QUICK!' : 'NICE TRY';
                 finalScoreSub.innerText = quickEnd.faceLost ? 'Your face left the frame' : `Your tries: ${quickEnd.times.map(ms => `${ms} ms`).join(' · ')}`;
             } else {
                 finalScoreText = String(quickEnd.score);
@@ -2278,13 +2355,9 @@ function endGame(reason = 'BLINK') {
             finalScoreLabel.innerText = "YOU SURVIVED";
             gameOverTitle.innerText = "BLINK DETECTED";
 
+            gameOverTitle.style.color = "var(--neon-red)";
             // The automatic best-score line below replaces the old saved-score line.
             gameOverWorldRecord.classList.add('hidden');
-            if (window.currentWorldRecord) {
-                gameOverWorldRecord.innerText = `Your Best: ${window.currentWorldRecord.toFixed(2)}s`;
-            } else {
-                gameOverWorldRecord.innerText = `Your Best: None yet!`;
-            }
 
         } else if (currentMode === 'PRECISION') {
             const diff = Math.abs(precisionTarget - elapsed);
@@ -2320,7 +2393,7 @@ function endGame(reason = 'BLINK') {
             gameOverTitle.style.color = "var(--neon-pink)";
         }
 
-        lastScore = reason === 'DISQUALIFIED' ? null : scoreToSave;
+        lastScore = reason === 'DISQUALIFIED' || noResult ? null : scoreToSave;
         if (lastScore !== null && ['ENDURANCE', 'SURPRISE'].includes(currentMode)) lastScore = Math.min(30, lastScore);
         lastResult = lastScore === null ? null : { mode: currentMode, score: lastScore, elapsed, target: precisionTarget };
         // Your best in this mode, saved on this device; Precision's best is the smallest miss.

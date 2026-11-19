@@ -100,7 +100,7 @@ export function challengeHeadline(challenge, skinId) {
 export function sharePayload(result, skinId) {
     const r = resultDetails(result), code = challengeCode(r);
     const url = challengeUrl(r, skinId);
-    return { title: 'Blink Stop', url, text: `${inviteLine(r, skinId)}\n👁️ Blink Stop · ${r.label}: ${r.metric}. ${r.mode === 'PRECISION' ? r.detail + '. ' : ''}${r.invitation}\n${code ? `Challenge code: ${code}\nTap the link to take the challenge. Or paste this code under Got a challenge?\n` : 'Try the Daily modifier on your device.\n'}${url}\n#BlinkStop` };
+    return { title: 'Blink Stop', url, text: `${inviteLine(r, skinId)}\n👁️ Blink Stop · ${r.label}: ${r.metric}. ${r.mode === 'PRECISION' ? r.detail + '. ' : ''}${r.invitation}\n${code ? `Challenge code: ${code}\nTap the link to take the challenge. Or paste this code under Have a friend's code? on the home screen.\n` : "Try today's Daily twist on your device.\n"}${url}\n#BlinkStop` };
 }
 
 export function shareClipboardText(result) { return sharePayload(result).text; }
