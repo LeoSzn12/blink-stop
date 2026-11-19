@@ -21,7 +21,7 @@ test('native icon and splash assets are branded PNGs, with adaptive icon safe ar
     assert.deepEqual([foreground.width, foreground.height], [432, 432]);
     assert.notEqual(android.hash, foreground.hash);
     const background = readFileSync(new URL('../android/app/src/main/res/values/ic_launcher_background.xml', import.meta.url), 'utf8');
-    assert.match(background, /#050917/);
+    assert.match(background, /#FFA83F/);
 });
 
 test('Android declares camera permission and iOS explains camera use', () => {

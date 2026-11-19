@@ -2,7 +2,7 @@ import { cpSync, mkdirSync, rmSync } from 'node:fs';
 import { build } from 'esbuild';
 
 // Root is the web hosting source; Capacitor serves www. Rebuild both from pinned npm assets.
-const files = ['index.html', 'privacy.html', 'tos.html', 'support.html', 'notices.html', 'how-to-play.html', 'manifest.json', 'service-worker.js'];
+const files = ['index.html', 'privacy.html', 'tos.html', 'support.html', 'notices.html', 'how-to-play.html', 'manifest.json', 'service-worker.js', 'favicon.ico', 'apple-touch-icon.png'];
 for (const file of files) cpSync(file, `www/${file}`);
 for (const file of ['ads.txt', 'package.json', 'package-lock.json', 'capacitor.config.json']) {
     rmSync(`www/${file}`, { force: true });
