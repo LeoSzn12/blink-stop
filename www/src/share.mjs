@@ -1,5 +1,7 @@
-const modes = { CLASSIC: 'Endurance', PRECISION: 'Precision', ENDURANCE: '30 Seconds', DAILY: 'Daily', SURPRISE: 'Surprise', DISTRACT: 'Distraction', BALLOON: 'Balloon Pop' };
-const codes = { C: 'CLASSIC', P: 'PRECISION', E: 'ENDURANCE', S: 'SURPRISE', J: 'DISTRACT', B: 'BALLOON' };
+const modes = { CLASSIC: 'Endurance', PRECISION: 'Precision', ENDURANCE: '30 Seconds', DAILY: 'Daily', SURPRISE: 'Surprise', DISTRACT: 'Distraction', BALLOON: 'Balloon Pop', FLASH: 'Flash', BEAT: 'Copy the Beat' };
+const codes = { C: 'CLASSIC', P: 'PRECISION', E: 'ENDURANCE', S: 'SURPRISE', J: 'DISTRACT', B: 'BALLOON', F: 'FLASH', R: 'BEAT' };
+// Modes where a smaller score wins.
+export const LOWER_WINS = ['PRECISION', 'FLASH'];
 export const PUBLIC_PLAY_URL = 'https://www.playblinkstop.com/';
 
 export function resultDetails(result) {
@@ -13,6 +15,14 @@ export function resultDetails(result) {
     if (result.mode === 'BALLOON') {
         if (!Number.isInteger(score) || score > 9999) throw new Error('Invalid balloon count');
         return { ...result, score, label: modes.BALLOON, metric: formatScore('BALLOON', score), detail: 'Popped just by blinking', invitation: 'Can you pop more?' };
+    }
+    if (result.mode === 'FLASH') {
+        if (!Number.isInteger(score) || score > 2000) throw new Error('Invalid reaction time');
+        return { ...result, score, label: modes.FLASH, metric: formatScore('FLASH', score), detail: 'Fastest blink after the flash', invitation: 'Can you blink faster?' };
+    }
+    if (result.mode === 'BEAT') {
+        if (!Number.isInteger(score) || score > 999) throw new Error('Invalid round count');
+        return { ...result, score, label: modes.BEAT, metric: formatScore('BEAT', score), detail: 'Rhythms copied just by blinking', invitation: 'Can you copy more?' };
     }
     return { ...result, score, label: modes[result.mode],
         metric: formatScore(result.mode, score),
@@ -30,7 +40,7 @@ export function challengeCode(result) {
 
 export function parseChallenge(text) {
     if (typeof text !== 'string' || text.length > 1000) throw new Error('Paste a Blink Stop challenge code.');
-    const found = [...text.toUpperCase().matchAll(/\bBS1-([CPESJB])-(0|5|10|15)-(\d{1,8})\b/g)];
+    const found = [...text.toUpperCase().matchAll(/\bBS1-([CPESJBFR])-(0|5|10|15)-(\d{1,8})\b/g)];
     const matches = [...new Map(found.map(match => [match[0], match])).values()];
     if (matches.length !== 1) throw new Error('Paste one valid Blink Stop challenge code.');
     const [, key, target, value] = matches[0];
@@ -44,7 +54,7 @@ export function challengeOutcome(result, challenge) {
     if (!challenge || result.mode !== challenge.mode || (result.mode === 'PRECISION' && result.target !== challenge.target)) return '';
     const difference = Math.round(result.score * 1000) - Math.round(challenge.score * 1000);
     if (difference === 0) return 'TIE! Rematch?';
-    const won = result.mode === 'PRECISION' ? difference < 0 : difference > 0;
+    const won = LOWER_WINS.includes(result.mode) ? difference < 0 : difference > 0;
     return won ? 'CHALLENGE BEATEN! Your friend is up next.' : 'FRIEND TAKES THIS ROUND. Rematch when ready?';
 }
 
@@ -81,6 +91,8 @@ export function challengeHeadline(challenge, skinId) {
     const persona = skinPersona(skinId);
     const as = persona ? ` ${persona}` : '';
     if (challenge.mode === 'PRECISION') return { title: `Beat ${challenge.score.toFixed(3)}s off ${challenge.target}s`, line: `Your friend blinked ${challenge.score.toFixed(3)}s off the ${challenge.target}-second mark${as}. Your turn.` };
+    if (challenge.mode === 'FLASH') return { title: `Blink faster than ${challenge.score} ms`, line: `Your friend blinked ${challenge.score} ms after the flash${as}. Your turn.` };
+    if (challenge.mode === 'BEAT') return { title: `Copy more than ${formatScore('BEAT', challenge.score)}`, line: `Your friend copied ${formatScore('BEAT', challenge.score)} of rhythm just by blinking${as}. Your turn.` };
     if (challenge.mode === 'BALLOON') return { title: `Pop more than ${challenge.score}`, line: `Your friend popped ${formatScore('BALLOON', challenge.score).replace(' popped', '')} just by blinking${as}. Your turn.` };
     return { title: `Beat ${formatScore(challenge.mode, challenge.score)}`, line: `Your friend kept their eyes open for ${formatScore(challenge.mode, challenge.score)} in ${modes[challenge.mode]}${as}. Your turn.` };
 }
@@ -96,6 +108,8 @@ export function shareClipboardText(result) { return sharePayload(result).text; }
 // How a score reads everywhere: seconds, seconds off target, or balloons.
 export function formatScore(mode, score) {
     if (mode === 'BALLOON') return `${score} balloon${score === 1 ? '' : 's'} popped`;
+    if (mode === 'FLASH') return `${Math.round(score)} ms`;
+    if (mode === 'BEAT') return `${score} round${score === 1 ? '' : 's'}`;
     if (mode === 'PRECISION') return `${score.toFixed(3)}s off`;
     return `${score.toFixed(2)}s`;
 }
@@ -106,6 +120,8 @@ export function inviteLine(result, skinId) {
         const r = resultDetails(result);
         const persona = skinPersona(skinId);
         if (r.mode === 'BALLOON') return `I popped ${r.metric.replace(' popped', '')} just by blinking${persona ? `, ${persona}` : ' 🎈'} Can you beat me?`;
+        if (r.mode === 'FLASH') return `I blinked ${r.metric} after the flash ${persona || '⚡'} Can you beat me?`;
+        if (r.mode === 'BEAT') return `I copied ${r.metric} of rhythm just by blinking ${persona || '🎵'} Can you beat me?`;
         if (r.mode === 'PRECISION') return `I blinked ${r.metric} the ${r.target}-second mark ${persona || '🎯'} Can you get closer?`;
         return `I kept my eyes open for ${r.metric} ${persona || '👀'} Can you beat me?`;
     } catch {

@@ -11,7 +11,9 @@ import * as versus from '../src/versus.mjs';
 import * as party from '../src/party.mjs';
 import * as reel from '../src/reel.mjs';
 import * as balloons from '../src/balloons.mjs';
-import { formatScore, inviteLine, challengeUrl, challengeHeadline, PUBLIC_PLAY_URL } from '../src/share.mjs';
+import { formatScore, LOWER_WINS, inviteLine, challengeUrl, challengeHeadline, PUBLIC_PLAY_URL } from '../src/share.mjs';
+import * as flash from '../src/flash.mjs';
+import * as beat from '../src/beat.mjs';
 import * as clipModule from '../src/clip.mjs';
 
 const source = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8').replace(/^import .*;\s*$/gm, '');
@@ -43,7 +45,7 @@ function harness(storage = { getItem: () => null, setItem() {} }, clipboard, { w
   class FaceMesh { constructor() { this.closes = 0; meshes.push(this); } onResults(fn) { this.resultHandler = fn; } setOptions() {} send() { return new Promise(resolve => { const emit = () => this.resultHandler({ image: {}, multiFaceLandmarks: [{}] }); pending.push(() => { lastDelivered = emit; emit(); resolve(); }); }); } close() { this.closes++; } }
   const context = { document, window: { innerWidth: 500, addEventListener() {}, ...win }, navigator: { clipboard, mediaDevices: { getUserMedia: () => permission || Promise.resolve(stream()) } },
     FaceMesh, console: { log() {}, warn: (...a) => process.env.HARNESS_LOG && process.stderr.write(a.join(' ') + '\n'), error() {} }, performance: { now: () => clock }, Date,
-    createCalibrationTracker, createTrackingFreshness, createFaceLossTracker, createSerializedInference, createSurpriseRound, createRewardedDemo, ...skins, ...versus, ...party, ...reel, ...balloons, ...clipModule, formatScore, inviteLine, challengeUrl, challengeHeadline, PUBLIC_PLAY_URL,
+    createCalibrationTracker, createTrackingFreshness, createFaceLossTracker, createSerializedInference, createSurpriseRound, createRewardedDemo, ...skins, ...versus, ...party, ...reel, ...balloons, ...flash, ...beat, ...clipModule, formatScore, LOWER_WINS, inviteLine, challengeUrl, challengeHeadline, PUBLIC_PLAY_URL,
     checkBlink: () => eyeValue === null ? null : ({ minEar: eyeValue, ear: eyeValue, blinking }), setBlinkThreshold(value) { threshold = value; }, resetBlinkState() {}, getBlinkThreshold: () => threshold,
     audioManager: { startDrone() {}, stopDrone() {}, playGlitch() {}, playWin() {}, playHeartbeat() {}, playSurprise() {} },
     appendScore() {}, cameraErrorMessage: () => '', createGameOverCameraStop: fn => ({ cancel() {}, schedule() {} }), sharePayload() {}, shareClipboardText() {}, createSocialUI: () => ({ reset() {}, render() {} }),
@@ -552,4 +554,46 @@ test('results show your saved best, and NEW BEST when you beat it', () => {
   h.debug.endGame('BLINK');
   assert.equal(h.el('best-score').innerText, 'NEW BEST!');
   assert.ok(Number(store.get('blink_best_CLASSIC')) >= 0);
+});
+test('Quick Games: Flash scores your fastest blink after green, in ms', async () => {
+  const h = harness();
+  h.debug.startGame('FLASH'); await h.settle(); await h.timers();
+  let t = 0;
+  const frame = async () => { h.setClock(t); h.tickInference(); h.deliver(); await h.settle(); h.raf(); t += 100; };
+  while (t < 4000) await frame();
+  assert.equal(h.debug.getState(), 'FLASH');
+  assert.equal(h.el('quick-stage').classList.contains('hidden'), false);
+  assert.equal(h.el('hud-label').innerText, 'TRY');
+  let hits = 0;
+  while (h.debug.getState() === 'FLASH' && t < 60000) {
+    await frame();
+    if (h.el('quick-stage').classList.contains('go')) {
+      h.setBlinking(true); await frame();
+      h.setBlinking(false); await frame();
+      hits++;
+    }
+  }
+  assert.equal(hits, 3);
+  assert.equal(h.debug.getState(), 'GAME_OVER');
+  assert.equal(h.el('final-score-label').innerText, 'FASTEST BLINK');
+  assert.match(h.el('final-score-val').innerText, /^\d+ ms$/);
+  assert.match(h.el('final-score-sub').innerText, /^Your tries: \d+ ms · \d+ ms · \d+ ms$/);
+  assert.equal(h.el('quick-stage').classList.contains('hidden'), true);
+});
+
+test('Quick Games: Copy the Beat ends after three wrong copies and counts rounds', async () => {
+  const h = harness();
+  h.debug.startGame('BEAT'); await h.settle(); await h.timers();
+  let t = 0;
+  const frame = async () => { h.setClock(t); h.tickInference(); h.deliver(); await h.settle(); h.raf(); t += 100; };
+  while (t < 4000) await frame();
+  assert.equal(h.debug.getState(), 'BEAT');
+  assert.equal(h.el('hud-label').innerText, 'ROUNDS');
+  assert.equal(h.el('lives-display').classList.contains('hidden'), false);
+  // Never blink back: each rhythm times out as a wrong copy.
+  while (h.debug.getState() === 'BEAT' && t < 120000) await frame();
+  assert.equal(h.debug.getState(), 'GAME_OVER');
+  assert.equal(h.el('final-score-val').innerText, '0');
+  assert.equal(h.el('final-score-label').innerText, 'ROUNDS COPIED');
+  assert.equal(h.el('lives-display').classList.contains('hidden'), true);
 });

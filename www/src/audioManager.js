@@ -110,6 +110,20 @@ class AudioManager {
         osc.start();
         osc.stop(this.ctx.currentTime + 0.25);
     }
+
+    // Short, soft beep for Flash and Copy the Beat.
+    playBeep(frequency = 660) {
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(frequency, this.ctx.currentTime);
+        gain.gain.setValueAtTime(0.12, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.15);
+        osc.connect(gain);
+        gain.connect(this.masterGain);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.15);
+    }
 }
 
 export const audioManager = new AudioManager();
