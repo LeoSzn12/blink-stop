@@ -13,14 +13,25 @@ test('Precision target picker has a named Back control wired to restore mode sel
     assert.match(js, /precisionBackBtn\.addEventListener\('click',\s*\(\)\s*=>\s*\{[\s\S]*?precisionOptions\.classList\.add\('hidden'\);[\s\S]*?modeSelection\.classList\.remove\('hidden'\);[\s\S]*?\}\)/);
 });
 
-test('Precision starts in one tap at 10 seconds, and the target can still be changed', () => {
+test('Precision asks for the target time after you tap it, not on the home screen', () => {
     const html = read('index.html');
     const js = read('src/main.js');
-    assert.match(html, /id="precision-target-label">10 seconds</);
-    assert.match(html, /<button\b[^>]*id="precision-change-btn"[^>]*>Change target time<\/button>/);
+    const menu = html.slice(html.indexOf('class="mode-selection"'), html.indexOf('id="olympics-options"'));
+    assert.doesNotMatch(html, /precision-change-btn|Change target time/);
+    assert.doesNotMatch(menu, /data-time=/, 'target times are not on the home screen');
     assert.match(html, /class="[^"]*option-btn active" data-time="10">10 sec</);
     assert.doesNotMatch(html, />\s*(5|10|15)s\s*</, 'no "5s" labels that read like 55');
-    assert.match(js, /mode === 'PRECISION'\) \{\s*precisionTarget = precisionChoice;\s*startGame\('PRECISION'\);/);
+    assert.match(js, /mode === 'PRECISION'\) \{[\s\S]*?modeSelection\.classList\.add\('hidden'\);[\s\S]*?precisionOptions\.classList\.remove\('hidden'\);/);
+    assert.doesNotMatch(js.slice(js.indexOf("mode === 'PRECISION') {"), js.indexOf("mode === 'ENDURANCE') {")), /startGame/);
+});
+
+test('skins are picked after choosing a game, not on the home screen', () => {
+    const html = read('index.html');
+    const menu = html.slice(html.indexOf('id="menu-screen"'), html.indexOf('id="olympics-options"'));
+    assert.doesNotMatch(menu, /skin-btn|skin-picker/);
+    const pick = html.slice(html.indexOf('id="skin-pick-screen"'), html.indexOf('id="go-flash"'));
+    for (const skin of ['CLASSIC', 'THANKSGIVING', 'CHRISTMAS', 'PARTY']) assert.match(pick, new RegExp(`data-skin="${skin}"`));
+    assert.match(pick, /id="skin-greeting"/);
 });
 
 test('first-time players get plain words and a camera line above the games', () => {

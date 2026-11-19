@@ -3,8 +3,9 @@
 // Positions are fractions of the play area: x 0..1 left to right, y 0 top .. 1 bottom.
 
 export const BALLOON_MISSES = 3;
-// A tall zone so a blink anywhere near a balloon pops it.
-export const POP_ZONE = { top: 0.2, bottom: 0.66 };
+// A tall zone so a blink anywhere near a balloon pops it. It sits below the score in the
+// top corner, so a balloon in the zone is never hidden under it.
+export const POP_ZONE = { top: 0.3, bottom: 0.74 };
 const ZONE_MIDDLE = (POP_ZONE.top + POP_ZONE.bottom) / 2;
 const POP_ANIMATION_MS = 450;
 const BLINK_COOLDOWN_MS = 250;
@@ -118,9 +119,10 @@ export function drawBalloons(ctx, round, skinId, width, height, now) {
     ctx.setLineDash([]);
     ctx.fillStyle = ready ? '#39ff14' : 'rgba(255, 255, 255, 0.8)';
     ctx.font = `bold ${Math.round(unit * 0.04)}px system-ui, sans-serif`;
-    ctx.textAlign = 'right';
-    ctx.textBaseline = 'bottom';
-    ctx.fillText(ready ? 'BLINK!' : 'POP ZONE', width - unit * 0.03, zoneTop - unit * 0.01);
+    // Under the zone on the left, clear of the score in the top right.
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText(ready ? 'BLINK!' : 'POP ZONE', unit * 0.03, zoneBottom + unit * 0.01);
     ctx.restore();
 
     for (const b of round.balloons) {

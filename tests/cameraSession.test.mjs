@@ -167,7 +167,8 @@ test('Classic starts calibration with corrupt score data without overwriting it'
   await h.settle(); await h.timers();
   assert.equal(h.debug.getState(), 'CALIBRATING');
   assert.equal(h.tracks.length, 1, 'camera startup must be reached');
-  assert.equal(h.el('wr-value').innerText, 'Unavailable');
+  // The chip shows the automatic best (blink_best_CLASSIC), not the named list.
+  assert.equal(h.el('wr-value').innerText, 'None yet');
   assert.equal(writes, 0, 'do not replace corrupt stored scores');
 });
 test('Classic starts calibration when local score reads throw', async () => {
@@ -520,7 +521,7 @@ test('blink clip: a Classic blink becomes a shareable clip made on the phone; Ba
 
 test('a game started from the menu shows the live camera to pick a look, then calibrates; Home goes back', async () => {
   const h = harness();
-  h.el('game-hud').classList.add('hidden'); // as in index.html
+  for (const id of ['game-hud', 'calibration-screen', 'game-over-screen']) h.el(id).classList.add('hidden'); // as in index.html
   h.click('surprise-start-btn'); await h.settle(); await h.timers();
   assert.equal(h.debug.getState(), 'SKIN_PICK');
   assert.equal(h.el('skin-pick-screen').classList.contains('hidden'), false);
@@ -581,19 +582,95 @@ test('Quick Games: Flash scores your fastest blink after green, in ms', async ()
   assert.equal(h.el('quick-stage').classList.contains('hidden'), true);
 });
 
-test('Quick Games: Copy the Beat ends after three wrong copies and counts rounds', async () => {
+test('Quick Games: Blink Beat ends after three missed notes and counts hits', async () => {
   const h = harness();
   h.debug.startGame('BEAT'); await h.settle(); await h.timers();
   let t = 0;
   const frame = async () => { h.setClock(t); h.tickInference(); h.deliver(); await h.settle(); h.raf(); t += 100; };
-  while (t < 4000) await frame();
+  while (h.debug.getState() !== 'BEAT' && t < 8000) await frame();
   assert.equal(h.debug.getState(), 'BEAT');
-  assert.equal(h.el('hud-label').innerText, 'ROUNDS');
+  assert.equal(h.el('hud-label').innerText, 'HITS');
   assert.equal(h.el('lives-display').classList.contains('hidden'), false);
-  // Never blink back: each rhythm times out as a wrong copy.
+  assert.equal(h.el('balloon-layer').classList.contains('hidden'), false, 'the note lane is drawn over the camera');
+  assert.equal(h.el('quick-stage').classList.contains('hidden'), true);
+  // Never blink: notes slide past and each miss costs a life.
   while (h.debug.getState() === 'BEAT' && t < 120000) await frame();
   assert.equal(h.debug.getState(), 'GAME_OVER');
   assert.equal(h.el('final-score-val').innerText, '0');
-  assert.equal(h.el('final-score-label').innerText, 'ROUNDS COPIED');
+  assert.equal(h.el('final-score-label').innerText, 'NOTES HIT');
   assert.equal(h.el('lives-display').classList.contains('hidden'), true);
+  assert.equal(h.el('balloon-layer').classList.contains('hidden'), true);
+});
+
+test('cancelling Home mid-round carries on instead of ending the round', async () => {
+  let onConfirm = () => true;
+  const h = harness(undefined, undefined, { extra: { confirm: (...a) => onConfirm(...a) } });
+  h.debug.startGame('BALLOON'); await h.settle(); await h.timers();
+  let t = 0;
+  const frame = async () => { h.setClock(t); h.tickInference(); h.deliver(); await h.settle(); h.raf(); t += 100; };
+  while (h.debug.getState() !== 'BALLOON' && t < 8000) await frame();
+  assert.equal(h.debug.getState(), 'BALLOON');
+  // The question stays open for five seconds, then the player taps Cancel.
+  onConfirm = () => { t += 5000; h.setClock(t); return false; };
+  h.click('home-btn');
+  for (let i = 0; i < 5; i++) await frame();
+  assert.equal(h.debug.getState(), 'BALLOON', 'the pause is not a face lost');
+  onConfirm = () => true;
+  h.click('home-btn');
+  assert.equal(h.debug.getState(), 'MENU');
+});
+
+test('Flash shows no green GO, and a round with every try timed out saves no best', async () => {
+  const saved = [];
+  const h = harness({ getItem: () => null, setItem(key, value) { saved.push(key); } });
+  h.el('go-flash').classList.add('hidden');
+  h.debug.startGame('FLASH'); await h.settle(); await h.timers();
+  let t = 0;
+  const frame = async () => { h.setClock(t); h.tickInference(); h.deliver(); await h.settle(); h.raf(); t += 100; };
+  while (h.debug.getState() !== 'FLASH' && t < 8000) await frame();
+  assert.equal(h.debug.getState(), 'FLASH');
+  assert.equal(h.el('go-flash').classList.contains('hidden'), true, 'green means blink in Flash, so no GO flash');
+  while (h.debug.getState() === 'FLASH' && t < 60000) await frame();
+  assert.equal(h.debug.getState(), 'GAME_OVER');
+  assert.equal(h.el('final-score-label').innerText, 'NO BLINK IN TIME');
+  assert.equal(saved.includes('blink_best_FLASH'), false);
+});
+
+test('glancing away in a timed round shows a come-back countdown before the round ends', async () => {
+  const h = harness();
+  h.el('come-back').classList.add('hidden');
+  h.debug.startGame('CLASSIC'); await h.settle(); await h.timers();
+  let t = 0;
+  const frame = async () => { h.setClock(t); h.tickInference(); h.deliver(); await h.settle(); h.raf(); t += 100; };
+  while (h.debug.getState() !== 'PLAYING' && t < 8000) await frame();
+  assert.equal(h.debug.getState(), 'PLAYING');
+  // Away for two seconds: still playing, with the countdown up.
+  h.setEye(null);
+  for (let i = 0; i < 20; i++) await frame();
+  assert.equal(h.debug.getState(), 'PLAYING');
+  assert.equal(h.el('come-back').classList.contains('hidden'), false);
+  assert.match(h.el('come-back').textContent, /Come back! [12]/);
+  // Back in view: the round carries on and the countdown goes away.
+  h.setEye(.3);
+  for (let i = 0; i < 5; i++) await frame();
+  assert.equal(h.debug.getState(), 'PLAYING');
+  assert.equal(h.el('come-back').classList.contains('hidden'), true);
+  // Away past the countdown: the round ends.
+  h.setEye(null);
+  for (let i = 0; i < 60 && h.debug.getState() === 'PLAYING'; i++) await frame();
+  assert.equal(h.debug.getState(), 'GAME_OVER');
+  assert.equal(h.el('come-back').classList.contains('hidden'), true);
+});
+
+test('results have one Share button that opens and closes the share sheet', () => {
+  const h = harness();
+  h.el('share-sheet').classList.add('hidden');
+  h.debug.endGame('BLINK');
+  h.click('share-open-btn');
+  assert.equal(h.el('share-sheet').classList.contains('hidden'), false);
+  h.click('share-close-btn');
+  assert.equal(h.el('share-sheet').classList.contains('hidden'), true);
+  h.click('share-open-btn');
+  h.debug.showMenu();
+  assert.equal(h.el('share-sheet').classList.contains('hidden'), true, 'leaving the results closes the sheet');
 });

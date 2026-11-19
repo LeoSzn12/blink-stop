@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Blink Stop - Don't Blink Challenge</title>
-    <link rel="stylesheet" href="src/style.css?v=17">
+    <link rel="stylesheet" href="src/style.css?v=22">
 
     <link rel="manifest" href="manifest.json">
 
@@ -44,14 +44,6 @@
                         </div>
                     </section>
 
-                    <div class="skin-picker" role="radiogroup" aria-label="Photo skin">
-                        <span class="label">SKIN</span>
-                        <button type="button" class="skin-btn" role="radio" aria-checked="false" data-skin="CLASSIC">Classic</button>
-                        <button type="button" class="skin-btn" role="radio" aria-checked="false" data-skin="THANKSGIVING">🦃 Thanksgiving</button>
-                        <button type="button" class="skin-btn" role="radio" aria-checked="false" data-skin="CHRISTMAS">🎄 Christmas</button>
-                        <button type="button" class="skin-btn" role="radio" aria-checked="false" data-skin="PARTY">🎉 Party</button>
-                    </div>
-                    <p id="skin-greeting" class="skin-greeting" aria-live="polite"></p>
 
                     <section id="challenge-banner" class="challenge-banner hidden" aria-live="polite" aria-label="Friend challenge">
                         <p class="challenge-banner-kicker">YOU'VE BEEN CHALLENGED</p>
@@ -66,8 +58,7 @@
 
                     <div class="mode-selection">
                         <button class="neon-btn mode-btn main-mode-btn play-hero" data-mode="CLASSIC">▶ PLAY<span class="btn-sub">Endurance: keep your eyes open longest</span></button>
-                        <button class="neon-btn mode-btn main-mode-btn precision-btn" data-mode="PRECISION">PRECISION<span class="btn-sub">Blink right at <span id="precision-target-label">10 seconds</span></span></button>
-                        <button id="precision-change-btn" class="neon-btn-small precision-change" type="button">Change target time</button>
+                        <button class="neon-btn mode-btn main-mode-btn precision-btn" data-mode="PRECISION">PRECISION<span class="btn-sub">Blink right on a target time you pick</span></button>
                         <button class="neon-btn mode-btn main-mode-btn olympics-btn" data-mode="OLYMPICS">QUICK GAMES<span class="btn-sub">Fast games for friends</span></button>
                         <details id="more-modes" class="more-modes">
                             <summary>More ways to play</summary>
@@ -85,7 +76,7 @@
                         <h2>QUICK GAMES</h2>
                         <button class="neon-btn mode-btn balloon-btn" data-mode="BALLOON">BALLOON POP<span class="btn-sub">Pop as many as you can. 3 lives.</span></button>
                         <button class="neon-btn mode-btn flash-btn" data-mode="FLASH">FLASH<span class="btn-sub">Blink the moment it turns green</span></button>
-                        <button class="neon-btn mode-btn beat-btn" data-mode="BEAT">COPY THE BEAT<span class="btn-sub">Blink back the rhythm. 3 lives.</span></button>
+                        <button class="neon-btn mode-btn beat-btn" data-mode="BEAT">BLINK BEAT<span class="btn-sub">Blink to the beat as notes hit the line</span></button>
                         <button class="neon-btn mode-btn" data-mode="VERSUS">STARE-DOWN<span class="btn-sub">2 players. First to blink loses.</span></button>
                         <button class="neon-btn mode-btn" data-mode="PARTY">PASS THE PHONE<span class="btn-sub">2 to 8 players, one phone</span></button>
                         <button class="neon-btn mode-btn" data-mode="DISTRACT">DISTRACTION<span class="btn-sub">Jokes try to make you blink</span></button>
@@ -117,7 +108,8 @@
 
                     <!-- Precision Options (Hidden by default) -->
                     <div id="precision-options" class="options-container hidden">
-                        <p class="label">BLINK RIGHT AT</p>
+                        <h2>PRECISION</h2>
+                        <p class="label">PICK YOUR TARGET: BLINK RIGHT AT</p>
                         <div class="option-btns">
                             <button class="neon-btn-small option-btn" data-time="5">5 sec</button>
                             <button class="neon-btn-small option-btn active" data-time="10">10 sec</button>
@@ -177,6 +169,7 @@
                 <div id="skin-pick-screen" class="screen hidden">
                     <div class="pick-panel">
                         <p id="skin-pick-mode" class="pick-mode"></p>
+                        <p id="skin-pick-tip" class="pick-tip"></p>
                         <h2 class="pick-title">PICK YOUR LOOK</h2>
                         <div class="skin-picker pick-skins" role="radiogroup" aria-label="Face filter">
                             <button type="button" class="skin-btn" role="radio" aria-checked="false" data-skin="CLASSIC">Classic</button>
@@ -184,11 +177,15 @@
                             <button type="button" class="skin-btn" role="radio" aria-checked="false" data-skin="CHRISTMAS">🎄 Christmas</button>
                             <button type="button" class="skin-btn" role="radio" aria-checked="false" data-skin="PARTY">🎉 Party</button>
                         </div>
+                        <p id="skin-greeting" class="skin-greeting" aria-live="polite"></p>
+                        <button id="sound-toggle" class="neon-btn-small sound-toggle" type="button" aria-pressed="true">Sound: on</button>
                         <button id="skin-pick-play" class="neon-btn pick-play" type="button">PLAY</button>
+                        <button id="skin-pick-back" class="neon-btn-small pick-back" type="button">Back</button>
                     </div>
                 </div>
 
                 <div id="go-flash" class="go-flash hidden" aria-hidden="true">GO!</div>
+                <div id="come-back" class="come-back hidden" role="alert">Come back!</div>
 
                 <!-- Calibration Screen -->
                 <div id="calibration-screen" class="screen hidden">
@@ -206,7 +203,8 @@
 
                 <!-- Endurance Mode Screen (Video Player) -->
                 <div id="endurance-screen" class="screen hidden">
-                    <h2 class="glitch" data-text="ENDURANCE TEST">ENDURANCE TEST</h2>
+                    <h2 class="glitch" data-text="30 SECONDS">30 SECONDS</h2>
+                    <div id="endurance-left" class="digital-text-lg endurance-left" role="timer" aria-label="Seconds left">30</div>
                     <div class="video-container">
                         <div class="endurance-void" aria-hidden="true">◉</div>
                         <div class="upload-progress-bar">
@@ -281,44 +279,53 @@
                         <div id="best-score" class="best-score hidden" role="status"></div>
                     </div>
 
-                    <!-- Selfie Preview -->
-                    <div id="selfie-container" class="hidden" style="margin-bottom: 1rem; width: 100%; max-width: 300px; border: 2px solid var(--neon-cyan); border-radius: 8px; overflow: hidden;">
-                        <img id="selfie-preview" style="width: 100%; display: block;" />
-                    </div>
-
-                    <video id="clip-preview" class="clip-preview hidden" muted loop playsinline autoplay aria-label="Your blink clip"></video>
-
                     <section id="dare-box" class="dare-box hidden" aria-label="Forfeit">
                         <p id="dare-text" class="dare-text"></p>
                         <button id="new-dare-btn" class="neon-btn-small" type="button">New dare</button>
                     </section>
                     <button id="party-next-btn" class="neon-btn hidden" type="button">NEXT PLAYER</button>
 
+                    <p id="challenge-outcome" class="challenge-outcome" role="status"></p>
                     <div class="game-over-btns">
                         <button id="restart-btn" class="neon-btn play-again-btn">PLAY AGAIN</button>
-                        <button id="clip-btn" class="neon-btn clip-btn hidden" type="button" disabled>MAKING YOUR CLIP...</button>
-                        <button id="selfie-btn" class="neon-btn selfie-btn">SHARE PHOTO</button>
-                        <button id="share-btn" class="neon-btn" aria-label="Share result and friend challenge caption">SHARE CHALLENGE</button>
+                        <button id="share-open-btn" class="neon-btn share-open-btn" type="button" aria-haspopup="dialog" aria-controls="share-sheet">SHARE</button>
+                        <button id="friend-turn-btn" class="neon-btn friend-turn-btn" type="button">FRIEND'S TURN</button>
                     </div>
                     <button id="menu-btn" class="neon-btn-small results-home-btn">⌂ HOME</button>
-                    <section id="social-result" class="social-result hidden" aria-label="Your challenge card">
-                        <p id="challenge-outcome" class="challenge-outcome" role="status"></p>
-                        <h3>MAKE IT A FRIEND CHALLENGE</h3>
-                        <img id="score-card" alt="Portrait Blink Stop card showing your mode, result and friend challenge" width="1080" height="1920">
-                        <p class="social-note">A photo-free card for your Story or post. Save it, attach it, and tag a friend. Camera photos are only exported with Share Photo.</p>
-                        <div class="social-actions">
-                            <button id="share-card-btn" class="neon-btn-small" type="button">Share card</button>
-                            <button id="save-card-btn" class="neon-btn-small" type="button">Save card</button>
-                            <button id="friend-turn-btn" class="neon-btn-small" type="button">Friend's turn</button>
+                    <!-- Photo and clip sit under the buttons, so Play Again never moves -->
+                    <div class="result-media">
+                        <div id="selfie-container" class="selfie-container hidden">
+                            <img id="selfie-preview" alt="Your framed photo from this round" />
                         </div>
-                        <p id="social-status" role="status" aria-live="polite"></p>
-                        <details class="caption-details">
-                            <summary>Copy the caption instead</summary>
-                            <label for="challenge-caption">Caption &amp; code — copy manually if sharing is unavailable</label>
-                            <textarea id="challenge-caption" rows="4" readonly></textarea>
-                            <p class="social-note">Friend's turn starts the same challenge on this phone. Daily has no comparison code because modifiers depend on the local date. Blink normally; stop if uncomfortable.</p>
-                        </details>
-                    </section>
+                        <video id="clip-preview" class="clip-preview hidden" muted loop playsinline autoplay aria-label="Your blink clip"></video>
+                    </div>
+                    <!-- One Share button opens every way to share in one place -->
+                    <div id="share-sheet" class="share-sheet hidden" role="dialog" aria-modal="true" aria-labelledby="share-sheet-title">
+                        <div class="share-sheet-panel">
+                            <h3 id="share-sheet-title">SHARE</h3>
+                            <div class="share-options">
+                                <button id="clip-btn" class="neon-btn clip-btn hidden" type="button" disabled>MAKING YOUR CLIP...</button>
+                                <button id="selfie-btn" class="neon-btn selfie-btn">SHARE PHOTO</button>
+                                <button id="share-btn" class="neon-btn" aria-label="Share a challenge link with your result">SHARE CHALLENGE</button>
+                            </div>
+                            <section id="social-result" class="social-result hidden" aria-label="Your challenge card">
+                                <img id="score-card" alt="Portrait Blink Stop card showing your mode, result and friend challenge" width="1080" height="1920">
+                                <p class="social-note">A photo-free card for your Story or post. Camera photos are only shared with Share Photo.</p>
+                                <div class="social-actions">
+                                    <button id="share-card-btn" class="neon-btn-small" type="button">Share card</button>
+                                    <button id="save-card-btn" class="neon-btn-small" type="button">Save card</button>
+                                </div>
+                                <p id="social-status" role="status" aria-live="polite"></p>
+                                <details class="caption-details">
+                                    <summary>Copy the caption instead</summary>
+                                    <label for="challenge-caption">Caption &amp; code — copy manually if sharing is unavailable</label>
+                                    <textarea id="challenge-caption" rows="4" readonly></textarea>
+                                    <p class="social-note">Daily has no challenge code because its twist depends on the local date. Blink normally; stop if uncomfortable.</p>
+                                </details>
+                            </section>
+                            <button id="share-close-btn" class="neon-btn-small share-close-btn" type="button">Done</button>
+                        </div>
+                    </div>
                     <details id="top-scores" class="top-scores">
                         <summary>Your top scores</summary>
                         <div class="name-entry-container">
@@ -366,7 +373,7 @@
         <a href="support.html" class="footer-link">Support</a>
     </footer>
 
-    <script type="module" src="src/main.js?v=79"></script>
+    <script type="module" src="src/main.js?v=84"></script>
 </body>
 
 </html>

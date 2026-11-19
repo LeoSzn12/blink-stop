@@ -43,11 +43,9 @@ test('Surprise consent, reward demo, portrait export and friend challenge work t
                 }
             };` }));
         await page.goto(server.url);
-        await page.locator('#menu-screen > .skin-picker [data-skin="CHRISTMAS"]').click();
-        assert.equal(await page.evaluate(() => document.body.classList.contains('skin-christmas')), true);
-        assert.equal(await page.locator('#menu-screen > .skin-picker [data-skin="CHRISTMAS"]').getAttribute('aria-checked'), 'true');
+        // Skins live on the game's own start screen now, not on the home screen.
+        assert.equal(await page.locator('#menu-screen .skin-picker').count(), 0);
         assert.equal(await page.locator('#home-fab').isVisible(), false);
-        assert.match(await page.evaluate(() => localStorage.getItem('blink_skin')), /^CHRISTMAS@\d{4}-\d{2}$/);
         await page.locator('#more-modes > summary').click();
         await page.locator('[data-mode="SURPRISE"]').click();
         assert.equal(await page.locator('#surprise-sound').isChecked(), false);
@@ -63,7 +61,10 @@ test('Surprise consent, reward demo, portrait export and friend challenge work t
         await page.locator('#surprise-start-btn').click();
         // Pick your look over the live camera, right before the round.
         await page.locator('#skin-pick-screen').waitFor({ state: 'visible' });
+        await page.locator('#skin-pick-screen [data-skin="CHRISTMAS"]').click();
+        assert.equal(await page.evaluate(() => document.body.classList.contains('skin-christmas')), true);
         assert.equal(await page.locator('#skin-pick-screen [data-skin="CHRISTMAS"]').getAttribute('aria-checked'), 'true');
+        assert.match(await page.evaluate(() => localStorage.getItem('blink_skin')), /^CHRISTMAS@\d{4}-\d{2}$/);
         assert.equal(await page.locator('#skin-pick-mode').innerText(), 'SURPRISE');
         if (process.env.PROTOTYPE_SCREENSHOTS) await page.screenshot({ path: `${process.env.PROTOTYPE_SCREENSHOTS}/pick-your-look.png` });
         await page.locator('#skin-pick-play').click();
@@ -90,11 +91,15 @@ test('Surprise consent, reward demo, portrait export and friend challenge work t
         assert.equal(await page.locator('#final-score-val').innerText(), '30.00s');
         // Framed holiday photo is shared as a JPEG file where the browser can share files.
         assert.equal(await page.locator('#selfie-preview').evaluate(img => [img.naturalWidth, img.naturalHeight].join('x')), '1080x1350');
+        // Every way to share lives behind one Share button.
+        await page.locator('#share-open-btn').click();
         await page.locator('#selfie-btn').click();
         const photo = await page.evaluate(() => window.lastShare);
         assert.equal(photo.name, 'blink-stop-photo.jpg');
         assert.equal(photo.type, 'image/jpeg');
         assert.ok(photo.size > 10000);
+        await page.locator('#share-close-btn').click();
+        assert.equal(await page.locator('#share-sheet').isVisible(), false);
         await page.locator('#top-scores > summary').click();
         await page.locator('#player-name-input').fill('TEST');
         await page.locator('#save-score-btn').click();
@@ -121,6 +126,7 @@ test('Surprise consent, reward demo, portrait export and friend challenge work t
         assert.equal(await page.locator('#final-score-val').innerText(), '30.00s');
         // Full social loop: card export, friend handoff, malformed input, imported
         // Precision target, actual blink, and comparison. No remote game backend.
+        await page.locator('#share-open-btn').click();
         assert.equal(await page.locator('#social-result').isVisible(), true);
         await page.locator('#share-card-btn').click();
         const shared = await page.evaluate(() => window.lastShare);
@@ -138,6 +144,7 @@ test('Surprise consent, reward demo, portrait export and friend challenge work t
             await writeFile(`${process.env.PROTOTYPE_SCREENSHOTS}/challenge-card.png`, Buffer.from(url.split(',')[1], 'base64'));
             await page.screenshot({ path: `${process.env.PROTOTYPE_SCREENSHOTS}/social-result.png`, fullPage: true });
         }
+        await page.locator('#share-close-btn').click();
         await page.locator('#friend-turn-btn').click();
         assert.equal(await page.locator('#surprise-options').isVisible(), true);
         assert.equal(await page.evaluate(() => document.querySelector('.input_video').srcObject), null);

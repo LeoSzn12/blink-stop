@@ -51,7 +51,7 @@ export function createSocialUI(startChallenge, { onLinkedChallenge = () => {} } 
         status.textContent = 'Download requested. Attach the card in your social app.';
     });
     return {
-        reset() { result = null; cardUrl = ''; cardFile = null; panel.classList.add('hidden'); card.removeAttribute('src'); el('challenge-caption').value = ''; status.textContent = ''; },
+        reset() { result = null; cardUrl = ''; cardFile = null; panel.classList.add('hidden'); card.removeAttribute('src'); el('challenge-caption').value = ''; status.textContent = ''; el('challenge-outcome').textContent = ''; el('friend-turn-btn').disabled = true; },
         render(value, challenge, skinId) {
             this.reset();
             if (!value) return;

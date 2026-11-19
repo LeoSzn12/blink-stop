@@ -23,7 +23,14 @@ jobs:
       - name: Use the runner's preinstalled Chrome
         run: command -v google-chrome
       - name: Build and test web/mobile candidate
-        run: CHROME_PATH="$(command -v google-chrome)" npm test
+        run: CHROME_PATH="$(command -v google-chrome)" LAYOUT_SCREENSHOTS="$RUNNER_TEMP/layout-screenshots" npm test
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: layout-screenshots
+          path: ${{ runner.temp }}/layout-screenshots
+          retention-days: 7
+          if-no-files-found: ignore
 
   android:
     needs: test
