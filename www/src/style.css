@@ -1256,3 +1256,24 @@ body.home-fab-on .screen { padding-top: calc(4.25rem + var(--safe-top)); }
 #menu-screen .challenge-entry { margin-top: 4.5rem; padding-top: 1rem; border-top: 1px solid rgba(255, 255, 255, .15); width: min(100%, 26rem); }
 #menu-screen .challenge-entry > summary { font-size: .95rem; color: #cfd6de; }
 #menu-screen .about-text { margin-top: 2.5rem; }
+
+/* Flash and Copy the Beat: one big light in the middle, a line of text, progress dots. */
+.quick-stage { position: fixed; inset: 0; z-index: 25; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1rem; pointer-events: none; transition: background-color .08s; }
+.quick-stage.hidden { display: none; }
+.quick-light { width: min(48vw, 14rem); aspect-ratio: 1; border-radius: 50%; background: rgba(12, 14, 22, .9); border: 6px solid rgba(255, 255, 255, .6); transition: background-color .06s, border-color .06s, transform .06s; }
+.quick-light.lit { background: var(--neon-cyan); border-color: #fff; transform: scale(1.06); }
+.quick-light.tap { background: #ff4fa3; border-color: #fff; transform: scale(1.06); }
+.quick-light.right { background: #3dff8a; border-color: #fff; }
+.quick-light.wrong { background: #ff3b3b; border-color: #fff; }
+.quick-stage.go { background: rgba(30, 220, 110, .88); }
+.quick-stage.go .quick-light { background: #3dff8a; border-color: #fff; transform: scale(1.1); }
+.quick-stage.early .quick-light { border-color: #ff3b3b; }
+.quick-text { margin: 0; padding: .5rem 1.1rem; border-radius: 12px; background: rgba(0, 0, 0, .85); color: #fff; font: 900 clamp(1.3rem, 6vw, 2rem)/1.2 var(--font-main); text-align: center; }
+.quick-text:empty { display: none; }
+.quick-dots { display: flex; gap: .5rem; padding: .4rem .7rem; border-radius: 999px; background: rgba(0, 0, 0, .7); }
+.quick-dots:empty { display: none; }
+.quick-dots .dot { width: .9rem; height: .9rem; border-radius: 50%; background: rgba(255, 255, 255, .25); }
+.quick-dots .dot.on { background: #3dff8a; }
+.quick-dots .dot.shown { background: var(--neon-cyan); }
+.quick-dots .dot.tapped { background: #ff4fa3; }
+@media (prefers-reduced-motion: reduce) { .quick-light, .quick-stage { transition: none; } }

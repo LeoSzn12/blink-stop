@@ -194,6 +194,14 @@ function roundRect(ctx, x, y, w, h, r) {
 // Words for the shareable photo, from the round's outcome.
 export function selfieCaption({ reason, mode, elapsed, target, score }) {
     const time = Number.isFinite(elapsed) ? `${Math.max(0, elapsed).toFixed(2)}s` : '';
+    if (mode === 'FLASH') {
+        const ms = Number.isFinite(score) ? Math.round(score) : 0;
+        return { headline: `${ms} MS!`, detail: 'Fastest blink after the flash. Your turn?' };
+    }
+    if (mode === 'BEAT') {
+        const n = Number.isFinite(score) ? score : 0;
+        return { headline: `${n} ROUND${n === 1 ? '' : 'S'} COPIED!`, detail: 'Copied the beat just by blinking. Your turn?' };
+    }
     if (mode === 'BALLOON') {
         const n = Number.isFinite(score) ? score : 0;
         return { headline: `${n} BALLOON${n === 1 ? '' : 'S'} POPPED!`, detail: 'Popped just by blinking. Your turn?' };

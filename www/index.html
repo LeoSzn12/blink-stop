@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Blink Stop - Don't Blink Challenge</title>
-    <link rel="stylesheet" href="src/style.css?v=15">
+    <link rel="stylesheet" href="src/style.css?v=16">
 
     <link rel="manifest" href="manifest.json">
 
@@ -84,6 +84,8 @@
                     <div id="olympics-options" class="options-container prototype-options hidden">
                         <h2>QUICK GAMES</h2>
                         <button class="neon-btn mode-btn balloon-btn" data-mode="BALLOON">BALLOON POP<span class="btn-sub">Blink to pop balloons. 3 lives.</span></button>
+                        <button class="neon-btn mode-btn flash-btn" data-mode="FLASH">FLASH<span class="btn-sub">Blink the moment it turns green</span></button>
+                        <button class="neon-btn mode-btn beat-btn" data-mode="BEAT">COPY THE BEAT<span class="btn-sub">Blink back the rhythm. 3 lives.</span></button>
                         <button class="neon-btn mode-btn" data-mode="VERSUS">STARE-DOWN<span class="btn-sub">2 players. First to blink loses.</span></button>
                         <button class="neon-btn mode-btn" data-mode="PARTY">PASS THE PHONE<span class="btn-sub">2 to 8 players, one phone</span></button>
                         <button class="neon-btn mode-btn" data-mode="DISTRACT">DISTRACTION<span class="btn-sub">Jokes try to make you blink</span></button>
@@ -165,6 +167,11 @@
 
                 <!-- Distraction round joke card -->
                 <div id="joke-card" class="joke-card hidden" aria-live="polite"></div>
+                <div id="quick-stage" class="quick-stage hidden" aria-live="polite">
+                    <div id="quick-light" class="quick-light" aria-hidden="true"></div>
+                    <p id="quick-text" class="quick-text"></p>
+                    <div id="quick-dots" class="quick-dots" aria-hidden="true"></div>
+                </div>
 
                 <!-- Pick a face filter right before a game, over the live camera -->
                 <div id="skin-pick-screen" class="screen hidden">
@@ -359,7 +366,7 @@
         <a href="support.html" class="footer-link">Support</a>
     </footer>
 
-    <script type="module" src="src/main.js?v=77"></script>
+    <script type="module" src="src/main.js?v=78"></script>
 </body>
 
 </html>
