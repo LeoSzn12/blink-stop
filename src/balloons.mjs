@@ -3,7 +3,9 @@
 // Positions are fractions of the play area: x 0..1 left to right, y 0 top .. 1 bottom.
 
 export const BALLOON_MISSES = 3;
-export const POP_ZONE = { top: 0.3, bottom: 0.56 };
+// A tall zone so a blink anywhere near a balloon pops it.
+export const POP_ZONE = { top: 0.2, bottom: 0.66 };
+const ZONE_MIDDLE = (POP_ZONE.top + POP_ZONE.bottom) / 2;
 const POP_ANIMATION_MS = 450;
 const BLINK_COOLDOWN_MS = 250;
 
@@ -84,7 +86,7 @@ export function createBalloonRound({ random = Math.random, firstBalloonMs = 600 
         blink(now) {
             if (over || now - lastBlink < BLINK_COOLDOWN_MS) return null;
             lastBlink = now;
-            const target = live().filter(inZone).sort((a, b) => Math.abs(a.y - 0.43) - Math.abs(b.y - 0.43))[0];
+            const target = live().filter(inZone).sort((a, b) => Math.abs(a.y - ZONE_MIDDLE) - Math.abs(b.y - ZONE_MIDDLE))[0];
             if (!target) {
                 if (freeStray) { freeStray = false; return { hit: false, kind: 'FREE', misses, over, now }; }
                 return miss(now, 'EMPTY');
@@ -142,7 +144,7 @@ export function drawBalloons(ctx, round, skinId, width, height, now) {
             ctx.font = `bold ${Math.round(unit * 0.06)}px system-ui, sans-serif`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText('POP!', x, y - r * (1 + t));
+            ctx.fillText('+1', x, y - r * (1 + t));
         } else {
             ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
             ctx.lineWidth = Math.max(1, unit * 0.003);

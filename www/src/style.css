@@ -1277,3 +1277,14 @@ body.home-fab-on .screen { padding-top: calc(4.25rem + var(--safe-top)); }
 .quick-dots .dot.shown { background: var(--neon-cyan); }
 .quick-dots .dot.tapped { background: #ff4fa3; }
 @media (prefers-reduced-motion: reduce) { .quick-light, .quick-stage { transition: none; } }
+
+/* Balloon Pop: the popped count is the goal, so it leads; lives sit small under it. */
+#game-hud.balloon-mode .hud-right { display: flex; flex-direction: column; align-items: flex-end; }
+#game-hud.balloon-mode .meter-container { display: none; }
+#game-hud.balloon-mode .score-container { order: -1; text-align: center; min-width: 7.5rem; }
+#game-hud.balloon-mode #score { font-size: 4.2rem; line-height: 1; display: inline-block; }
+#game-hud.balloon-mode #score.bump { animation: score-bump .35s ease-out; }
+#game-hud.balloon-mode .lives-hud { font-size: 1.15rem; margin: .4rem 0 0; padding: .25rem .5rem; align-items: center; }
+#game-hud.balloon-mode .lives-hud::before { content: 'LIVES'; font-size: .7rem; letter-spacing: .08em; color: rgba(255, 255, 255, .75); margin-right: .3rem; font-family: system-ui, sans-serif; }
+@keyframes score-bump { 0% { transform: scale(1); } 35% { transform: scale(1.45); color: #fff; } 100% { transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { #game-hud.balloon-mode #score.bump { animation: none; } }

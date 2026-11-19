@@ -92,3 +92,26 @@ export function createFaceLossTracker(durationMs = 1000) {
         }
     };
 }
+
+// Tap games (Balloon Pop, Flash, Copy the Beat) want every deliberate blink, even a quick one
+// the camera sees in a single frame. Endurance keeps the stricter sustained-closure detector
+// so a flicker never ends a round. One blink fires once; the eyes must reopen past a slightly
+// higher line before the next blink can count.
+export const TAP_CLOSE = 1.12;
+export const TAP_REOPEN = 1.2;
+export function createTapBlink({ close = TAP_CLOSE, reopen = TAP_REOPEN } = {}) {
+    let closed = false;
+    return {
+        reset() { closed = false; },
+        get closed() { return closed; },
+        // Returns true only on the frame the eyes close.
+        observe(eye, threshold) {
+            const minEar = eye?.minEar;
+            if (!Number.isFinite(minEar) || minEar <= 0 || !Number.isFinite(threshold) || threshold <= 0) return false;
+            const shut = !!eye.blinking || minEar < threshold * close;
+            if (shut && !closed) { closed = true; return true; }
+            if (!shut && minEar >= threshold * reopen) closed = false;
+            return false;
+        },
+    };
+}

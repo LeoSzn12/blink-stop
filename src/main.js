@@ -1,7 +1,7 @@
 import { checkBlink, setBlinkThreshold, resetBlinkState, getBlinkThreshold } from './blinkDetection.js';
 import { audioManager } from './audioManager.js';
 
-import { createFaceLossTracker, createCalibrationTracker, createTrackingFreshness } from './gameRules.mjs';
+import { createFaceLossTracker, createCalibrationTracker, createTrackingFreshness, createTapBlink } from './gameRules.mjs';
 import { createSerializedInference } from './inference.mjs';
 import { appendScore } from './leaderboard.mjs';
 import { cameraErrorMessage } from './cameraHelp.mjs';
@@ -113,14 +113,16 @@ const jokeCard = document.getElementById('joke-card');
 const olympicsOptions = document.getElementById('olympics-options');
 const balloonLayer = document.getElementById('balloon-layer');
 const balloonCtx = balloonLayer.getContext('2d');
-let balloonRound = null, balloonEyeClosed = false, balloonFrameId = null, balloonEnd = null;
+let balloonRound = null, balloonFrameId = null, balloonEnd = null;
+// Balloon Pop, Flash and Copy the Beat count every deliberate blink, even a one-frame one.
+const tapBlink = createTapBlink();
 const livesDisplay = document.getElementById('lives-display');
 // Flash and Copy the Beat share one stage: a big light, a line of text and progress dots.
 const quickStage = document.getElementById('quick-stage');
 const quickLight = document.getElementById('quick-light');
 const quickText = document.getElementById('quick-text');
 const quickDots = document.getElementById('quick-dots');
-let quickRound = null, quickEyeClosed = false, quickFrameId = null, quickEnd = null, quickTapUntil = 0;
+let quickRound = null, quickFrameId = null, quickEnd = null, quickTapUntil = 0;
 
 // Face filter pick: a game started from the menu first shows the live camera with the
 // skin on your face, so you choose your look right before playing. Retry skips it.
@@ -934,10 +936,11 @@ document.getElementById('party-new-dare-btn').addEventListener('click', () => { 
 function stopBalloons() {
     cancelAnimationFrame(balloonFrameId);
     balloonRound = null;
-    balloonEyeClosed = false;
+    tapBlink.reset();
     balloonCtx.clearRect(0, 0, balloonLayer.width, balloonLayer.height);
     balloonLayer.classList.add('hidden');
     livesDisplay.classList.add('hidden');
+    gameHud.classList.remove('balloon-mode');
 }
 
 function hideJoke() {
@@ -981,10 +984,23 @@ function renderBalloonLives() {
     livesDisplay.setAttribute('aria-label', `${left} ${left === 1 ? 'life' : 'lives'} left`);
 }
 
+function balloonLivesText() {
+    const left = balloonRound ? balloonRound.livesLeft() : BALLOON_MISSES;
+    return left === 1 ? 'Last life!' : `${left} lives left`;
+}
+
+// The popped count is the goal, so it grows for a moment on every pop.
+function bumpBalloonScore(score) {
+    scoreDisplay.innerText = String(score);
+    scoreDisplay.classList?.remove('bump');
+    void scoreDisplay.offsetWidth;
+    scoreDisplay.classList?.add('bump');
+}
+
 function startBalloonRound() {
     gameState = 'BALLOON';
     balloonRound = createBalloonRound();
-    balloonEyeClosed = false;
+    tapBlink.reset();
     balloonEnd = null;
     startTime = Date.now();
     balloonLayer.classList.remove('hidden');
@@ -992,11 +1008,11 @@ function startBalloonRound() {
     hudLabel.innerText = 'POPPED';
     scoreDisplay.innerText = '0';
     gameHud.classList.remove('hidden');
-    gameHud.classList.add('active');
+    gameHud.classList.add('active', 'balloon-mode');
     livesDisplay.classList.remove('hidden');
     renderBalloonLives();
     faceStatus.classList.remove('hidden', 'not-detected');
-    faceStatusText.innerText = 'Blink when a balloon is in the zone';
+    faceStatusText.innerText = 'Pop as many as you can! Blink when one is in the zone';
     updateBalloonLoop();
 }
 
@@ -1006,8 +1022,8 @@ function updateBalloonLoop() {
     if (tracking.stale(now)) return endBalloon(true);
     if (balloonRound.update(now).length) {
         if (navigator.vibrate) navigator.vibrate(60);
-        faceStatusText.innerText = 'One got away!';
         renderBalloonLives();
+        if (!balloonRound.over) faceStatusText.innerText = `One got away! ${balloonLivesText()}`;
     }
     sizeBalloonLayer();
     drawBalloons(balloonCtx, balloonRound, currentSkin, balloonLayer.width, balloonLayer.height, now);
@@ -1024,25 +1040,24 @@ function handleBalloonEye(eye, now) {
         faceStatus.classList.remove('not-detected');
         currentEAR = eye.ear;
         minEARValue = eye.minEar;
-        if (eye.blinking && !balloonEyeClosed) {
+        if (tapBlink.observe(eye, getBlinkThreshold())) {
             const result = balloonRound.blink(now);
             if (result?.hit) {
-                scoreDisplay.innerText = String(result.score);
-                faceStatusText.innerText = 'POP!';
+                bumpBalloonScore(result.score);
+                faceStatusText.innerText = `POP! ${result.score} popped`;
                 if (navigator.vibrate) navigator.vibrate(25);
             } else if (result?.kind === 'FREE') {
                 faceStatusText.innerText = 'Wait for the zone. That one was free!';
             } else if (result) {
-                faceStatusText.innerText = 'Too early!';
                 renderBalloonLives();
+                faceStatusText.innerText = `Too early! ${balloonLivesText()}`;
                 if (navigator.vibrate) navigator.vibrate(60);
             }
             if (balloonRound.over) return endBalloon(false);
         }
-        balloonEyeClosed = !!eye.blinking;
     } else {
         resetBlinkState();
-        balloonEyeClosed = false;
+        tapBlink.reset();
         faceStatus.classList.add('not-detected');
         faceStatusText.innerText = 'Face not detected – move closer & improve lighting';
         if (faceLoss.observe(false, now)) endBalloon(true);
@@ -1059,7 +1074,7 @@ function endBalloon(faceLost) {
 function stopQuick() {
     cancelAnimationFrame(quickFrameId);
     quickRound = null;
-    quickEyeClosed = false;
+    tapBlink.reset();
     quickStage.classList.add('hidden');
     quickStage.classList.remove('go', 'early');
     quickLight.classList.remove('lit', 'tap', 'right', 'wrong');
@@ -1091,7 +1106,7 @@ function renderQuickLives() {
 function startQuickRound(mode) {
     gameState = mode;
     quickRound = mode === 'FLASH' ? createFlashRound() : createBeatRound();
-    quickEyeClosed = false;
+    tapBlink.reset();
     quickEnd = null;
     startTime = Date.now();
     quickStage.classList.remove('hidden', 'go', 'early');
@@ -1185,7 +1200,7 @@ function handleQuickEye(eye, now) {
         faceStatus.classList.remove('not-detected');
         currentEAR = eye.ear;
         minEARValue = eye.minEar;
-        if (eye.blinking && !quickEyeClosed) {
+        if (tapBlink.observe(eye, getBlinkThreshold())) {
             const result = quickRound.blink(now);
             if (gameState === 'FLASH' && result) {
                 if (result.kind === 'EARLY') {
@@ -1208,10 +1223,9 @@ function handleQuickEye(eye, now) {
             }
             if (quickRound.over) return endQuick(false);
         }
-        quickEyeClosed = !!eye.blinking;
     } else {
         resetBlinkState();
-        quickEyeClosed = false;
+        tapBlink.reset();
         faceStatus.classList.add('not-detected');
         faceStatusText.innerText = 'Face not detected – move closer & improve lighting';
         if (faceLoss.observe(false, now)) endQuick(true);
