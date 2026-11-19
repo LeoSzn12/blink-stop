@@ -272,6 +272,35 @@ let startTime = 0;
 // on where the round was instead of counting the pause as a face lost or notes missed.
 let pausedMs = 0;
 function clock() { return performance.now() - pausedMs; }
+// Glancing away in a timed round: a short "come back" countdown with the clock paused,
+// twice per round, before losing your face ends the run. Blinks can't be seen while
+// away, so the clock never runs then and a third glance ends the round as before.
+const PRECISION_CLOCK_SHOWN_S = 3;
+const GLANCE_GRACE_MS = 3000;
+const TIMED_MODES = ['CLASSIC', 'ENDURANCE', 'DAILY', 'DISTRACT', 'SURPRISE'];
+const GLANCES_PER_ROUND = 2;
+let awaySince = null, awayFrozenMs = 0, glancesLeft = GLANCES_PER_ROUND;
+function resetGlance() { awaySince = null; glancesLeft = GLANCES_PER_ROUND; document.getElementById('come-back')?.classList.add('hidden'); }
+// Called every frame of a timed round. Returns true when the round should end.
+function glanceAwayOver(now) {
+    const banner = document.getElementById('come-back');
+    if (!tracking.stale(now)) {
+        if (awaySince !== null) { awaySince = null; banner?.classList.add('hidden'); }
+        return false;
+    }
+    if (awaySince === null) {
+        if (glancesLeft <= 0) return true;
+        glancesLeft--;
+        awaySince = now;
+        awayFrozenMs = Date.now() - startTime;
+        banner?.classList.remove('hidden');
+    }
+    startTime = Date.now() - awayFrozenMs; // the clock stays paused while you're away
+    const left = GLANCE_GRACE_MS - (now - awaySince);
+    if (left <= 0) { banner?.classList.add('hidden'); return true; }
+    if (banner) banner.textContent = `Come back! ${Math.ceil(left / 1000)}`;
+    return false;
+}
 function confirmDuringRound(message) {
     const askedAt = performance.now();
     const ok = confirm(message);
@@ -875,6 +904,15 @@ saveScoreBtn.addEventListener('click', () => {
 });
 
 // Share Logic
+// Share sheet: one Share button on the results opens the clip, photo, link and card.
+const shareSheet = document.getElementById('share-sheet');
+function closeShareSheet() { shareSheet.classList.add('hidden'); }
+document.getElementById('share-open-btn').addEventListener('click', () => {
+    shareSheet.classList.remove('hidden');
+    document.getElementById('share-close-btn').focus?.();
+});
+document.getElementById('share-close-btn').addEventListener('click', closeShareSheet);
+shareSheet.addEventListener('click', event => { if (event.target === shareSheet) closeShareSheet(); });
 shareBtn.addEventListener('click', async () => {
     if (lastScore === null || !lastResult) return;
     const payload = sharePayload(lastResult, currentSkin);
@@ -1622,6 +1660,7 @@ function endVersus(outcome) {
 }
 
 function startGame(mode) {
+    closeShareSheet();
     const pickSkin = pickSkinNext && !party;
     pickSkinNext = false;
     if (gameState === 'AD_DEMO') return;
@@ -1721,7 +1760,7 @@ const goFlash = document.getElementById('go-flash');
 let goFlashTimer = null;
 function roundTipFor(mode) {
     switch (mode) {
-        case 'PRECISION': return `Blink right at ${precisionTarget} seconds.`;
+        case 'PRECISION': return `Blink right at ${precisionTarget} seconds. The clock hides after ${PRECISION_CLOCK_SHOWN_S}, so count in your head.`;
         case 'ENDURANCE': return "Don't blink for 30 seconds.";
         case 'DAILY': return `Today's twist: ${dailyTwist().name}. Don't blink!`;
         case 'SURPRISE': return "Something may startle you. Don't blink!";
@@ -1901,6 +1940,7 @@ function finishCalibration() {
     if (soundEnabled) audioManager.startDrone();
 
     if (currentMode === 'DAILY') container.classList.add(dailyTwist().cls);
+    resetGlance();
 
     // Reset blink detection state before starting game
     resetBlinkState();
@@ -1945,10 +1985,11 @@ function startEnduranceMode() {
 
 function updateEnduranceLoop() {
     if (gameState === 'ENDURANCE') {
-        if (tracking.stale(clock())) {
+        if (glanceAwayOver(clock())) {
             endGame('DISQUALIFIED');
             return;
         }
+        if (awaySince !== null) { animationFrameId = requestAnimationFrame(updateEnduranceLoop); return; }
         const elapsed = (Date.now() - startTime) / 1000;
         const duration = 30; // 30 seconds
         const progress = Math.min((elapsed / duration) * 100, 100);
@@ -1988,6 +2029,7 @@ function updateEnduranceLoop() {
 }
 
 function showMenu() {
+    closeShareSheet();
     social.reset();
     activeChallenge = null;
     lastResult = null;
@@ -2097,6 +2139,7 @@ function onResults(results, session) {
         calibration.observe(calibrationLastEye ?? NaN, now);
     }
     if (eye && Number.isFinite(eye.minEar) && eye.minEar > 0 && eye.minEar <= 1) {
+        if ((gameState === 'PLAYING' || gameState === 'ENDURANCE') && awaySince !== null) tracking.reset(now);
         if ((gameState === 'PLAYING' || gameState === 'ENDURANCE') && !tracking.observe(now)) {
             endGame('DISQUALIFIED');
             canvasCtx.restore();
@@ -2107,7 +2150,7 @@ function onResults(results, session) {
         // Update face tracking status
         if (gameState === 'PLAYING' || gameState === 'ENDURANCE') {
             faceStatus.classList.remove('hidden', 'not-detected');
-            faceStatusText.innerText = 'Tracking eyes...';
+            faceStatusText.innerText = gameState === 'PLAYING' && currentMode === 'PRECISION' && (Date.now() - startTime) / 1000 >= PRECISION_CLOCK_SHOWN_S ? 'Clock hidden. Count it in your head' : 'Tracking eyes...';
         }
 
         // Visual Debug: Show if face is detected
@@ -2136,11 +2179,7 @@ function onResults(results, session) {
         hudLabel.style.color = "#555";
         hudLabel.style.textShadow = "none";
 
-        if (gameState === 'PLAYING' || gameState === 'ENDURANCE') {
-            if (faceLoss.observe(false, now)) {
-                endGame('DISQUALIFIED');
-            }
-        }
+        // Timed rounds: the frame loop's "come back" countdown decides (glanceAwayOver).
     }
     canvasCtx.restore();
 }
@@ -2173,10 +2212,11 @@ function updateClassicVisualStage(elapsedSeconds) {
 
 function updateGameLoop() {
     if (gameState === 'PLAYING') {
-        if (tracking.stale(clock())) {
+        if (glanceAwayOver(clock())) {
             endGame('DISQUALIFIED');
             return;
         }
+        if (awaySince !== null) { animationFrameId = requestAnimationFrame(updateGameLoop); return; }
         const elapsed = (Date.now() - startTime) / 1000;
         if (currentMode === 'SURPRISE') {
             const surprise = surpriseRound.observe(elapsed * 1000);
@@ -2187,7 +2227,11 @@ function updateGameLoop() {
                 return;
             }
         }
-        scoreDisplay.innerText = `${elapsed.toFixed(2)}s`;
+        // Precision: the clock shows for the first seconds, then you count in your head.
+        if (currentMode === 'PRECISION' && elapsed >= PRECISION_CLOCK_SHOWN_S) {
+            if (scoreDisplay.innerText !== '?.??s') scoreDisplay.innerText = '?.??s';
+            if (faceStatusText.innerText !== 'Clock hidden. Count it in your head') faceStatusText.innerText = 'Clock hidden. Count it in your head';
+        } else scoreDisplay.innerText = `${elapsed.toFixed(2)}s`;
         if (currentMode === 'DISTRACT') updateJokes(elapsed);
 
         // Update Eye Openness Meter and tension effect
@@ -2257,6 +2301,7 @@ function endGame(reason = 'BLINK') {
     clearSelfie();
     gameState = 'GAME_OVER';
     gameOverTitle.style.color = 'var(--neon-red)'; // each result below sets its own colour
+    resetGlance();
     faceLoss.reset();
     resetBlinkState();
     cancelAnimationFrame(animationFrameId);
@@ -2343,6 +2388,13 @@ function endGame(reason = 'BLINK') {
             } catch (err) {
                 console.warn('Theme preference not saved:', err);
             }
+        } else if (reason === 'DISQUALIFIED' && TIMED_MODES.includes(currentMode) && elapsed > 0) {
+            // Show how far you got; a run that ended away from the camera isn't saved as a best.
+            scoreToSave = 0;
+            finalScoreText = `${Math.min(elapsed, ['ENDURANCE', 'SURPRISE'].includes(currentMode) ? 30 : Infinity).toFixed(2)}s`;
+            finalScoreLabel.innerText = "THEN YOUR FACE LEFT THE CAMERA";
+            gameOverTitle.innerText = "ROUND OVER";
+            gameOverTitle.style.color = "var(--neon-red)";
         } else if (reason === 'DISQUALIFIED') {
             scoreToSave = 0;
             finalScoreText = "OUT";
@@ -2364,12 +2416,11 @@ function endGame(reason = 'BLINK') {
             scoreToSave = diff;
 
             // NEW: Show Actual Time as Primary Score
-            finalScoreText = `${elapsed.toFixed(2)}s`;
-            finalScoreLabel.innerText = "YOU BLINKED AT";
-
-            // NEW: Show Target/Off-by as Secondary Detail
+            // The score is how far off you were; the blink time is the detail.
+            finalScoreText = `${diff.toFixed(2)}s`;
+            finalScoreLabel.innerText = "OFF THE TARGET BY";
             finalScoreSub.classList.remove('hidden');
-            finalScoreSub.innerText = `Target: ${precisionTarget.toFixed(2)}s (off by ${diff.toFixed(2)}s)`;
+            finalScoreSub.innerText = `You blinked at ${elapsed.toFixed(2)}s · target ${precisionTarget.toFixed(0)}s`;
 
             if (diff < 0.1) {
                 gameOverTitle.innerText = "PERFECT!";

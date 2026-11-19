@@ -91,11 +91,15 @@ test('Surprise consent, reward demo, portrait export and friend challenge work t
         assert.equal(await page.locator('#final-score-val').innerText(), '30.00s');
         // Framed holiday photo is shared as a JPEG file where the browser can share files.
         assert.equal(await page.locator('#selfie-preview').evaluate(img => [img.naturalWidth, img.naturalHeight].join('x')), '1080x1350');
+        // Every way to share lives behind one Share button.
+        await page.locator('#share-open-btn').click();
         await page.locator('#selfie-btn').click();
         const photo = await page.evaluate(() => window.lastShare);
         assert.equal(photo.name, 'blink-stop-photo.jpg');
         assert.equal(photo.type, 'image/jpeg');
         assert.ok(photo.size > 10000);
+        await page.locator('#share-close-btn').click();
+        assert.equal(await page.locator('#share-sheet').isVisible(), false);
         await page.locator('#top-scores > summary').click();
         await page.locator('#player-name-input').fill('TEST');
         await page.locator('#save-score-btn').click();
@@ -122,6 +126,7 @@ test('Surprise consent, reward demo, portrait export and friend challenge work t
         assert.equal(await page.locator('#final-score-val').innerText(), '30.00s');
         // Full social loop: card export, friend handoff, malformed input, imported
         // Precision target, actual blink, and comparison. No remote game backend.
+        await page.locator('#share-open-btn').click();
         assert.equal(await page.locator('#social-result').isVisible(), true);
         await page.locator('#share-card-btn').click();
         const shared = await page.evaluate(() => window.lastShare);
@@ -139,6 +144,7 @@ test('Surprise consent, reward demo, portrait export and friend challenge work t
             await writeFile(`${process.env.PROTOTYPE_SCREENSHOTS}/challenge-card.png`, Buffer.from(url.split(',')[1], 'base64'));
             await page.screenshot({ path: `${process.env.PROTOTYPE_SCREENSHOTS}/social-result.png`, fullPage: true });
         }
+        await page.locator('#share-close-btn').click();
         await page.locator('#friend-turn-btn').click();
         assert.equal(await page.locator('#surprise-options').isVisible(), true);
         assert.equal(await page.evaluate(() => document.querySelector('.input_video').srcObject), null);

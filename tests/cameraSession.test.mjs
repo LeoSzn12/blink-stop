@@ -635,3 +635,42 @@ test('Flash shows no green GO, and a round with every try timed out saves no bes
   assert.equal(h.el('final-score-label').innerText, 'NO BLINK IN TIME');
   assert.equal(saved.includes('blink_best_FLASH'), false);
 });
+
+test('glancing away in a timed round shows a come-back countdown before the round ends', async () => {
+  const h = harness();
+  h.el('come-back').classList.add('hidden');
+  h.debug.startGame('CLASSIC'); await h.settle(); await h.timers();
+  let t = 0;
+  const frame = async () => { h.setClock(t); h.tickInference(); h.deliver(); await h.settle(); h.raf(); t += 100; };
+  while (h.debug.getState() !== 'PLAYING' && t < 8000) await frame();
+  assert.equal(h.debug.getState(), 'PLAYING');
+  // Away for two seconds: still playing, with the countdown up.
+  h.setEye(null);
+  for (let i = 0; i < 20; i++) await frame();
+  assert.equal(h.debug.getState(), 'PLAYING');
+  assert.equal(h.el('come-back').classList.contains('hidden'), false);
+  assert.match(h.el('come-back').textContent, /Come back! [12]/);
+  // Back in view: the round carries on and the countdown goes away.
+  h.setEye(.3);
+  for (let i = 0; i < 5; i++) await frame();
+  assert.equal(h.debug.getState(), 'PLAYING');
+  assert.equal(h.el('come-back').classList.contains('hidden'), true);
+  // Away past the countdown: the round ends.
+  h.setEye(null);
+  for (let i = 0; i < 60 && h.debug.getState() === 'PLAYING'; i++) await frame();
+  assert.equal(h.debug.getState(), 'GAME_OVER');
+  assert.equal(h.el('come-back').classList.contains('hidden'), true);
+});
+
+test('results have one Share button that opens and closes the share sheet', () => {
+  const h = harness();
+  h.el('share-sheet').classList.add('hidden');
+  h.debug.endGame('BLINK');
+  h.click('share-open-btn');
+  assert.equal(h.el('share-sheet').classList.contains('hidden'), false);
+  h.click('share-close-btn');
+  assert.equal(h.el('share-sheet').classList.contains('hidden'), true);
+  h.click('share-open-btn');
+  h.debug.showMenu();
+  assert.equal(h.el('share-sheet').classList.contains('hidden'), true, 'leaving the results closes the sheet');
+});

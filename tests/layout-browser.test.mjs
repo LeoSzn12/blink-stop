@@ -37,12 +37,28 @@ test('game-over actions remain reachable on narrow and enlarged-text screens', a
           document.querySelector('#game-over-screen').classList.remove('hidden');
           document.querySelector('#social-result').classList.remove('hidden');
         }, scenario);
-        for (const selector of ['#restart-btn', '#share-btn', '#selfie-btn', '#share-card-btn', '#save-card-btn', '#friend-turn-btn', '#menu-btn']) {
+        for (const selector of ['#restart-btn', '#share-open-btn', '#friend-turn-btn', '#menu-btn']) {
           await page.locator(selector).evaluate(el => scrollBy(0, el.getBoundingClientRect().top - 100));
           const box = await page.locator(selector).boundingBox();
           const footerTop = await page.locator('.footer').evaluate(el => el.getBoundingClientRect().top);
           assert.ok(box.x >= 0 && box.x + box.width <= scenario.width && box.y >= 0 && box.y + box.height <= footerTop,
             `${scenario.name} ${selector} clipped: ${JSON.stringify({ box, footerTop })}`);
+        }
+        // Play Again and Share sit right under the score, above the fold, on a phone.
+        if (scenario.name === 'narrow portrait') {
+          await page.evaluate(() => scrollTo(0, 0));
+          for (const selector of ['#restart-btn', '#share-open-btn']) {
+            const box = await page.locator(selector).boundingBox();
+            assert.ok(box.y + box.height <= scenario.height, `${selector} should be above the fold: ${JSON.stringify(box)}`);
+          }
+        }
+        // The share sheet's options all fit on screen (scrolling inside the sheet if needed).
+        await page.evaluate(() => document.querySelector('#share-sheet').classList.remove('hidden'));
+        for (const selector of ['#selfie-btn', '#share-btn', '#share-card-btn', '#save-card-btn', '#share-close-btn']) {
+          await page.locator(selector).evaluate(el => el.scrollIntoView({ block: 'center' }));
+          const box = await page.locator(selector).boundingBox();
+          assert.ok(box.x >= 0 && box.x + box.width <= scenario.width && box.y >= 0 && box.y + box.height <= scenario.height,
+            `${scenario.name} share sheet ${selector} clipped: ${JSON.stringify(box)}`);
         }
         const overflow = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
         assert.ok(overflow <= 1, `${scenario.name} horizontal overflow: ${overflow}`);
