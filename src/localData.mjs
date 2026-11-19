@@ -1,5 +1,11 @@
+// Every key Blink Stop keeps in local storage, so Clear my data removes all of it.
+const BEST_MODES = ['CLASSIC', 'ENDURANCE', 'DAILY', 'SURPRISE', 'DISTRACT', 'BALLOON', 'PRECISION_5', 'PRECISION_10', 'PRECISION_15'];
+export const GAME_KEYS = [
+    'blink_lb_CLASSIC', 'blink_lb_PRECISION', 'blink_lb_ENDURANCE', 'blink_lb_DAILY', 'blink_lb_SURPRISE', 'blink_lb_DISTRACT', 'blink_lb_BALLOON',
+    ...BEST_MODES.map(mode => `blink_best_${mode}`),
+    'blink_theme_purple', 'blink_skin',
+];
+
 export function clearStoredGameData(storage) {
-    for (const key of ['blink_lb_CLASSIC', 'blink_lb_PRECISION', 'blink_lb_ENDURANCE', 'blink_lb_DAILY', 'blink_lb_SURPRISE', 'blink_lb_DISTRACT', 'blink_lb_BALLOON', 'blink_theme_purple', 'blink_skin']) {
-        storage.removeItem(key);
-    }
+    for (const key of GAME_KEYS) storage.removeItem(key);
 }

@@ -32,7 +32,7 @@ test('native score share includes only supplied result, never camera data', asyn
     assert.equal('files' in result, false);
 });
 test('clear data removes game-owned keys without deleting unrelated storage', () => {
-    const data = new Map([['blink_lb_CLASSIC', 'scores'], ['blink_theme_purple', 'true'], ['another-app', 'keep']]);
+    const data = new Map([['blink_lb_CLASSIC', 'scores'], ['blink_best_BALLOON', '12'], ['blink_best_PRECISION_10', '0.04'], ['blink_theme_purple', 'true'], ['another-app', 'keep']]);
     clearStoredGameData({ removeItem: key => data.delete(key) });
     assert.deepEqual([...data], [['another-app', 'keep']]);
 });
