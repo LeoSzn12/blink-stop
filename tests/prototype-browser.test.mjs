@@ -95,6 +95,7 @@ test('Surprise consent, reward demo, portrait export and friend challenge work t
         assert.equal(photo.name, 'blink-stop-photo.jpg');
         assert.equal(photo.type, 'image/jpeg');
         assert.ok(photo.size > 10000);
+        await page.locator('#top-scores > summary').click();
         await page.locator('#player-name-input').fill('TEST');
         await page.locator('#save-score-btn').click();
         assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('blink_lb_SURPRISE'))[0].score), 30);

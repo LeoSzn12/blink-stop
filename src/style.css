@@ -1220,3 +1220,34 @@ body.home-fab-on .screen { padding-top: calc(4.25rem + var(--safe-top)); }
 .pick-title { color: #fff; font-weight: 900; font-size: 1.5rem; letter-spacing: .04em; }
 .pick-skins { margin: .25rem 0 .5rem; }
 .pick-play { width: 100%; min-width: 0; font-size: 1.6rem; padding: .9rem 1rem; }
+
+/* Home: one big Play, the other modes under it. */
+.play-hero { font-size: 2.1rem; padding: 1.1rem 1.5rem; border-width: 3px; background: var(--neon-cyan); color: #04060a; box-shadow: 0 0 24px rgba(0, 255, 255, .45); }
+.play-hero .btn-sub { color: #04060a; opacity: .85; }
+.play-hero:hover, .play-hero:focus-visible { background: #fff; color: #04060a; }
+
+/* Bigger, easier tap targets everywhere. */
+.neon-btn, .skin-btn, .home-fab, .menu-btn-hud, .top-scores > summary, .caption-details > summary, .more-modes summary, .challenge-entry summary { min-height: 48px; }
+
+/* Before each game: one tip, a 3-2-1, then GO. */
+.round-tip { max-width: 24rem; margin: .5rem auto 0; padding: .6rem 1rem; border-radius: 12px; background: rgba(0, 0, 0, .85); color: #fff; font: 700 1.1rem/1.35 var(--font-main); text-align: center; }
+.round-tip:empty { display: none; }
+.countdown { margin-top: .75rem; color: #fff; font: 900 5rem/1 var(--font-main); text-shadow: 0 4px 18px rgba(0, 0, 0, .8); }
+.countdown:empty { display: none; }
+.go-flash { position: fixed; inset: 0; z-index: 150; display: flex; align-items: center; justify-content: center; pointer-events: none; color: #3dff8a; font: 900 6rem/1 var(--font-main); text-shadow: 0 6px 24px rgba(0, 0, 0, .8); animation: go-pop .7s ease-out forwards; }
+.go-flash.hidden { display: none; }
+@keyframes go-pop { 0% { transform: scale(.6); opacity: 0; } 25% { transform: scale(1.1); opacity: 1; } 100% { transform: scale(1); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .go-flash { animation: none; } }
+
+/* Results: score first, then Play again, then everything else. */
+.best-score { display: block; margin-top: .35rem; color: #cfd6de; font: 700 1.1rem var(--font-main); }
+.best-score.new-best { color: #3dff8a; font-size: 1.35rem; font-weight: 900; }
+.game-over-btns { display: flex; flex-wrap: wrap; gap: .6rem; justify-content: center; }
+.play-again-btn { flex-basis: 100%; font-size: 1.7rem; padding: 1rem; background: var(--neon-cyan); color: #04060a; }
+.play-again-btn:hover, .play-again-btn:focus-visible { background: #fff; color: #04060a; }
+.selfie-btn { border-color: var(--neon-pink); color: #fff; }
+.results-home-btn { margin-top: .75rem; background: rgba(12, 14, 22, .94); color: #fff; border-color: #fff; }
+.top-scores, .caption-details { width: min(100%, 26rem); margin: .75rem auto 0; text-align: left; }
+.top-scores > summary, .caption-details > summary { display: flex; align-items: center; justify-content: center; cursor: pointer; padding: .5rem 1rem; border-radius: 12px; background: rgba(12, 14, 22, .94); color: #fff; font: 700 1rem var(--font-main); list-style: none; }
+.top-scores > summary::-webkit-details-marker, .caption-details > summary::-webkit-details-marker { display: none; }
+.top-scores[open] > summary, .caption-details[open] > summary { margin-bottom: .5rem; }

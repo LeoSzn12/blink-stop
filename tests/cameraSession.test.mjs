@@ -180,7 +180,7 @@ test('Classic starts calibration when local score reads throw', async () => {
 });
 test('corrupt score data remains untouched and cannot be reported saved', () => {
   let writes = 0;
-  const h = harness({ getItem: key => key.startsWith('blink_lb_') ? '{broken' : null, setItem() { writes++; } });
+  const h = harness({ getItem: key => key.startsWith('blink_lb_') ? '{broken' : null, setItem(key) { if (key.startsWith('blink_lb_')) writes++; } });
   h.debug.endGame('BLINK');
   assert.match(h.el('leaderboard-list').textContent, /unavailable/i);
   h.el('player-name-input').value = 'LEO';
@@ -539,4 +539,16 @@ test('a game started from the menu shows the live camera to pick a look, then ca
   // Retry and direct starts skip the pick.
   h.debug.startGame('CLASSIC'); await h.settle(); await h.timers();
   assert.equal(h.debug.getState(), 'CALIBRATING');
+});
+test('results show your saved best, and NEW BEST when you beat it', () => {
+  const store = new Map([['blink_best_CLASSIC', '1e12']]);
+  const h = harness({ getItem: key => store.get(key) ?? null, setItem(key, value) { store.set(key, value); } });
+  h.debug.endGame('BLINK');
+  assert.equal(h.el('restart-btn').innerText, 'PLAY AGAIN');
+  assert.match(h.el('best-score').innerText, /^Your best: /);
+  assert.equal(store.get('blink_best_CLASSIC'), '1e12');
+  store.set('blink_best_CLASSIC', '-1');
+  h.debug.endGame('BLINK');
+  assert.equal(h.el('best-score').innerText, 'NEW BEST!');
+  assert.ok(Number(store.get('blink_best_CLASSIC')) >= 0);
 });

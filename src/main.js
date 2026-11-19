@@ -1229,6 +1229,8 @@ function startVersusCalibration() {
     versusLastFrame = null;
     calibrationStartTime = performance.now();
     calibrationStatus.innerText = 'FINDING BOTH FACES';
+    roundTip.textContent = roundTipFor('VERSUS');
+    countdownEl.textContent = '';
     calibrationHint.innerText = versusNames
         ? `${versusNames[0]} on the left, ${versusNames[1]} on the right, cheek to cheek. Light in front of you, eyes open normally.`
         : 'Two players side by side, both faces in view. Light in front of you, eyes open normally.';
@@ -1251,6 +1253,7 @@ function beginVersusPlay() {
     gameState = 'VERSUS';
     calibrationScreen.classList.add('hidden');
     calibrationScreen.classList.remove('active');
+    showGo();
     startTime = Date.now();
     versusStartedAt = performance.now();
     if (soundEnabled) audioManager.startDrone();
@@ -1381,7 +1384,7 @@ function startGame(mode) {
     dareBox.classList.add('hidden');
     partyNextBtn.classList.add('hidden');
     gameOverScreen.classList.remove('versus-result', 'party-turn');
-    restartBtn.innerText = 'RETRY';
+    restartBtn.innerText = 'PLAY AGAIN';
     partyScreen.classList.add('hidden');
     partyScreen.classList.remove('active');
     if (mode !== 'CLASSIC') partyTurn = false;
@@ -1459,6 +1462,41 @@ function startGame(mode) {
         });
 }
 
+// One line before each game says what to do, while a 3-2-1 runs over calibration.
+const roundTip = document.getElementById('round-tip');
+const countdownEl = document.getElementById('countdown');
+const goFlash = document.getElementById('go-flash');
+let goFlashTimer = null;
+function roundTipFor(mode) {
+    switch (mode) {
+        case 'PRECISION': return `Blink right at ${precisionTarget} seconds.`;
+        case 'ENDURANCE': return "Don't blink for 30 seconds.";
+        case 'DAILY': return "Today's twist is on. Don't blink!";
+        case 'SURPRISE': return "Something may startle you. Don't blink!";
+        case 'DISTRACT': return "Jokes are coming. Don't blink!";
+        case 'BALLOON': return 'Blink when a balloon is in the green zone.';
+        case 'VERSUS': return 'First to blink loses.';
+        default: return 'Keep your eyes open as long as you can.';
+    }
+}
+function showGo() {
+    clearTimeout(goFlashTimer);
+    goFlash.classList.remove('hidden');
+    goFlashTimer = setTimeout(() => goFlash.classList.add('hidden'), 700);
+}
+
+// Best score per mode, kept on this device without needing a name.
+function bestKey(mode) { return `blink_best_${mode}`; }
+function recordBest(mode, score) {
+    let best = null;
+    try { const stored = Number.parseFloat(localStorage.getItem(bestKey(mode))); if (Number.isFinite(stored)) best = stored; } catch { return { best: null, isNew: false }; }
+    const better = best === null || (mode.startsWith('PRECISION') ? score < best : score > best);
+    if (better) {
+        try { localStorage.setItem(bestKey(mode), String(score)); } catch { /* storage unavailable */ }
+    }
+    return { best: better ? score : best, isNew: better && best !== null };
+}
+
 function showSkinPick(mode) {
     gameState = 'SKIN_PICK';
     loadingMsg.style.display = 'none';
@@ -1492,6 +1530,8 @@ function startCalibration() {
     calibrationStatus.innerText = 'FINDING YOUR EYES';
     calibrationHint.innerText = calibrationHintText;
     calibrationLoader.style.width = '0%';
+    roundTip.textContent = roundTipFor(currentMode);
+    countdownEl.textContent = '3';
 
     menuScreen.classList.add('hidden');
     menuScreen.classList.remove('active');
@@ -1512,6 +1552,8 @@ function updateCalibrationLoop() {
         const elapsed = now - calibrationStartTime;
         const progress = calibration.progress(now);
         calibrationLoader.style.width = `${progress * 100}%`;
+        const count = String(Math.max(1, Math.ceil((3000 - elapsed) / 1000)));
+        if (countdownEl.textContent !== count) countdownEl.textContent = count;
 
         if (elapsed >= 3000 && calibration.ready(now)) {
             finishCalibration();
@@ -1574,6 +1616,7 @@ function finishCalibration() {
 
     calibrationScreen.classList.add('hidden');
     calibrationScreen.classList.remove('active');
+    showGo();
 
     // Start Audio Drone
     if (soundEnabled) audioManager.startDrone();
@@ -1684,7 +1727,7 @@ function showMenu() {
     dareBox.classList.add('hidden');
     partyNextBtn.classList.add('hidden');
     gameOverScreen.classList.remove('versus-result', 'party-turn');
-    restartBtn.innerText = 'RETRY';
+    restartBtn.innerText = 'PLAY AGAIN';
     gameOverCameraStop.cancel();
     gameState = 'MENU';
     cancelAnimationFrame(animationFrameId);
@@ -1914,7 +1957,7 @@ function endGame(reason = 'BLINK') {
     gameOverScreen.classList.remove('versus-result', 'party-turn');
     dareBox.classList.add('hidden');
     partyNextBtn.classList.add('hidden');
-    restartBtn.innerText = 'RETRY';
+    restartBtn.innerText = 'PLAY AGAIN';
     if (reason === 'MENU_EXIT') {
         showMenu();
         return;
@@ -1994,8 +2037,8 @@ function endGame(reason = 'BLINK') {
             finalScoreLabel.innerText = "YOU SURVIVED";
             gameOverTitle.innerText = "BLINK DETECTED";
 
-            // Show World Record
-            gameOverWorldRecord.classList.remove('hidden');
+            // The automatic best-score line below replaces the old saved-score line.
+            gameOverWorldRecord.classList.add('hidden');
             if (window.currentWorldRecord) {
                 gameOverWorldRecord.innerText = `Your Best: ${window.currentWorldRecord.toFixed(2)}s`;
             } else {
@@ -2039,6 +2082,15 @@ function endGame(reason = 'BLINK') {
         lastScore = reason === 'DISQUALIFIED' ? null : scoreToSave;
         if (lastScore !== null && ['ENDURANCE', 'SURPRISE'].includes(currentMode)) lastScore = Math.min(30, lastScore);
         lastResult = lastScore === null ? null : { mode: currentMode, score: lastScore, elapsed, target: precisionTarget };
+        // Your best in this mode, saved on this device; Precision's best is the smallest miss.
+        const bestScoreEl = document.getElementById('best-score');
+        if (lastResult) {
+            const bestKeyMode = currentMode === 'PRECISION' ? `PRECISION_${precisionTarget}` : currentMode;
+            const { best, isNew } = recordBest(bestKeyMode, lastScore);
+            bestScoreEl.innerText = isNew ? 'NEW BEST!' : best !== null && best !== lastScore ? `Your best: ${formatScore(currentMode, best)}` : '';
+            bestScoreEl.classList.toggle('new-best', isNew);
+            bestScoreEl.classList.toggle('hidden', !bestScoreEl.innerText);
+        } else bestScoreEl.classList.add('hidden');
         social.render(lastResult, activeChallenge, currentSkin);
         finalScoreVal.innerText = finalScoreText;
 

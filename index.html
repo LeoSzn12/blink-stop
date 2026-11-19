@@ -65,7 +65,7 @@
                     <p id="eye-tracking-status" class="eye-tracking-status" role="status" aria-live="polite"></p>
 
                     <div class="mode-selection">
-                        <button class="neon-btn mode-btn main-mode-btn" data-mode="CLASSIC">ENDURANCE<span class="btn-sub">Keep your eyes open longest</span></button>
+                        <button class="neon-btn mode-btn main-mode-btn play-hero" data-mode="CLASSIC">▶ PLAY<span class="btn-sub">Endurance: keep your eyes open longest</span></button>
                         <button class="neon-btn mode-btn main-mode-btn precision-btn" data-mode="PRECISION">PRECISION<span class="btn-sub">Blink right at <span id="precision-target-label">10 seconds</span></span></button>
                         <button id="precision-change-btn" class="neon-btn-small precision-change" type="button">Change target time</button>
                         <button class="neon-btn mode-btn main-mode-btn olympics-btn" data-mode="OLYMPICS">QUICK GAMES<span class="btn-sub">Fast games for friends</span></button>
@@ -181,9 +181,13 @@
                     </div>
                 </div>
 
+                <div id="go-flash" class="go-flash hidden" aria-hidden="true">GO!</div>
+
                 <!-- Calibration Screen -->
                 <div id="calibration-screen" class="screen hidden">
-                    <h2 class="glitch" data-text="CALIBRATING">CALIBRATING</h2>
+                    <p id="round-tip" class="round-tip"></p>
+                    <div id="countdown" class="countdown" aria-live="polite">3</div>
+                    <h2 class="glitch" data-text="GET READY">GET READY</h2>
                     <p class="subtitle">Keep your eyes open normally</p>
                     <p id="calibration-hint" class="calibration-hint">Face the camera with a light in front of you.</p>
                     <div class="calibration-loader">
@@ -266,23 +270,10 @@
                         <div id="final-score-sub" class="score-sub hidden"></div>
                         <!-- World Record for Classic Mode -->
                         <div id="game-over-world-record" class="score-sub hidden"></div>
+                        <!-- Your best in this mode, kept on this device -->
+                        <div id="best-score" class="best-score hidden" role="status"></div>
                     </div>
 
-                    <div class="name-entry-container">
-                        <input type="text" id="player-name-input" placeholder="ENTER NAME" maxlength="10">
-                        <button id="save-score-btn" class="neon-btn-small">SAVE</button>
-                    </div>
-
-                    <!-- Leaderboards -->
-                    <div class="leaderboard-container">
-                        <h3>YOUR TOP SCORES</h3>
-                        <ul id="leaderboard-list">
-                            <!-- Populated by JS -->
-                        </ul>
-                    </div>
-
-
-                    
                     <!-- Selfie Preview -->
                     <div id="selfie-container" class="hidden" style="margin-bottom: 1rem; width: 100%; max-width: 300px; border: 2px solid var(--neon-cyan); border-radius: 8px; overflow: hidden;">
                         <img id="selfie-preview" style="width: 100%; display: block;" />
@@ -297,11 +288,12 @@
                     <button id="party-next-btn" class="neon-btn hidden" type="button">NEXT PLAYER</button>
 
                     <div class="game-over-btns">
-                        <button id="restart-btn" class="neon-btn">RETRY</button>
-                        <button id="share-btn" class="neon-btn" aria-label="Share result and friend challenge caption">SHARE CHALLENGE</button>
-                        <button id="selfie-btn" class="neon-btn" style="border-color: var(--neon-pink); color: var(--neon-pink)">SHARE PHOTO</button>
+                        <button id="restart-btn" class="neon-btn play-again-btn">PLAY AGAIN</button>
                         <button id="clip-btn" class="neon-btn clip-btn hidden" type="button" disabled>MAKING YOUR CLIP...</button>
+                        <button id="selfie-btn" class="neon-btn selfie-btn">SHARE PHOTO</button>
+                        <button id="share-btn" class="neon-btn" aria-label="Share result and friend challenge caption">SHARE CHALLENGE</button>
                     </div>
+                    <button id="menu-btn" class="neon-btn-small results-home-btn">⌂ HOME</button>
                     <section id="social-result" class="social-result hidden" aria-label="Your challenge card">
                         <p id="challenge-outcome" class="challenge-outcome" role="status"></p>
                         <h3>MAKE IT A FRIEND CHALLENGE</h3>
@@ -312,12 +304,27 @@
                             <button id="save-card-btn" class="neon-btn-small" type="button">Save card</button>
                             <button id="friend-turn-btn" class="neon-btn-small" type="button">Friend's turn</button>
                         </div>
-                        <label for="challenge-caption">Caption &amp; code — copy manually if sharing is unavailable</label>
-                        <textarea id="challenge-caption" rows="4" readonly></textarea>
-                        <p class="social-note">Friend's turn starts the same challenge on this phone. Daily has no comparison code because modifiers depend on the local date. Blink normally; stop if uncomfortable.</p>
                         <p id="social-status" role="status" aria-live="polite"></p>
+                        <details class="caption-details">
+                            <summary>Copy the caption instead</summary>
+                            <label for="challenge-caption">Caption &amp; code — copy manually if sharing is unavailable</label>
+                            <textarea id="challenge-caption" rows="4" readonly></textarea>
+                            <p class="social-note">Friend's turn starts the same challenge on this phone. Daily has no comparison code because modifiers depend on the local date. Blink normally; stop if uncomfortable.</p>
+                        </details>
                     </section>
-                    <button id="menu-btn" class="neon-btn-small">⌂ HOME</button>
+                    <details id="top-scores" class="top-scores">
+                        <summary>Your top scores</summary>
+                        <div class="name-entry-container">
+                            <input type="text" id="player-name-input" placeholder="ENTER NAME" maxlength="10">
+                            <button id="save-score-btn" class="neon-btn-small">SAVE</button>
+                        </div>
+                        <div class="leaderboard-container">
+                            <h3>YOUR TOP SCORES</h3>
+                            <ul id="leaderboard-list">
+                                <!-- Populated by JS -->
+                            </ul>
+                        </div>
+                    </details>
                     <!-- Hidden for version 1.0; the demo code stays for a later update. -->
                     <button id="demo-bonus-btn" class="neon-btn-small demo-link hidden" type="button" hidden>Preview bonus theme demo</button>
                 </div>
