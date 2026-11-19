@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createFlashRound, FLASH_TRIES, FLASH_TIMEOUT_MS } from '../src/flash.mjs';
-import { createBeatRound, makeRhythm, copyMatches, gapMatches, BEAT_LIVES, START_BEATS, SHORT_MS, LONG_MS } from '../src/beat.mjs';
+import { createBeatRound, judgeOffset, bpmFor, BEAT_LIVES, START_BPM, MAX_BPM, PERFECT_MS, GOOD_MS, LATENCY_MS, LEAD_MS, LIFE_BACK_STREAK } from '../src/beat.mjs';
 
 test('Flash: blink after green scores the reaction in ms; best of three is the fastest', () => {
     const round = createFlashRound({ random: () => 0, firstWaitMs: 1000 });
@@ -40,58 +40,91 @@ test('Flash: no blink after green times out at the limit', () => {
     assert.deepEqual([slow.kind, slow.ms], ['SLOW', FLASH_TIMEOUT_MS]);
 });
 
-test('Copy the Beat: rhythms start short and timing is forgiving but not sloppy', () => {
-    assert.deepEqual(makeRhythm(3, () => 0.9), [SHORT_MS, LONG_MS]);
-    assert.equal(gapMatches(SHORT_MS, SHORT_MS + 200), true);
-    assert.equal(gapMatches(SHORT_MS, LONG_MS), false);
-    assert.equal(gapMatches(LONG_MS, SHORT_MS), false);
-    assert.equal(copyMatches([450, 1000], [0, 500, 1450]), true);
-    assert.equal(copyMatches([450, 1000], [0, 500]), false);
-});
-
-function play(round, now, gaps) {
-    // Runs the show, then blinks the given gaps back. Returns the time after judging.
-    let t = now;
-    while (round.phase === 'SHOW') { round.update(t); t += 50; }
-    assert.equal(round.phase, 'COPY');
-    let result = round.blink(t);
-    for (const gap of gaps) { t += gap; result = round.blink(t) ?? result; }
-    return { t, result };
+// Runs the round frame by frame until the next live note's time, returning that time.
+function nextNoteAt(round, from) {
+    let t = from;
+    for (; t < from + 10000; t += 10) {
+        round.update(t);
+        const live = round.visible(t).filter(n => n.state === 'LIVE');
+        const near = live.find(n => n.progress >= 0.999);
+        if (near) return t;
+    }
+    throw new Error('no note');
 }
 
-test('Copy the Beat: a right copy adds a beat, a wrong one costs a life, three wrong ends it', () => {
-    const round = createBeatRound({ random: () => 0.9 });
+test('Blink Beat: timing windows are forgiving and allow for camera delay', () => {
+    assert.equal(judgeOffset(0), 'PERFECT');
+    assert.equal(judgeOffset(PERFECT_MS), 'PERFECT');
+    assert.equal(judgeOffset(-GOOD_MS), 'GOOD');
+    assert.equal(judgeOffset(GOOD_MS + 1), null);
+    assert.equal(bpmFor(0), START_BPM);
+    assert.ok(bpmFor(8) > bpmFor(0));
+    assert.equal(bpmFor(10000), MAX_BPM);
+    assert.ok(60000 / MAX_BPM >= 500, 'notes never come faster than about two blinks a second');
+});
+
+test('Blink Beat: a count-in, then a blink at the line hits, even with camera delay', () => {
+    const round = createBeatRound({ random: () => 0 });
     round.update(0);
-    assert.equal(round.beats, START_BEATS);
-    let { t, result } = play(round, 0, round.gaps);
-    assert.equal(result.kind, 'RIGHT');
+    assert.equal(round.visible(0).filter(n => n.state === 'LIVE' && n.progress >= 0).length, 0, 'nothing to hit during the count-in');
+    const at = nextNoteAt(round, 0);
+    assert.ok(at >= LEAD_MS - 20, `first note comes after the count-in (${at})`);
+    const hit = round.blink(at + LATENCY_MS);
+    assert.equal(hit.kind, 'PERFECT');
     assert.equal(round.score, 1);
-    assert.equal(round.beats, START_BEATS + 1);
-    round.update(t + 1200);
-    assert.equal(round.phase, 'SHOW');
-    for (let i = 0; i < BEAT_LIVES; i++) {
-        ({ t, result } = play(round, t + 1200, round.gaps.map(() => 1500)));
-        assert.equal(result.kind, 'WRONG');
-        round.update(t + 1200);
-    }
+    assert.equal(round.combo, 1);
+    const next = nextNoteAt(round, at + 50);
+    assert.equal(round.blink(next + LATENCY_MS + 200).kind, 'GOOD');
+    assert.equal(round.combo, 2);
+});
+
+test('Blink Beat: a stray blink breaks the streak but costs no life', () => {
+    const round = createBeatRound({ random: () => 0 });
+    round.update(0);
+    const at = nextNoteAt(round, 0);
+    round.blink(at + LATENCY_MS);
+    const stray = round.blink(at + 600);
+    assert.equal(stray.kind, 'STRAY');
+    assert.equal(round.combo, 0);
+    assert.equal(round.livesLeft(), BEAT_LIVES);
+});
+
+test('Blink Beat: missed notes cost lives and three ends it', () => {
+    const round = createBeatRound({ random: () => 0 });
+    let t = 0, missed = 0;
+    while (!round.over && t < 60000) { missed += round.update(t).missed; t += 20; }
     assert.equal(round.over, true);
-    assert.equal(round.livesLeft(), 0);
-    assert.equal(round.score, 1);
+    assert.equal(missed, BEAT_LIVES);
+    assert.equal(round.score, 0);
+    assert.equal(round.blink(t + 1000), null, 'no blinks count after the end');
 });
 
-test('Copy the Beat: stopping partway, or never starting, is judged as wrong', () => {
-    const round = createBeatRound();
-    round.update(0);
+test('Blink Beat: blinking nonstop does not beat the game', () => {
+    const round = createBeatRound({ random: () => 0.5 });
     let t = 0;
-    while (round.phase === 'SHOW') { round.update(t); t += 50; }
-    round.blink(t);
-    assert.equal(round.update(t + 1000), null);
-    assert.equal(round.update(t + 1900).kind, 'WRONG');
-    assert.equal(round.livesLeft(), BEAT_LIVES - 1);
-    assert.equal(round.blink(t + 1950), null, 'blinks during the result do nothing');
+    while (!round.over && t < 40000) { round.update(t); if (t % 300 === 0) round.blink(t); t += 20; }
+    assert.ok(round.bestCombo < 8, `spamming blinks keeps the streak short (${round.bestCombo})`);
 });
 
-test('Flash and Copy the Beat results share, and challenge codes round-trip', async () => {
+test('Blink Beat: a long streak wins a lost life back and the beat speeds up', () => {
+    const round = createBeatRound({ random: () => 0 });
+    let t = 0;
+    // Miss the first note, then hit the rest perfectly.
+    while (round.update(t).missed === 0) t += 20;
+    assert.equal(round.livesLeft(), BEAT_LIVES - 1);
+    const startBpm = round.bpm;
+    for (let i = 0; i < LIFE_BACK_STREAK; i++) {
+        const at = nextNoteAt(round, t + 20);
+        const result = round.blink(at + LATENCY_MS);
+        assert.equal(result.kind, 'PERFECT');
+        t = at;
+        if (i === LIFE_BACK_STREAK - 1) assert.equal(result.lifeBack, true);
+    }
+    assert.equal(round.livesLeft(), BEAT_LIVES);
+    assert.ok(round.bpm > startBpm);
+});
+
+test('Flash and Blink Beat results share, and challenge codes round-trip', async () => {
     const { sharePayload, parseChallenge, challengeOutcome, formatScore, inviteLine, challengeHeadline } = await import('../src/share.mjs');
     const flash = { mode: 'FLASH', score: 287 };
     assert.equal(formatScore('FLASH', 287), '287 ms');
@@ -101,7 +134,7 @@ test('Flash and Copy the Beat results share, and challenge codes round-trip', as
     assert.match(inviteLine(flash), /287 ms after the flash/);
     assert.equal(challengeHeadline({ mode: 'FLASH', score: 287 }).title, 'Blink faster than 287 ms');
     const beat = { mode: 'BEAT', score: 4 };
-    assert.equal(formatScore('BEAT', 1), '1 round');
+    assert.equal(formatScore('BEAT', 1), '1 note');
     assert.deepEqual(parseChallenge(sharePayload(beat).text), { mode: 'BEAT', score: 4, target: 0 });
     assert.match(challengeOutcome({ mode: 'BEAT', score: 5 }, { mode: 'BEAT', score: 4 }), /BEATEN/);
 });

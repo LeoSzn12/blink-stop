@@ -93,7 +93,7 @@ export function createFaceLossTracker(durationMs = 1000) {
     };
 }
 
-// Tap games (Balloon Pop, Flash, Copy the Beat) want every deliberate blink, even a quick one
+// Tap games (Balloon Pop, Flash, Blink Beat) want every deliberate blink, even a quick one
 // the camera sees in a single frame. Endurance keeps the stricter sustained-closure detector
 // so a flicker never ends a round. One blink fires once; the eyes must reopen past a slightly
 // higher line before the next blink can count.

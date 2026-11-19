@@ -581,19 +581,22 @@ test('Quick Games: Flash scores your fastest blink after green, in ms', async ()
   assert.equal(h.el('quick-stage').classList.contains('hidden'), true);
 });
 
-test('Quick Games: Copy the Beat ends after three wrong copies and counts rounds', async () => {
+test('Quick Games: Blink Beat ends after three missed notes and counts hits', async () => {
   const h = harness();
   h.debug.startGame('BEAT'); await h.settle(); await h.timers();
   let t = 0;
   const frame = async () => { h.setClock(t); h.tickInference(); h.deliver(); await h.settle(); h.raf(); t += 100; };
-  while (t < 4000) await frame();
+  while (h.debug.getState() !== 'BEAT' && t < 8000) await frame();
   assert.equal(h.debug.getState(), 'BEAT');
-  assert.equal(h.el('hud-label').innerText, 'ROUNDS');
+  assert.equal(h.el('hud-label').innerText, 'HITS');
   assert.equal(h.el('lives-display').classList.contains('hidden'), false);
-  // Never blink back: each rhythm times out as a wrong copy.
+  assert.equal(h.el('balloon-layer').classList.contains('hidden'), false, 'the note lane is drawn over the camera');
+  assert.equal(h.el('quick-stage').classList.contains('hidden'), true);
+  // Never blink: notes slide past and each miss costs a life.
   while (h.debug.getState() === 'BEAT' && t < 120000) await frame();
   assert.equal(h.debug.getState(), 'GAME_OVER');
   assert.equal(h.el('final-score-val').innerText, '0');
-  assert.equal(h.el('final-score-label').innerText, 'ROUNDS COPIED');
+  assert.equal(h.el('final-score-label').innerText, 'NOTES HIT');
   assert.equal(h.el('lives-display').classList.contains('hidden'), true);
+  assert.equal(h.el('balloon-layer').classList.contains('hidden'), true);
 });

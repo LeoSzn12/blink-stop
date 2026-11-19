@@ -15,7 +15,7 @@ import { parseNames, createParty, createDeck, forfeitCards, jokeCards } from './
 import { drawReel } from './reel.mjs';
 import { createBalloonRound, drawBalloons, BALLOON_MISSES } from './balloons.mjs';
 import { createFlashRound } from './flash.mjs';
-import { createBeatRound, BEAT_LIVES } from './beat.mjs';
+import { createBeatRound, BEAT_LIVES, drawBeat } from './beat.mjs';
 import { clipSupported, createClipBuffer, encodeClip, pickClipType, clipExtension } from './clip.mjs';
 
 // DOM Elements
@@ -114,22 +114,22 @@ const olympicsOptions = document.getElementById('olympics-options');
 const balloonLayer = document.getElementById('balloon-layer');
 const balloonCtx = balloonLayer.getContext('2d');
 let balloonRound = null, balloonFrameId = null, balloonEnd = null;
-// Balloon Pop, Flash and Copy the Beat count every deliberate blink, even a one-frame one.
+// Balloon Pop, Flash and Blink Beat count every deliberate blink, even a one-frame one.
 const tapBlink = createTapBlink();
 const livesDisplay = document.getElementById('lives-display');
-// Flash and Copy the Beat share one stage: a big light, a line of text and progress dots.
+// Flash uses one stage: a big light, a line of text and progress dots.
 const quickStage = document.getElementById('quick-stage');
 const quickLight = document.getElementById('quick-light');
 const quickText = document.getElementById('quick-text');
 const quickDots = document.getElementById('quick-dots');
-let quickRound = null, quickFrameId = null, quickEnd = null, quickTapUntil = 0;
+let quickRound = null, quickFrameId = null, quickEnd = null;
 
 // Face filter pick: a game started from the menu first shows the live camera with the
 // skin on your face, so you choose your look right before playing. Retry skips it.
 const skinPickScreen = document.getElementById('skin-pick-screen');
 const skinPickMode = document.getElementById('skin-pick-mode');
 const SKIN_PICK_MODES = ['CLASSIC', 'PRECISION', 'ENDURANCE', 'DAILY', 'VERSUS', 'DISTRACT', 'BALLOON', 'FLASH', 'BEAT', 'SURPRISE'];
-const MODE_NAMES = { CLASSIC: 'Endurance', PRECISION: 'Precision', ENDURANCE: '30 Seconds', DAILY: 'Daily', VERSUS: 'Stare-down', DISTRACT: 'Distraction', BALLOON: 'Balloon Pop', FLASH: 'Flash', BEAT: 'Copy the Beat', SURPRISE: 'Surprise' };
+const MODE_NAMES = { CLASSIC: 'Endurance', PRECISION: 'Precision', ENDURANCE: '30 Seconds', DAILY: 'Daily', VERSUS: 'Stare-down', DISTRACT: 'Distraction', BALLOON: 'Balloon Pop', FLASH: 'Flash', BEAT: 'Blink Beat', SURPRISE: 'Surprise' };
 let pickSkinNext = false;
 let shareLine = 'Think you can beat me?'; // invite text that travels with a shared photo
 let shareUrl = PUBLIC_PLAY_URL; // challenge link that travels with a shared photo or clip
@@ -1082,7 +1082,7 @@ function endBalloon(faceLost) {
     endGame('BALLOON_OVER');
 }
 
-// ---------- Flash and Copy the Beat ----------
+// ---------- Flash and Blink Beat ----------
 function stopQuick() {
     cancelAnimationFrame(quickFrameId);
     quickRound = null;
@@ -1091,7 +1091,15 @@ function stopQuick() {
     quickStage.classList.remove('go', 'early');
     quickLight.classList.remove('lit', 'tap', 'right', 'wrong');
     gameHud.classList.remove('tap-mode');
+    if (beatBarsPlayed !== null) {
+        beatBarsPlayed = null;
+        balloonCtx.clearRect(0, 0, balloonLayer.width, balloonLayer.height);
+        balloonLayer.classList.add('hidden');
+        livesDisplay.classList.add('hidden');
+    }
 }
+
+let beatBarsPlayed = null; // beats played so far in Blink Beat (for the accent on each bar)
 
 function renderQuickDots(filled, total, cls = 'on') {
     const dots = [];
@@ -1122,8 +1130,8 @@ function startQuickRound(mode) {
     tapBlink.reset();
     quickEnd = null;
     startTime = Date.now();
-    quickStage.classList.remove('hidden', 'go', 'early');
     quickLight.classList.remove('lit', 'tap', 'right', 'wrong');
+    if (mode === 'FLASH') quickStage.classList.remove('hidden', 'go', 'early');
     gameHud.classList.remove('hidden');
     gameHud.classList.add('active', 'tap-mode');
     faceStatus.classList.remove('hidden', 'not-detected');
@@ -1134,13 +1142,15 @@ function startQuickRound(mode) {
         faceStatusText.innerText = 'Blink the moment it turns green';
         renderQuickDots(0, quickRound.tries);
     } else {
-        hudLabel.innerText = 'ROUNDS';
+        // Blink Beat draws its lane and notes on the same camera overlay as Balloon Pop.
+        beatBarsPlayed = 0;
+        hudLabel.innerText = 'HITS';
         scoreDisplay.innerText = '0';
-        quickText.textContent = 'Watch the rhythm';
-        faceStatusText.innerText = 'Watch first, then blink it back';
+        balloonLayer.classList.remove('hidden');
+        sizeBalloonLayer();
+        faceStatusText.innerText = 'Listen to the beat. Blink as each note hits the line';
         livesDisplay.classList.remove('hidden');
         renderQuickLives();
-        renderQuickDots(0, quickRound.beats);
     }
     updateQuickLoop();
 }
@@ -1175,33 +1185,17 @@ function showFlashEvent(event) {
 }
 
 function showBeatEvent(event, now) {
-    quickLight.classList.toggle('lit', quickRound.lit(now));
-    if (quickTapUntil && now >= quickTapUntil) { quickLight.classList.remove('tap'); quickTapUntil = 0; }
-    if (!event) return;
-    if (event.kind === 'FLASH') {
-        if (soundEnabled) audioManager.playBeep?.(660);
-        renderQuickDots(event.index + 1, quickRound.beats, 'shown');
-    } else if (event.kind === 'YOUR_TURN') {
-        quickText.textContent = 'Your turn: blink it back';
-        faceStatusText.innerText = `Blink ${quickRound.beats} times in the same rhythm`;
-        renderQuickDots(0, quickRound.beats);
-    } else if (event.kind === 'RIGHT' || event.kind === 'WRONG') {
-        showBeatResult(event);
-    } else if (event.kind === 'NEXT') {
-        quickLight.classList.remove('right', 'wrong');
-        quickText.textContent = `Watch: ${event.beats} beats`;
-        faceStatusText.innerText = 'Watch first, then blink it back';
-        renderQuickDots(0, quickRound.beats);
+    for (let i = 0; i < (event?.beats || 0); i++) {
+        if (soundEnabled) audioManager.playKick?.(beatBarsPlayed % 4 === 0);
+        beatBarsPlayed++;
     }
-}
-
-function showBeatResult(event) {
-    quickLight.classList.remove('tap');
-    quickLight.classList.add(event.kind === 'RIGHT' ? 'right' : 'wrong');
-    quickText.textContent = event.kind === 'RIGHT' ? 'Nice! One more beat' : 'Missed it';
-    scoreDisplay.innerText = String(event.cleared);
-    renderQuickLives();
-    if (event.kind === 'WRONG' && navigator.vibrate) navigator.vibrate(60);
+    if (event?.missed) {
+        renderQuickLives();
+        if (navigator.vibrate) navigator.vibrate(60);
+        if (!quickRound.over) faceStatusText.innerText = quickRound.livesLeft() === 1 ? 'Missed one! Last life' : `Missed one! ${quickRound.livesLeft()} lives left`;
+    }
+    sizeBalloonLayer();
+    drawBeat(balloonCtx, quickRound, currentSkin, balloonLayer.width, balloonLayer.height, now);
 }
 
 // A blink counts the moment the eyes close; holding them shut is one blink.
@@ -1227,12 +1221,15 @@ function handleQuickEye(eye, now) {
                     if (navigator.vibrate) navigator.vibrate(25);
                 }
             } else if (gameState === 'BEAT' && result) {
-                if (result.kind === 'TAP') {
-                    quickLight.classList.add('tap');
-                    quickTapUntil = now + 160;
-                    renderQuickDots(result.count, quickRound.beats, 'tapped');
-                    if (soundEnabled) audioManager.playBeep?.(520);
-                } else showBeatResult(result);
+                if (result.kind === 'PERFECT' || result.kind === 'GOOD') {
+                    bumpBalloonScore(result.score);
+                    if (soundEnabled) audioManager.playBeep?.(result.kind === 'PERFECT' ? 880 : 660);
+                    if (navigator.vibrate) navigator.vibrate(20);
+                    if (result.lifeBack) renderQuickLives();
+                    faceStatusText.innerText = result.lifeBack ? `${result.combo} in a row! Life back` : result.combo >= 3 ? `${result.combo} in a row!` : result.kind === 'PERFECT' ? 'Perfect!' : 'Good!';
+                } else if (result.kind === 'STRAY') {
+                    faceStatusText.innerText = 'Wait for a note to reach the line';
+                }
             }
             if (quickRound.over) return endQuick(false);
         }
@@ -1254,7 +1251,7 @@ function endQuick(faceLost) {
         if (faceLost && !times.length) { quickEnd = null; endGame('DISQUALIFIED'); return; }
         quickEnd = { mode, score: quickRound.best, times, faceLost, lastHit: !faceLost && quickRound.last?.kind === 'HIT' };
     } else {
-        quickEnd = { mode, score: quickRound.score, longest: quickRound.score ? quickRound.beats - 1 : 0, faceLost };
+        quickEnd = { mode, score: quickRound.score, bestCombo: quickRound.bestCombo, perfect: quickRound.perfect, faceLost };
     }
     endGame('QUICK_OVER');
 }
@@ -1695,7 +1692,7 @@ function roundTipFor(mode) {
         case 'DISTRACT': return "Jokes are coming. Don't blink!";
         case 'BALLOON': return 'Blink when a balloon is in the green zone.';
         case 'FLASH': return 'Wait for green, then blink as fast as you can.';
-        case 'BEAT': return 'Watch the flashes, then blink the same rhythm back.';
+        case 'BEAT': return 'Notes slide down to the line with the beat. Blink as each one hits it.';
         case 'VERSUS': return 'First to blink loses.';
         default: return 'Keep your eyes open as long as you can.';
     }
@@ -2235,9 +2232,9 @@ function endGame(reason = 'BLINK') {
                 finalScoreSub.innerText = quickEnd.faceLost ? 'Your face left the frame' : `Your tries: ${quickEnd.times.map(ms => `${ms} ms`).join(' · ')}`;
             } else {
                 finalScoreText = String(quickEnd.score);
-                finalScoreLabel.innerText = quickEnd.score === 1 ? 'ROUND COPIED' : 'ROUNDS COPIED';
-                gameOverTitle.innerText = quickEnd.score >= 6 ? 'PERFECT RHYTHM!' : quickEnd.score >= 3 ? 'NICE BEAT!' : 'GAME OVER';
-                finalScoreSub.innerText = quickEnd.faceLost ? 'Your face left the frame' : `Longest rhythm: ${quickEnd.longest} beats`;
+                finalScoreLabel.innerText = quickEnd.score === 1 ? 'NOTE HIT' : 'NOTES HIT';
+                gameOverTitle.innerText = quickEnd.score >= 40 ? 'ROCK STAR EYES!' : quickEnd.score >= 15 ? 'NICE BEAT!' : 'GAME OVER';
+                finalScoreSub.innerText = quickEnd.faceLost ? 'Your face left the frame' : `Best streak: ${quickEnd.bestCombo} · Perfect: ${quickEnd.perfect}`;
             }
         } else if (reason === 'BALLOON_OVER' && balloonEnd) {
             scoreToSave = balloonEnd.score;

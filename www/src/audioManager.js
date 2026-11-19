@@ -111,7 +111,23 @@ class AudioManager {
         osc.stop(this.ctx.currentTime + 0.25);
     }
 
-    // Short, soft beep for Flash and Copy the Beat.
+    // Blink Beat's backing beat: a soft kick drum, louder on the first beat of a bar.
+    playKick(accent = false) {
+        const t = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(accent ? 160 : 130, t);
+        osc.frequency.exponentialRampToValueAtTime(45, t + 0.18);
+        gain.gain.setValueAtTime(accent ? 0.5 : 0.32, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
+        osc.connect(gain);
+        gain.connect(this.masterGain);
+        osc.start(t);
+        osc.stop(t + 0.23);
+    }
+
+    // Short, soft beep for Flash and Blink Beat.
     playBeep(frequency = 660) {
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();

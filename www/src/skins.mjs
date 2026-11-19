@@ -200,7 +200,7 @@ export function selfieCaption({ reason, mode, elapsed, target, score }) {
     }
     if (mode === 'BEAT') {
         const n = Number.isFinite(score) ? score : 0;
-        return { headline: `${n} ROUND${n === 1 ? '' : 'S'} COPIED!`, detail: 'Copied the beat just by blinking. Your turn?' };
+        return { headline: `${n} NOTE${n === 1 ? '' : 'S'} HIT!`, detail: 'Hit the beat just by blinking. Your turn?' };
     }
     if (mode === 'BALLOON') {
         const n = Number.isFinite(score) ? score : 0;
