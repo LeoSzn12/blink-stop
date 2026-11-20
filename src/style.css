@@ -271,14 +271,15 @@ h1.glitch {
 }
 
 /* Tension state */
+/* Slow and soft: under one pulse a second, well clear of flashing limits. */
 .tension-active {
-    animation: tensionPulse 0.4s infinite;
+    animation: tensionPulse 1.4s ease-in-out infinite;
     box-shadow: inset 0 0 100px rgba(255, 0, 0, 0.4);
 }
 
 @keyframes tensionPulse {
     0% { filter: contrast(1) sepia(0) hue-rotate(0deg); }
-    50% { filter: contrast(1.2) sepia(0.5) hue-rotate(-20deg) saturate(1.5); }
+    50% { filter: contrast(1.1) sepia(0.3) hue-rotate(-12deg) saturate(1.25); }
     100% { filter: contrast(1) sepia(0) hue-rotate(0deg); }
 }
 
@@ -1424,3 +1425,40 @@ body.in-game .footer, body.in-game footer { display: none; }
 .eye-tracking-status { font-size: 1rem; font-weight: 700; }
 .calibration-light-tip { margin: .75rem auto 0; max-width: 24rem; padding: .6rem .9rem; border: 2px solid #ffd23f; border-radius: 12px; background: rgba(0, 0, 0, .85); color: #ffd23f; font-weight: 800; font-size: 1.1rem; text-align: center; }
 .calibration-light-tip.hidden { display: none; }
+
+/* Precision: pick a challenge (Classic target times or Gas Pump) */
+.precision-choice-title { margin: .75rem 0 0; font-weight: 800; color: #fff; }
+.pump-btn { display: flex; flex-direction: column; align-items: center; margin: 1.25rem auto 1rem; max-width: 100%; white-space: normal; border-color: #ffd23f; color: #ffd23f; }
+
+
+/* Daily "glitchy screen" twist: these keyframes were missing, so the twist did nothing.
+   A small jitter and a slow colour drift; nothing flashes. */
+@keyframes glitch {
+    0%, 100% { transform: translate(0, 0) skewX(0deg); }
+    20% { transform: translate(-3px, 1px) skewX(-1deg); }
+    40% { transform: translate(2px, -1px) skewX(.6deg); }
+    60% { transform: translate(-1px, 2px) skewX(0deg); }
+    80% { transform: translate(3px, 0) skewX(-.6deg); }
+}
+@keyframes hue-rotate { from { filter: hue-rotate(0deg); } to { filter: hue-rotate(360deg); } }
+.chaos-glitch { animation: glitch .6s steps(5) infinite, hue-rotate 6s linear infinite; }
+
+/* Pop: a quick bump and a coloured flash on every balloon. Reduced motion keeps the flash only. */
+.pop-hit .video-wrapper { animation: pop-bump .18s ease-out; }
+.pop-flash { position: fixed; inset: 0; z-index: 140; pointer-events: none; background: radial-gradient(circle at 50% 45%, var(--pop-color, #39ff14) 0%, transparent 65%); opacity: 0; animation: pop-flash .25s ease-out; }
+@keyframes pop-bump { 0% { transform: translate(0, 0) scale(1); } 30% { transform: translate(-4px, 3px) scale(1.012); } 60% { transform: translate(3px, -2px) scale(1.006); } 100% { transform: translate(0, 0) scale(1); } }
+@keyframes pop-flash { 0% { opacity: .35; } 100% { opacity: 0; } }
+
+/* Celebrations: confetti canvas over everything, and a big crown for the party champion. */
+.confetti-layer { position: fixed; inset: 0; z-index: 160; pointer-events: none; width: 100%; height: 100%; }
+.champion-crown { display: block; font-size: clamp(4rem, 18vw, 7rem); line-height: 1; margin: .25rem auto .5rem; text-align: center; animation: crown-drop .7s cubic-bezier(.2, 1.4, .4, 1) both; }
+.champion-crown.hidden { display: none; }
+@keyframes crown-drop { 0% { transform: translateY(-60px) scale(.6) rotate(-12deg); opacity: 0; } 100% { transform: none; opacity: 1; } }
+#final-score-val.counting { color: #fff; }
+
+@media (prefers-reduced-motion: reduce) {
+    .tension-active, .classic-stage-shake, .classic-stage-void-plus, .chaos-shake, .chaos-glitch,
+    .pop-hit .video-wrapper, .champion-crown { animation: none !important; }
+}
+
+.effects-toggles { display: flex; flex-wrap: wrap; gap: .75rem; justify-content: center; }

@@ -22,6 +22,7 @@
   "dependencies": {
     "@capacitor/core": "8.5.2",
     "@capacitor/filesystem": "8.1.4",
+    "@capacitor/haptics": "8.0.2",
     "@capacitor/share": "8.0.3",
     "@mediapipe/face_mesh": "0.4.1633559619"
   },

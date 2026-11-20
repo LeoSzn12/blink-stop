@@ -119,7 +119,7 @@ export function drawClipFrame(ctx, frame, { skinId, seconds, blinked, stamp, cap
     if (Number.isFinite(seconds)) {
         ctx.font = font(48);
         ctx.lineWidth = 8; ctx.strokeStyle = 'rgba(0, 0, 0, 0.6)';
-        const label = `${Math.max(0, seconds).toFixed(2)}s`;
+        const label = caption?.timeLabel ? caption.timeLabel(seconds) : `${Math.max(0, seconds).toFixed(2)}s`;
         ctx.strokeText(label, width / 2, py + 44);
         ctx.fillStyle = blinked ? '#ff4d4d' : '#ffffff';
         ctx.fillText(label, width / 2, py + 44);

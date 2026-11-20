@@ -97,3 +97,25 @@ test('balloon results share, challenge and caption as counts, not seconds', () =
     assert.match(inviteLine(null), /beat me/);
     assert.equal(selfieCaption({ mode: 'BALLOON', score: 1 }).headline, '1 BALLOON POPPED!');
 });
+
+test('the first five pops stay at the easy pace, levels go up every five, and a 15 streak wins a life back', async () => {
+    const { EASY_POPS, LIFE_BACK_STREAK, balloonLevel } = await import('../src/balloons.mjs');
+    assert.equal(difficulty(EASY_POPS).speed, difficulty(0).speed);
+    assert.ok(difficulty(EASY_POPS + 1).speed > difficulty(0).speed);
+    assert.equal(balloonLevel(0), 1);
+    assert.equal(balloonLevel(5), 2);
+    const round = createBalloonRound({ random: () => 0.5 });
+    // Lose one life on an empty blink (the first stray blink is free).
+    round.update(0); round.blink(10); round.blink(400);
+    assert.equal(round.misses, 1);
+    let t = 500, last = null;
+    for (let i = 0; i < LIFE_BACK_STREAK; i++) {
+        t = untilInZone(round, t + 300);
+        last = round.blink(t);
+        assert.equal(last.hit, true);
+        if (i === 4) assert.equal(last.levelUp, true);
+    }
+    assert.equal(last.streak, LIFE_BACK_STREAK);
+    assert.equal(last.lifeBack, true);
+    assert.equal(round.misses, 0);
+});

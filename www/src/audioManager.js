@@ -79,22 +79,69 @@ class AudioManager {
         osc.stop(this.ctx.currentTime + 0.3);
     }
 
-    playWin() {
+    // A short note with a quick attack and a fade (all sounds here are made in code).
+    tone(frequency, start, length, { type = 'triangle', volume = 0.2, slideTo = null } = {}) {
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
-
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(440, this.ctx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(880, this.ctx.currentTime + 0.5);
-
-        gain.gain.setValueAtTime(0.3, this.ctx.currentTime);
-        gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 1);
-
+        osc.type = type;
+        osc.frequency.setValueAtTime(frequency, start);
+        if (slideTo) osc.frequency.exponentialRampToValueAtTime(slideTo, start + length);
+        gain.gain.setValueAtTime(0.0001, start);
+        gain.gain.exponentialRampToValueAtTime(volume, start + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.0001, start + length);
         osc.connect(gain);
         gain.connect(this.masterGain);
+        osc.start(start);
+        osc.stop(start + length + 0.02);
+    }
 
-        osc.start();
-        osc.stop(this.ctx.currentTime + 1);
+    // Win fanfare: a bright four-note run up, then a held chord.
+    playWin() {
+        const t = this.ctx.currentTime;
+        [523.25, 659.25, 783.99].forEach((f, i) => this.tone(f, t + i * 0.09, 0.16, { volume: 0.18 }));
+        [523.25, 659.25, 783.99, 1046.5].forEach(f => this.tone(f, t + 0.3, 0.7, { volume: 0.1 }));
+    }
+
+    // Balloon pop: a deep thump (felt more than heard) plus a short burst of noise.
+    playPop(pitch = 1) {
+        const t = this.ctx.currentTime;
+        this.tone(150 * pitch, t, 0.12, { type: 'sine', volume: 0.55, slideTo: 45 });
+        if (!this.noise) {
+            const length = Math.floor(this.ctx.sampleRate * 0.12);
+            this.noise = this.ctx.createBuffer(1, length, this.ctx.sampleRate);
+            const data = this.noise.getChannelData(0);
+            for (let i = 0; i < length; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / length) ** 2;
+        }
+        const src = this.ctx.createBufferSource();
+        src.buffer = this.noise;
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.value = 1800 * pitch;
+        const gain = this.ctx.createGain();
+        gain.gain.value = 0.5;
+        src.connect(filter); filter.connect(gain); gain.connect(this.masterGain);
+        src.start(t);
+    }
+
+    // 3-2-1 countdown ticks, then a higher GO.
+    playTick() { this.tone(660, this.ctx.currentTime, 0.1, { type: 'square', volume: 0.08 }); }
+    playGo() {
+        const t = this.ctx.currentTime;
+        this.tone(988, t, 0.25, { type: 'square', volume: 0.09 });
+        this.tone(1318.5, t + 0.04, 0.25, { volume: 0.08 });
+    }
+
+    // Losing buzzer: two low notes stepping down.
+    playBuzzer() {
+        const t = this.ctx.currentTime;
+        this.tone(220, t, 0.22, { type: 'sawtooth', volume: 0.1, slideTo: 196 });
+        this.tone(165, t + 0.24, 0.4, { type: 'sawtooth', volume: 0.1, slideTo: 110 });
+    }
+
+    // Level up and a life back: a quick sparkle up.
+    playLevelUp() {
+        const t = this.ctx.currentTime;
+        [784, 988, 1175].forEach((f, i) => this.tone(f, t + i * 0.06, 0.12, { volume: 0.1 }));
     }
 
     playSurprise() {

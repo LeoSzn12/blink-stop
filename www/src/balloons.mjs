@@ -22,17 +22,22 @@ export function balloonColors(skinId) {
 }
 
 // Rising speed (play heights per second) and gap between balloons both ramp with the score.
-// The first handful of pops stay easy; by about 20 pops a balloon crosses the zone in
-// roughly half a second, which is where most players start losing lives.
+// The first five pops stay at the easy starting pace so everyone (kids, grandparents) gets
+// going; then it climbs, and by about 20 pops a balloon crosses the zone in under a second.
 export const MAX_SPEED = 0.55;
 export const MIN_GAP_MS = 600;
+export const EASY_POPS = 5;
+// A streak this long earns a lost life back, so a long run stays winnable.
+export const LIFE_BACK_STREAK = 15;
 export function difficulty(score) {
-    const s = Math.max(0, score | 0);
-    return { speed: Math.min(0.17 + s * 0.018, MAX_SPEED), gapMs: Math.max(1500 - s * 50, MIN_GAP_MS) };
+    const s = Math.max(0, (score | 0) - EASY_POPS);
+    return { speed: Math.min(0.17 + s * 0.022, MAX_SPEED), gapMs: Math.max(1500 - s * 60, MIN_GAP_MS) };
 }
+// Level shown to the player: goes up every five pops.
+export function balloonLevel(score) { return 1 + Math.floor(Math.max(0, score | 0) / 5); }
 
 export function createBalloonRound({ random = Math.random, firstBalloonMs = 600 } = {}) {
-    let balloons = [], score = 0, misses = 0, over = false;
+    let balloons = [], score = 0, misses = 0, over = false, streak = 0;
     let started = null, last = null, nextSpawn = null, lastBlink = -Infinity, nextId = 1;
     // Everyone blinks without meaning to: one stray blink per balloon is free.
     let freeStray = true;
@@ -42,6 +47,7 @@ export function createBalloonRound({ random = Math.random, firstBalloonMs = 600 
 
     function miss(now, kind) {
         misses++;
+        streak = 0;
         if (misses >= BALLOON_MISSES) over = true;
         return { hit: false, kind, misses, over, now };
     }
@@ -59,6 +65,7 @@ export function createBalloonRound({ random = Math.random, firstBalloonMs = 600 
     return {
         get score() { return score; },
         get misses() { return misses; },
+        get streak() { return streak; },
         get over() { return over; },
         get balloons() { return balloons; },
         livesLeft: () => Math.max(0, BALLOON_MISSES - misses),
@@ -94,7 +101,10 @@ export function createBalloonRound({ random = Math.random, firstBalloonMs = 600 
             }
             target.poppedAt = now;
             score++;
-            return { hit: true, balloon: target, score };
+            streak++;
+            let lifeBack = false;
+            if (streak % LIFE_BACK_STREAK === 0 && misses > 0) { misses--; lifeBack = true; }
+            return { hit: true, balloon: target, score, streak, lifeBack, levelUp: score % 5 === 0 };
         },
         elapsed: now => (started === null ? 0 : Math.max(0, (now - started) / 1000)),
     };
@@ -131,6 +141,15 @@ export function drawBalloons(ctx, round, skinId, width, height, now) {
         ctx.save();
         if (b.poppedAt) {
             const t = Math.min(1, (now - b.poppedAt) / 450);
+            // Bits of balloon fly out and fall (fixed per balloon, so it looks the same each frame).
+            ctx.fillStyle = color;
+            for (let i = 0; i < 12; i++) {
+                const a = (i / 12) * Math.PI * 2 + b.wobble;
+                const dist = r * (0.6 + t * (1.8 + (i % 3) * 0.5));
+                const px = x + Math.cos(a) * dist, py = y + Math.sin(a) * dist + t * t * r * 1.5;
+                ctx.globalAlpha = 1 - t;
+                ctx.beginPath(); ctx.arc(px, py, r * 0.12 * (1 - t * 0.5), 0, Math.PI * 2); ctx.fill();
+            }
             ctx.globalAlpha = 1 - t;
             ctx.strokeStyle = color;
             ctx.lineWidth = Math.max(2, unit * 0.008);

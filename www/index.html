@@ -68,7 +68,7 @@
                         <button class="neon-btn mode-btn main-mode-btn play-hero" data-mode="BALLOON"><span class="mode-icon" aria-hidden="true">🎈</span> BALLOON POP<span class="btn-sub">Blink to pop. How many can you get?</span></button>
                         <button class="neon-btn mode-btn main-mode-btn party-btn" data-mode="PARTY"><span class="mode-icon" aria-hidden="true">📱</span> PASS THE PHONE<span class="btn-sub">Family game for 2 to 8 players</span></button>
                         <button class="neon-btn mode-btn main-mode-btn stare-btn" data-mode="CLASSIC"><span class="mode-icon" aria-hidden="true">👁️</span> DON'T BLINK<span class="btn-sub">Keep your eyes open longest</span></button>
-                        <button class="neon-btn mode-btn main-mode-btn precision-btn" data-mode="PRECISION"><span class="mode-icon" aria-hidden="true">🎯</span> PRECISION<span class="btn-sub">Blink right on a target time you pick</span></button>
+                        <button class="neon-btn mode-btn main-mode-btn precision-btn" data-mode="PRECISION"><span class="mode-icon" aria-hidden="true">🎯</span> PRECISION<span class="btn-sub">Hit a target time, or stop the gas pump at $10</span></button>
                         <button class="neon-btn mode-btn main-mode-btn olympics-btn" data-mode="OLYMPICS"><span class="mode-icon" aria-hidden="true">⚡</span> MORE GAMES<span class="btn-sub">Flash, Blink Beat, Stare-Down, Jokes</span></button>
                         <!-- 30 Seconds, Daily and Surprise are hidden for the holiday launch (fewer choices,
                              no jump scare on the family screen). Their code stays; challenge links still work. -->
@@ -124,12 +124,14 @@
                     <!-- Precision Options (Hidden by default) -->
                     <div id="precision-options" class="options-container hidden">
                         <h2>PRECISION</h2>
-                        <p class="label">PICK YOUR TARGET: BLINK RIGHT AT</p>
+                        <p class="label">PICK A CHALLENGE</p>
+                        <p class="precision-choice-title">🎯 Classic: blink right at</p>
                         <div class="option-btns">
                             <button class="neon-btn-small option-btn" data-time="5">5 sec</button>
                             <button class="neon-btn-small option-btn active" data-time="10">10 sec</button>
                             <button class="neon-btn-small option-btn" data-time="15">15 sec</button>
                         </div>
+                        <button id="pump-start-btn" class="neon-btn pump-btn" type="button"><span class="mode-icon" aria-hidden="true">⛽</span> GAS PUMP<span class="btn-sub">Blink to stop the pump at exactly $10.00</span></button>
                         <button id="precision-back-btn" class="neon-btn-small" type="button">Back</button>
                     </div>
 
@@ -156,6 +158,7 @@
 
                 <!-- Party: pass the phone, standings, final and champion -->
                 <div id="party-screen" class="screen hidden">
+                    <div id="champion-crown" class="champion-crown hidden" aria-hidden="true">👑</div>
                     <h2 id="party-title" class="party-title">PASS THE PHONE</h2>
                     <p id="party-message" class="party-message" role="status" aria-live="polite"></p>
                     <ol id="party-standings" class="party-standings"></ol>
@@ -193,7 +196,10 @@
                             <button type="button" class="skin-btn" role="radio" aria-checked="false" data-skin="PARTY">🎉 Party</button>
                         </div>
                         <p id="skin-greeting" class="skin-greeting" aria-live="polite"></p>
-                        <button id="sound-toggle" class="neon-btn-small sound-toggle" type="button" aria-pressed="true">Sound: on</button>
+                        <div class="effects-toggles">
+                            <button id="sound-toggle" class="neon-btn-small sound-toggle" type="button" aria-pressed="true">Sound: on</button>
+                            <button id="haptics-toggle" class="neon-btn-small haptics-toggle" type="button" aria-pressed="true">Vibration: on</button>
+                        </div>
                         <button id="skin-pick-play" class="neon-btn pick-play" type="button">PLAY</button>
                         <button id="skin-pick-back" class="neon-btn-small pick-back" type="button">Back</button>
                     </div>
