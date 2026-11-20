@@ -96,7 +96,7 @@ test('a slow eye-tracking download does not eat the calibration time', async () 
   h.debug.startGame('CLASSIC'); await h.settle(); await h.timers();
   h.setClock(15000); h.raf();
   assert.equal(h.debug.getState(),'CALIBRATING','no frames yet: still loading, not a failure');
-  assert.match(h.el('calibration-status').innerText,/LOADING EYE TRACKING/);
+  assert.match(h.el('calibration-status').innerText,/DOWNLOADING EYE TRACKER \(ONE TIME\)/);
   assert.match(h.el('calibration-hint').innerText,/slow connection/i);
   // The first frame arrives late; the player still gets their full time from there.
   h.setClock(30000); h.tickInference(); h.deliver(); await h.settle(); h.raf();
@@ -468,7 +468,7 @@ test('Blink Olympics: Balloon Pop counts blinks as pops, ends on misses and shar
   assert.equal(h.jpegCount(), 1);
 });
 
-test('blink clip: a Classic blink becomes a shareable clip made on the phone; Balloon Pop and DQs make none', async () => {
+test('blink clip: a Classic blink becomes a shareable clip made on the phone; a lost face or an unfinished Balloon round makes none', async () => {
   class FakeRecorder {
     static isTypeSupported(type) { return type === 'video/mp4'; }
     constructor(stream, options) { this.options = options; FakeRecorder.made.push(this); }
@@ -494,7 +494,7 @@ test('blink clip: a Classic blink becomes a shareable clip made on the phone; Ba
   assert.equal(h.el('clip-btn').disabled, true);
   assert.equal(h.el('clip-btn').innerText, 'MAKING YOUR CLIP...');
   h.setBlinking(false);
-  for (let t = 6200; t <= 7000; t += 100) { h.setClock(t); h.tickInference(); h.deliver(); await h.settle(); }
+  for (let t = 6200; t <= 7700; t += 100) { h.setClock(t); h.tickInference(); h.deliver(); await h.settle(); }
   assert.equal(FakeRecorder.made.length, 1);
   assert.equal(FakeRecorder.made[0].options.mimeType, 'video/mp4');
   await new Promise(resolve => setTimeout(resolve, 5000));
@@ -508,7 +508,7 @@ test('blink clip: a Classic blink becomes a shareable clip made on the phone; Ba
   assert.equal(h.el('clip-btn').classList.contains('hidden'), true);
   assert.equal(h.el('clip-preview').src, '');
 
-  // Balloon Pop ends on misses, not a stare: no clip.
+  // A Balloon round ended without a real game over (no score to show): no clip.
   h.debug.startGame('BALLOON'); await h.settle(); await h.timers();
   h.debug.endGame('BALLOON_OVER');
   assert.equal(h.el('clip-btn').classList.contains('hidden'), true);

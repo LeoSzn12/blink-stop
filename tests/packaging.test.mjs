@@ -65,7 +65,13 @@ test('native web assets omit npm manifests and ad inventory', () => {
 test('candidate pages and styles contain no remote font fetch or borrowed social image', () => {
     for (const prefix of ['', 'www/']) {
         for (const page of ['index.html', 'privacy.html', 'tos.html', 'how-to-play.html']) {
-            assert.doesNotMatch(read(`${prefix}${page}`), /fonts\.googleapis|fonts\.gstatic|raw\.githubusercontent|og:image/i, `${prefix}${page}`);
+            const html = read(`${prefix}${page}`);
+            assert.doesNotMatch(html, /fonts\.googleapis|fonts\.gstatic|raw\.githubusercontent/i, `${prefix}${page}`);
+            // A link-preview image is allowed only when it is our own artwork on our own site.
+            for (const [, url] of html.matchAll(/og:image"\s+content="([^"]+)"/gi)) {
+                assert.match(url, /^https:\/\/playblinkstop\.com\/icons\/[\w-]+\.png$/, `${prefix}${page}`);
+                assert.ok(existsSync(new URL(`${prefix}${url.replace('https://playblinkstop.com/', '')}`, root)), url);
+            }
         }
         assert.doesNotMatch(read(`${prefix}src/style.css`), /fonts\.googleapis|fonts\.gstatic|@import\s+url/i);
     }

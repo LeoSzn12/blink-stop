@@ -20,8 +20,11 @@ export function parseNames(text) {
     return names;
 }
 
+export const PARTY_GAMES = ['BALLOON', 'CLASSIC'];
+
 // Everyone takes a solo turn; the top two meet in a head-to-head final.
-export function createParty(names) {
+// game: what each turn plays. Balloon Pop (popped count) or CLASSIC (longest stare).
+export function createParty(names, { game = 'BALLOON' } = {}) {
     if (!Array.isArray(names) || names.length < MIN_PLAYERS) throw new Error(`Add at least ${MIN_PLAYERS} players.`);
     if (names.length > MAX_PLAYERS) throw new Error(`Up to ${MAX_PLAYERS} players.`);
     const turns = names.map((name, order) => ({ name, order, score: null }));
@@ -30,6 +33,7 @@ export function createParty(names) {
         .sort((a, b) => b.score - a.score || a.order - b.order)
         .map(({ name, score }) => ({ name, score }));
     return {
+        game: PARTY_GAMES.includes(game) ? game : 'BALLOON',
         players: [...names],
         current: () => (index < turns.length ? turns[index].name : null),
         turnNumber: () => Math.min(index + 1, turns.length),

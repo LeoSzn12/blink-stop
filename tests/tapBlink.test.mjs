@@ -11,9 +11,20 @@ test('a blink seen in a single frame counts once', () => {
     assert.equal(tap.observe({ minEar: 0.3 }, T), false);
 });
 
-test('a partly closed eye just above the strict line still counts', () => {
+test('a squint or a laugh (eyes a little narrower) does not count', () => {
     const tap = createTapBlink();
-    assert.equal(tap.observe({ minEar: 0.245 }, T), true);
+    // Open eye about 0.3; laughing narrows both eyes to about 0.25.
+    assert.equal(tap.observe({ minEar: 0.245, ear: 0.25 }, T), false);
+});
+
+test('one squinting eye does not count when the other stays open', () => {
+    const tap = createTapBlink();
+    assert.equal(tap.observe({ minEar: 0.17, ear: 0.235 }, T), false);
+});
+
+test('both eyes clearly closing in one frame counts', () => {
+    const tap = createTapBlink();
+    assert.equal(tap.observe({ minEar: 0.2, ear: 0.21 }, T), true);
 });
 
 test('holding the eyes shut pops only once', () => {

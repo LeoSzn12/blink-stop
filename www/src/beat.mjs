@@ -134,7 +134,11 @@ export const HIT_LINE = 0.8;
 const LANE_TOP = 0.22;
 const COLORS = { CLASSIC: '#00f3ff', THANKSGIVING: '#ff9f43', CHRISTMAS: '#ff4d6d', PARTY: '#ff2bd6' };
 
-export function drawBeat(ctx, round, skin, width, height, now) {
+// pulseAt: when the last beat played. The target ring fills briefly on every beat so the
+// rhythm is visible with the sound off (a muted phone at a loud table). At most about two
+// pulses a second, a soft fade, no flashing.
+export const PULSE_MS = 220;
+export function drawBeat(ctx, round, skin, width, height, now, { pulseAt = null } = {}) {
     ctx.clearRect(0, 0, width, height);
     const unit = Math.min(width, height);
     const color = COLORS[skin] || COLORS.CLASSIC;
@@ -156,6 +160,15 @@ export function drawBeat(ctx, round, skin, width, height, now) {
     ctx.beginPath(); ctx.moveTo(x - laneW * 0.75, line); ctx.lineTo(x + laneW * 0.75, line); ctx.stroke();
     ctx.beginPath(); ctx.arc(x, line, laneW * 0.3, 0, Math.PI * 2); ctx.stroke();
     ctx.globalAlpha = 1;
+    const pulse = Number.isFinite(pulseAt) && now >= pulseAt ? Math.max(0, 1 - (now - pulseAt) / PULSE_MS) : 0;
+    if (pulse > 0) {
+        ctx.globalAlpha = 0.45 * pulse;
+        ctx.fillStyle = color;
+        ctx.beginPath(); ctx.arc(x, line, laneW * 0.3, 0, Math.PI * 2); ctx.fill();
+        ctx.globalAlpha = 0.5 * pulse;
+        ctx.fillRect(x - laneW / 2, line - unit * 0.006, laneW, unit * 0.012);
+        ctx.globalAlpha = 1;
+    }
 
     for (const n of round.visible(now)) {
         const y = top + (line - top) * n.progress;

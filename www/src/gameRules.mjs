@@ -97,7 +97,11 @@ export function createFaceLossTracker(durationMs = 1000) {
 // the camera sees in a single frame. Endurance keeps the stricter sustained-closure detector
 // so a flicker never ends a round. One blink fires once; the eyes must reopen past a slightly
 // higher line before the next blink can count.
-export const TAP_CLOSE = 1.12;
+// Laugh-proofing: the line is judged on both eyes together (a smirk or one squinting eye
+// doesn't count) and sits at the player's blink threshold itself (about 75% of their
+// calibrated open eye), not above it, so laughing and squinting at the table don't pop.
+// The detector's own blink flag still always counts. Tune on a real phone if needed.
+export const TAP_CLOSE = 1.0;
 export const TAP_REOPEN = 1.2;
 export function createTapBlink({ close = TAP_CLOSE, reopen = TAP_REOPEN } = {}) {
     let closed = false;
@@ -108,9 +112,11 @@ export function createTapBlink({ close = TAP_CLOSE, reopen = TAP_REOPEN } = {}) 
         observe(eye, threshold) {
             const minEar = eye?.minEar;
             if (!Number.isFinite(minEar) || minEar <= 0 || !Number.isFinite(threshold) || threshold <= 0) return false;
-            const shut = !!eye.blinking || minEar < threshold * close;
+            // Both eyes together; older callers that only pass minEar still work.
+            const both = Number.isFinite(eye.ear) && eye.ear > 0 ? eye.ear : minEar;
+            const shut = !!eye.blinking || both < threshold * close;
             if (shut && !closed) { closed = true; return true; }
-            if (!shut && minEar >= threshold * reopen) closed = false;
+            if (!shut && both >= threshold * reopen) closed = false;
             return false;
         },
     };
