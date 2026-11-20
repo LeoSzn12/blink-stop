@@ -1,7 +1,7 @@
-import { checkBlink, setBlinkThreshold, resetBlinkState, getBlinkThreshold } from './blinkDetection.js';
+import { checkBlink, setBlinkThreshold, resetBlinkState, getBlinkThreshold, getBlinkLine } from './blinkDetection.js';
 import { audioManager } from './audioManager.js';
 
-import { createFaceLossTracker, createCalibrationTracker, createTrackingFreshness, createTapBlink } from './gameRules.mjs';
+import { createFaceLossTracker, createCalibrationTracker, createTrackingFreshness, createTapBlink, createBlinkTest, blinkLineFor, DEFAULT_LINE } from './gameRules.mjs';
 import { createSerializedInference } from './inference.mjs';
 import { appendScore } from './leaderboard.mjs';
 import { cameraErrorMessage } from './cameraHelp.mjs';
@@ -479,6 +479,26 @@ let demoReturnState = 'MENU';
 let demoFrameId;
 const faceLoss = createFaceLossTracker();
 const calibration = createCalibrationTracker();
+// Blink test: on the first solo round the player blinks once at the end of setup. It shows
+// them the game sees their blinks, and it sets their personal blink line. Later rounds reuse
+// what it learned (as a share of their open eyes) without asking again.
+const blinkTest = createBlinkTest();
+const BLINK_TEST_MS = 5000;
+let blinkTestStart = null;
+let blinkTestDoneAt = null;
+// The blink line as a share of the open eye, once learned. Kept on this phone so the test
+// runs once, not every visit; it only holds a number between 0.7 and 0.8.
+const LINE_KEY = 'blink_line';
+let learnedLine = (() => {
+    try { const v = Number.parseFloat(localStorage.getItem(LINE_KEY)); return v >= 0.7 && v <= 0.8 ? v : null; } catch { return null; }
+})();
+const eyeLight = document.getElementById('eye-light');
+let eyeLightClosedAt = -Infinity;
+function setEyeLight(state, text) {
+    if (!eyeLight) return;
+    if (eyeLight.dataset.state !== state) eyeLight.dataset.state = state;
+    if (eyeLight.textContent !== text) eyeLight.textContent = text;
+}
 const tracking = createTrackingFreshness();
 function beginChallenge(challenge) {
     // A friend challenge mid-party would wipe the party's standings.
@@ -517,6 +537,21 @@ const social = createSocialUI(beginChallenge, { onLinkedChallenge: showChallenge
 
 // Eye tracking (about 10 MB) gets ready while the player is still on the home screen,
 // so a slow connection is spent here and not inside a round's calibration time.
+const LITE_TRACKER_KEY = 'blink_lite_tracker';
+const SLOW_TRACKER_MS = 90;
+let liteTracker = (() => { try { return localStorage.getItem(LITE_TRACKER_KEY) === '1'; } catch { return false; } })();
+let trackerTimes = [];
+function noteTrackerTime(ms, refined) {
+    if (!refined || liteTracker || !Number.isFinite(ms)) return;
+    trackerTimes.push(ms);
+    if (trackerTimes.length > 20) trackerTimes.shift();
+    if (trackerTimes.length < 20) return;
+    const sorted = [...trackerTimes].sort((a, b) => a - b);
+    if (sorted[10] > SLOW_TRACKER_MS) {
+        liteTracker = true;
+        try { localStorage.setItem(LITE_TRACKER_KEY, '1'); } catch { /* storage unavailable */ }
+    }
+}
 let eyeTrackingWarm = null;
 let eyeTrackingReady = false;
 function setEyeTrackingStatus(text) {
@@ -535,7 +570,7 @@ function warmEyeTracking() {
     setEyeTrackingStatus(warmText());
     const warmTicker = setInterval(() => { if (!eyeTrackingReady) setEyeTrackingStatus(warmText()); }, 1000);
     const mesh = new FaceMesh({ locateFile: file => `vendor/face_mesh/${file}` });
-    mesh.setOptions({ maxNumFaces: 2, refineLandmarks: false, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+    mesh.setOptions({ maxNumFaces: 2, refineLandmarks: !liteTracker, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
     eyeTrackingWarm = Promise.resolve()
         .then(() => (typeof mesh.initialize === 'function' ? mesh.initialize() : undefined))
         .then(() => {
@@ -617,11 +652,16 @@ function setPrecisionChoice(seconds) {
 }
 
 // MediaPipe Setup
-function createSessionFaceMesh(session, maxNumFaces = 1) {
+// Solo games use the tracker's detailed eye model (refineLandmarks): it follows the eyelids
+// far more closely, so blinks stand out clearly from open eyes. Stare-down tracks two faces
+// and keeps the lighter model. If a phone runs the detailed model too slowly, it switches
+// to the lighter one from the next round on and remembers that.
+function createSessionFaceMesh(session, maxNumFaces = 1, refine = false) {
     const mesh = new FaceMesh({ locateFile: file => `vendor/face_mesh/${file}` });
+    mesh.refined = refine;
     mesh.setOptions({
         maxNumFaces,
-        refineLandmarks: false, // Keep OFF for performance
+        refineLandmarks: refine,
         minDetectionConfidence: 0.5,
         minTrackingConfidence: 0.5
     });
@@ -642,8 +682,10 @@ const inference = createSerializedInference(async (image, session) => {
     const mesh = faceMesh;
     activeMesh = mesh;
     resultSession = session;
+    const sentAt = performance.now();
     try {
         await mesh.send({ image });
+        noteTrackerTime(performance.now() - sentAt, mesh.refined);
     } finally {
         resultSession = null;
         activeMesh = null;
@@ -657,8 +699,9 @@ async function startCameraLoop(session) {
     try {
         const stream = takeWarmCamera() || await navigator.mediaDevices.getUserMedia({
             video: {
-                width: { ideal: window.innerWidth < 768 ? 480 : 640 },
-                height: { ideal: window.innerWidth < 768 ? 360 : 480 },
+                width: { ideal: 640 },
+                height: { ideal: 480 },
+                frameRate: { ideal: 30 },
                 facingMode: 'user'
             }
         });
@@ -702,21 +745,39 @@ async function startCameraLoop(session) {
     }
 }
 
+// Every new camera frame goes to the eye tracker as soon as it is free, so a quick blink
+// isn't lost between fixed ticks. Browsers without per-frame callbacks check every 33 ms.
+let frameCallbackId = null;
+let frameCallbackAt = -Infinity;
+function sendFrame(session) {
+    if (videoElement.paused || videoElement.ended) return;
+    try {
+        const pending = inference.send(videoElement, session);
+        if (pending && typeof pending.catch === 'function') pending.catch(error => console.warn("FaceMesh skipped:", error));
+    } catch (error) {
+        console.warn("FaceMesh skipped:", error);
+    }
+}
 function startDetectionLoop(session) {
-    if (detectionInterval) clearInterval(detectionInterval);
-
-    // Run detection at 20 FPS (good balance between performance and accuracy)
-    detectionInterval = setInterval(async () => {
-        if (videoElement.paused || videoElement.ended) return;
-        try {
-            await inference.send(videoElement, session);
-        } catch (error) {
-            console.warn("FaceMesh skipped:", error);
-        }
-    }, 50); // 50ms = 20 FPS
+    stopDetectionLoop();
+    if (typeof videoElement.requestVideoFrameCallback === 'function') {
+        const onFrame = () => {
+            if (session !== cameraSession) return;
+            frameCallbackAt = performance.now();
+            sendFrame(session);
+            frameCallbackId = videoElement.requestVideoFrameCallback(onFrame);
+        };
+        frameCallbackId = videoElement.requestVideoFrameCallback(onFrame);
+    }
+    // Also a steady tick: it covers browsers without frame callbacks and a paused callback.
+    detectionInterval = setInterval(() => {
+        if (performance.now() - frameCallbackAt > 150) sendFrame(session);
+    }, 33);
 }
 
 function stopDetectionLoop() {
+    if (frameCallbackId !== null && typeof videoElement.cancelVideoFrameCallback === 'function') videoElement.cancelVideoFrameCallback(frameCallbackId);
+    frameCallbackId = null;
     if (detectionInterval) clearInterval(detectionInterval);
     detectionInterval = null;
     // A send already in flight remains locked until it actually settles.
@@ -1864,7 +1925,8 @@ function startGame(mode) {
     // Abandon any previous camera permission prompt or pending startup; keep a running camera.
     stopCameraAndDetection({ keepWarm: true });
     const session = cameraSession;
-    faceMesh = createSessionFaceMesh(session, 2); // Two faces: Stare-down needs both; solo keeps the closest player.
+    // Two faces: Stare-down needs both; solo keeps the closest player with the detailed eye model.
+    faceMesh = createSessionFaceMesh(session, 2, mode !== 'VERSUS' && !liteTracker);
     hideCameraProblem();
     retryMode = party ? null : mode;
     currentMode = mode;
@@ -2028,6 +2090,11 @@ function startCalibration() {
     calibrationLastFrame = null;
     calibrationFirstFrame = null;
     calibrationLastEye = null;
+    blinkTest.reset();
+    blinkTestStart = null;
+    blinkTestDoneAt = null;
+    eyeLightClosedAt = -Infinity;
+    setEyeLight('off', '👁️ Looking for your eyes');
     calibrationStatus.innerText = 'FINDING YOUR EYES';
     calibrationHint.innerText = calibrationHintText;
     resetLightTip();
@@ -2061,8 +2128,13 @@ function updateCalibrationLoop() {
             if (count) { if (soundEnabled) audioManager.playTick?.(); haptics.fire('tick'); }
         }
 
+        if (blinkTestStart !== null) {
+            updateBlinkTest(now);
+            return;
+        }
         if (elapsed >= 3000 && calibration.ready(now)) {
-            finishCalibration();
+            if (wantsBlinkTest() && measureBaseline()) startBlinkTest(now);
+            else finishCalibration();
         } else {
             // The clock that matters starts at the first eye-tracking frame: on a slow
             // connection the first one can take a while, and that is not the player's fault.
@@ -2096,6 +2168,8 @@ function updateCalibrationLoop() {
             const hint = loading && elapsed >= 6000 ? 'Slow connection? This only happens the first time. Hang on a moment.' : calibrationHintText;
             if (calibrationHint.innerText !== hint) calibrationHint.innerText = hint;
             updateLightTip(now);
+            const seen = calibrationLastFrame !== null && now - calibrationLastFrame < 1000 && calibrationLastEye !== null;
+            setEyeLight(seen ? 'open' : 'off', seen ? '👁️ Eyes found' : '👁️ Looking for your eyes');
             // Keep valid samples across the three-second warm-up. Slower cameras
             // must be able to reach the required sample count without restarting.
             calibrationFrameId = requestAnimationFrame(updateCalibrationLoop);
@@ -2138,7 +2212,50 @@ function updateLightTip(now) {
     lightTip.classList.toggle('hidden', darkChecks < 2);
 }
 
-function finishCalibration() {
+function startBlinkTest(now) {
+    blinkTestStart = now;
+    blinkTest.reset();
+    countdownEl.textContent = '';
+    calibrationLoader.style.width = '100%';
+    calibrationStatus.innerText = 'NOW BLINK ONCE';
+    calibrationHint.innerText = 'Just a normal blink, so the game learns your eyes.';
+    setEyeLight('open', '👁️ Watching for your blink');
+    calibrationFrameId = requestAnimationFrame(updateCalibrationLoop);
+}
+function updateBlinkTest(now) {
+    const eye = calibrationLastEye;
+    const fresh = calibrationLastFrame !== null && now - calibrationLastFrame < 1000;
+    if (blinkTestDoneAt === null) {
+        if (fresh && eye !== null && eye < getBlinkThreshold()) eyeLightClosedAt = now;
+        if (fresh && eye !== null && blinkTest.observe(eye, baselineEAR)) {
+            const line = blinkLineFor(baselineEAR, blinkTest.low);
+            learnedLine = line / baselineEAR;
+            try { localStorage.setItem(LINE_KEY, learnedLine.toFixed(3)); } catch { /* storage unavailable */ }
+            setBlinkThreshold(Math.min(line, 0.35));
+            blinkTestDoneAt = now;
+            calibrationStatus.innerText = 'GOT IT ✓';
+            calibrationHint.innerText = 'Your blinks come through clearly.';
+            setEyeLight('seen', '✅ Blink seen');
+            if (soundEnabled) audioManager.playTick?.();
+            haptics.fire('pop');
+        } else if (now - blinkTestStart >= BLINK_TEST_MS) {
+            // No clear blink seen: start anyway with the usual line, and ask again next round.
+            blinkTestStart = null;
+            finishCalibration();
+            return;
+        } else {
+            const closed = now - eyeLightClosedAt < 300;
+            setEyeLight(closed ? 'closed' : 'open', closed ? '😌 Eyes closed' : '👁️ Watching for your blink');
+        }
+    } else if (now - blinkTestDoneAt >= 700) {
+        finishCalibration();
+        blinkTestStart = null;
+        return;
+    }
+    calibrationFrameId = requestAnimationFrame(updateCalibrationLoop);
+}
+
+function measureBaseline() {
     const calibrationData = calibration.values();
     if (calibrationData.length > 0) {
         // Sort and trim the top/bottom 10% to remove noise/outliers
@@ -2152,9 +2269,18 @@ function finishCalibration() {
         baselineEAR = avg;
         // A fixed 0.18 floor could exceed a person's open-eye baseline and
         // immediately end a round. Keep the threshold relative to their eyes.
-        const newThreshold = Math.min(avg * 0.75, 0.35);
-        setBlinkThreshold(newThreshold);
+        setBlinkThreshold(Math.min(avg * (learnedLine ?? DEFAULT_LINE), 0.35));
+        return true;
     }
+    return false;
+}
+// Only a player's first solo round asks for the test; party turns and challenges skip it.
+function wantsBlinkTest() {
+    return learnedLine === null && !party && currentMode !== 'VERSUS';
+}
+
+function finishCalibration() {
+    if (blinkTestStart === null) measureBaseline();
 
     calibrationScreen.classList.add('hidden');
     calibrationScreen.classList.remove('active');
@@ -2223,7 +2349,7 @@ function updateEnduranceLoop() {
         if (enduranceLeft) enduranceLeft.textContent = String(Math.max(0, Math.ceil(duration - elapsed)));
 
         // Update Eye Openness Meter and add tension effects
-        const threshold = getBlinkThreshold();
+        const threshold = getBlinkLine();
         let openness = ((minEARValue - threshold) / (baselineEAR - threshold)) * 100;
         openness = Math.max(0, Math.min(100, openness));
         
@@ -2463,7 +2589,7 @@ function updateGameLoop() {
         if (currentMode === 'DISTRACT') updateJokes(elapsed);
 
         // Update Eye Openness Meter and tension effect
-        const threshold = getBlinkThreshold();
+        const threshold = getBlinkLine();
         let openness = ((minEARValue - threshold) / (baselineEAR - threshold)) * 100;
         openness = Math.max(0, Math.min(100, openness));
         
