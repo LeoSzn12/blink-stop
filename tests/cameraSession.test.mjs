@@ -503,8 +503,12 @@ test('blink clip: a Classic blink becomes a shareable clip made on the phone; a 
   for (let t = 6200; t <= 7700; t += 100) { h.setClock(t); h.tickInference(); h.deliver(); await h.settle(); }
   assert.equal(FakeRecorder.made.length, 1);
   assert.equal(FakeRecorder.made[0].options.mimeType, 'video/mp4');
-  await new Promise(resolve => setTimeout(resolve, 5000));
-  await h.settle();
+  // The clip is encoded in real time (2.5 s before the blink + 1.5 s after), so a slow CI
+  // machine can take a little over 4 s: wait for it rather than a fixed 5 s.
+  for (let waited = 0; h.el('clip-btn').disabled && waited < 12000; waited += 250) {
+    await new Promise(resolve => setTimeout(resolve, 250));
+    await h.settle();
+  }
   assert.equal(h.el('clip-btn').disabled, false);
   assert.equal(h.el('clip-btn').innerText, 'SHARE CLIP');
   assert.equal(h.el('clip-preview').src, 'blob:clip');
