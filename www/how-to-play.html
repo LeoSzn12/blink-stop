@@ -4,63 +4,84 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>How to Play - Blink Stop</title>
-    <link rel="stylesheet" href="src/style.css?v=4">
-
+    <link rel="stylesheet" href="src/style.css?v=24">
     <style>
-        body { overflow: auto; display: block; padding: 2rem; }
-        .content { max-width: 800px; margin: 0 auto; color: #fff; line-height: 1.6; }
-        h1 { color: var(--neon-cyan); font-family: system-ui, sans-serif; margin-bottom: 2rem; }
-        h2 { color: var(--neon-pink); margin-top: 2rem; margin-bottom: 1rem; }
-        ul { margin-left: 2rem; margin-bottom: 1rem; }
-        p { margin-bottom: 1rem; }
-        a { color: var(--neon-cyan); text-decoration: none; }
-        a:hover { color: var(--neon-pink); }
-        .back-link { display: inline-block; margin-bottom: 2rem; font-family: system-ui, sans-serif; font-size: 1.2rem; }
+        body { overflow: auto; display: block; padding: 1.25rem 1rem 2.5rem; }
+        .content { max-width: 34rem; margin: 0 auto; color: #fff; line-height: 1.45; }
+        .back-link { display: inline-block; color: var(--neon-cyan); text-decoration: none; font-weight: 800; padding: .4rem 0; }
+        h1 { color: var(--neon-cyan); font-size: clamp(1.7rem, 7vw, 2.3rem); margin: .6rem 0 .25rem; line-height: 1.15; }
+        .lead { color: #c8ced8; margin: 0 0 1.2rem; }
+        h2 { color: var(--neon-pink); font-size: 1.15rem; letter-spacing: .04em; margin: 1.6rem 0 .6rem; }
+        .steps { list-style: none; padding: 0; margin: 0; display: grid; gap: .5rem; }
+        .steps li { display: flex; gap: .7rem; align-items: center; background: rgba(255, 255, 255, .06); border-radius: 12px; padding: .65rem .8rem; }
+        .steps b { color: var(--neon-cyan); font-size: 1.1rem; min-width: 1.4rem; text-align: center; }
+        .games { display: grid; gap: .6rem; }
+        .game { display: grid; grid-template-columns: 2.4rem 1fr; gap: .2rem .7rem; align-items: start; background: rgba(255, 255, 255, .06);
+            border: 1px solid rgba(255, 255, 255, .1); border-radius: 14px; padding: .8rem .9rem; }
+        .game .icon { grid-row: span 2; font-size: 1.9rem; line-height: 1; }
+        .game h3 { font-size: 1.05rem; margin: 0; letter-spacing: .03em; }
+        .game p { margin: 0; color: #d3dbe5; font-size: .95rem; }
+        details { background: rgba(255, 255, 255, .05); border-radius: 12px; padding: .6rem .9rem; margin-bottom: .5rem; }
+        summary { cursor: pointer; font-weight: 800; }
+        details p { margin: .5rem 0 .2rem; color: #d3dbe5; font-size: .95rem; }
+        .cta { display: block; text-align: center; margin: 1.8rem auto 0; padding: .9rem 1rem; border: 2px solid var(--neon-cyan);
+            border-radius: 999px; color: #fff; font-weight: 900; text-decoration: none; letter-spacing: .05em; }
+        .safety { color: #9aa3b2; font-size: .85rem; text-align: center; margin-top: 1rem; }
     </style>
 </head>
 <body>
-    <div class="content">
-        <a href="index.html" class="back-link">&larr; BACK TO GAME</a>
-        <h1>How To Play Blink Stop</h1>
-        
-        <h2>Game Modes</h2>
-        <h3>PLAY (ENDURANCE)</h3>
-        <p>Who can keep their eyes open longest? Survive as long as possible without blinking. The longer you last, the more intense it gets with visual effects and faster audio!</p>
+    <main class="content">
+        <a href="index.html" class="back-link">&larr; Back to the game</a>
+        <h1>How to play</h1>
+        <p class="lead">Blink Stop watches your eyes through the camera. Every game is about when you blink.</p>
 
-        <h3>PRECISION</h3>
-        <p>Tap Precision, then pick a target time: 5, 10 or 15 seconds. The clock shows for the first 3 seconds, then hides, so you count the rest in your head. Your score is how far off the target you blinked: closer is better.</p>
+        <h2>SET UP IN 10 SECONDS</h2>
+        <ol class="steps">
+            <li><b>1</b> Hold the phone at eye level, about an arm's length away.</li>
+            <li><b>2</b> Face a light or a window, not a bright light behind you.</li>
+            <li><b>3</b> Keep your eyes open normally while the bar fills.</li>
+            <li><b>4</b> The first time, blink once when asked. The eye light shows the game saw it.</li>
+        </ol>
 
-        <h3>30 SECONDS (under More ways to play)</h3>
-        <p>Try to last 30 seconds without blinking. Take a break if your eyes feel uncomfortable.</p>
-        
-        <h3>DAILY CHALLENGE</h3>
-        <p>Every day brings a new twist once the round starts: inverted colours, a glitchy screen or a blurry screen. The tip before the round names today's twist. Survive as long as you can.</p>
+        <h2>THE GAMES</h2>
+        <div class="games">
+            <div class="game"><span class="icon">🎈</span><h3>Balloon Pop</h3><p>Blink when a balloon is in the green zone to pop it. A miss costs a life, and you have 3. It speeds up as you go.</p></div>
+            <div class="game"><span class="icon">📱</span><h3>Pass the Phone</h3><p>2 to 8 players take turns on one phone. Pick Balloon Pop or Don't Blink. The winner gets a crown, last place gets a dare.</p></div>
+            <div class="game"><span class="icon">👁️</span><h3>Don't Blink</h3><p>Keep your eyes open as long as you can. The screen gets wilder the longer you last.</p></div>
+            <div class="game"><span class="icon">🎯</span><h3>Precision</h3><p>Classic: blink right at 5, 10 or 15 seconds. The clock hides after 3, so count in your head. Gas Pump: blink to stop the pump at exactly $10.00. It speeds up after $8.</p></div>
+            <div class="game"><span class="icon">⚡</span><h3>Flash</h3><p>Wait for green, then blink as fast as you can. Your fastest of 3 tries counts.</p></div>
+            <div class="game"><span class="icon">🎵</span><h3>Blink Beat</h3><p>Blink as each note hits the line, in time with the beat. Turn the sound on.</p></div>
+            <div class="game"><span class="icon">⚔️</span><h3>Stare-Down</h3><p>Two players, cheek to cheek. First to blink loses.</p></div>
+            <div class="game"><span class="icon">😂</span><h3>Jokes</h3><p>The phone tells jokes while you try not to blink.</p></div>
+        </div>
 
-        <h3>SURPRISE MODE</h3>
-        <p>Opt into a 30-second round with one sudden illustrated face at an unpredictable moment. Sound starts off and can be enabled before the round. There are no flashing effects. Blink whenever you need to; Home ends the round.</p>
+        <h2>SHARING</h2>
+        <details>
+            <summary>Photos, clips and challenges</summary>
+            <p>After a round, tap Share. Share Photo sends a framed photo with your result. Share Clip sends a few-second video of the moment you blinked. Share Challenge sends a link so a friend can try to beat you in the same game.</p>
+            <p>Photos and clips are made on your phone and only leave it when you share them.</p>
+        </details>
+        <details>
+            <summary>Holiday skins</summary>
+            <p>Pick a look before each game: a pilgrim hat for Thanksgiving, a Santa hat for Christmas, or a party hat. Skins only change what's drawn, never how blinks are seen.</p>
+        </details>
 
-        <h2>Tips for Success</h2>
-        <ul>
-            <li>Stare at the center of the screen</li>
-            <li>Keep your eyes comfortably open while calibration samples your open-eye baseline</li>
-            <li>Good, even lighting on your face significantly helps with detection</li>
-            <li>Sit 1-2 feet away from your camera and ensure it is at eye-level</li>
-        </ul>
+        <h2>HELP</h2>
+        <details>
+            <summary>It doesn't notice my blinks</summary>
+            <p>Turn on a light in front of you and hold the phone at eye level. Glasses with strong glare can hide your eyes, so tilt them or try without. Your blink check is saved on this phone; to redo it, use Clear Local Data on the Support page.</p>
+        </details>
+        <details>
+            <summary>Face not found, or the game won't start</summary>
+            <p>Allow camera access, move a little closer, and add light. If eye tracking stalls, tap Restart camera. Home leaves setup at any time.</p>
+        </details>
+        <details>
+            <summary>The camera is busy</summary>
+            <p>Close other apps that use the camera (FaceTime, Zoom) and try again.</p>
+        </details>
 
-        <h2>Troubleshooting Camera Issues</h2>
-        <p><strong>Game won't start?</strong><br>Allow camera access. Calibration progress follows clear eye readings rather than restarting every three seconds. Face a light and hold your phone at eye level with your eyes comfortably open. If tracking cannot get ready within 15 seconds, the app returns to the menu with help. If eye tracking stalls, use Restart camera. You can leave calibration at any time with Home.</p>
-
-        <p><strong>Face not detected?</strong><br>Improve lighting, move closer to the camera, and remove heavy glasses if possible.</p>
-
-        <p><strong>Camera being used by another app?</strong><br>Close other apps (Zoom, FaceTime, etc.) and try again.</p>
-
-        <h2>Challenge a friend</h2><p>After a valid round, share a portrait card or challenge caption. Your friend pastes the code under Have a friend's code? to play the same mode and target. Friend’s turn lets another player try on this phone. Precision compares timing error: lower is better. Other modes compare survival: higher is better, with a tie at the 30-second limit. Surprise timing varies and warns each player before starting. Daily has no friend code because its twist depends on the local date. Cards contain no camera photos; Share Photo is a separate choice. Blink normally and take breaks.</p>
-        <h2>Challenge links and blink clips</h2><p>After a round, Share Challenge sends a link like "I kept my eyes open for 14.00s as a turkey 🦃 Can you beat me?". Your friend taps it and sees the time to beat, in the same holiday skin, with one button to play. The time to beat stays on screen during their round. After a blink, Blink Stop also makes a few-second clip of the moment you blinked, hat and all. Tap Share Clip to post it to Reels, TikTok or the family chat. The clip is made on your phone and only leaves it when you share it.</p><h2>Quick Games: Balloon Pop</h2><p>Balloons float up through a zone across the middle of the screen, and it turns green when a balloon is inside. Keep your eyes open, then blink when a balloon is inside the zone to pop it. Letting a balloon float away is a miss. So is blinking with nothing in the zone, though your first stray blink for each balloon is free. You have 3 lives, shown as balloons at the top. Each miss costs one. Balloons get faster as you go, and they match your holiday skin.</p><h2>Quick Games: Flash</h2><p>Keep your eyes open and wait. At a random moment the screen turns green: blink as fast as you can. You get 3 tries, and your fastest blink, in milliseconds, is your score. Blink before green and that try starts over. After your last try Blink Stop makes a clip of your blink to share.</p><h2>Quick Games: Blink Beat</h2><p>A rhythm game for your eyes. Notes slide down a lane in time with the beat. Blink just as each note reaches the line: close to the beat is Good, right on it is Perfect. A note that slides past is a miss, and you have 3 lives. Blinking when no note is near breaks your streak but costs no life, and every 15 in a row wins a lost life back. The beat speeds up as you go. Turn the sound on to hear it.</p>
-        <h2>Quick Games: Stare-down</h2><p>Two players sit side by side, cheek to cheek, with a light in front of them and the phone at eye level. Once both faces are found, keep your eyes open: the first to blink loses and gets a dare. Blink together and it's a dead heat. If a face leaves the frame, the round doesn't count, so tap Rematch.</p>
-        <h2>Quick Games: Pass the phone</h2><p>Type 2 to 8 names, then pass the phone. Everyone takes one Endurance turn. The two longest stares meet in a head-to-head final (or skip it and the top stare wins). The champion gets a crown, last place gets a dare, and Share Reel puts everyone's caught-blinking photos in one picture. Names and photos stay on this phone and disappear when the party ends.</p>
-        <h2>Quick Games: Distraction</h2><p>The phone tells jokes while you stare, and friends can join in. Your time saves to its own leaderboard and can be shared as a challenge.</p>
-        <h2>Holiday and party skins</h2><p>Pick a game, then pick your look before it starts: Thanksgiving puts a pilgrim hat and turkey feathers on your head, Christmas adds a Santa hat and snow, and Party adds a party hat and confetti. The hat follows your face on screen while you play. After a round, Share Photo sends a framed photo with your result, so the moment you blinked is ready for the family group chat. November starts on Thanksgiving and December on Christmas; your pick is remembered for the rest of the month. Skins only change what is drawn on your screen and in your photo, never how blinks are detected.</p>
-        <p>Ready? <a href="index.html">Head back to the game</a> and see how long you can last!</p>
-    </div>
+        <a href="index.html" class="cta">PLAY NOW</a>
+        <p class="safety">Blink normally between rounds and stop if your eyes feel uncomfortable. Ages 13+.</p>
+    </main>
 </body>
 </html>

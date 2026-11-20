@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import { readFileSync } from 'node:fs';
 
-import { createCalibrationTracker, createTrackingFreshness, createFaceLossTracker, createTapBlink } from '../src/gameRules.mjs';
+import { createCalibrationTracker, createTrackingFreshness, createFaceLossTracker, createTapBlink, createBlinkTest, blinkLineFor, DEFAULT_LINE } from '../src/gameRules.mjs';
 import { createSerializedInference } from '../src/inference.mjs';
 import { createSurpriseRound, createRewardedDemo } from '../src/surprise.mjs';
 import * as skins from '../src/skins.mjs';
@@ -19,7 +19,11 @@ import * as pump from '../src/pump.mjs';
 import * as feedback from '../src/feedback.mjs';
 
 const source = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8').replace(/^import .*;\s*$/gm, '');
-function harness(storage = { getItem: () => null, setItem() {} }, clipboard, { win = {}, extra = {} } = {}) {
+function harness(storage = { getItem: () => null, setItem() {} }, clipboard, { win = {}, extra = {}, blinkTest = false } = {}) {
+  // Most tests start rounds as a returning player whose blink line is already learned.
+  const realStorage = storage;
+  storage = new Proxy(realStorage, { get: (target, key) => key === 'getItem'
+    ? k => (k === 'blink_line' && !blinkTest ? '0.78' : target.getItem(k)) : (typeof target[key] === 'function' ? target[key].bind(target) : target[key]) });
   const els = new Map(), raf = new Map(), timers = new Map(), intervals = new Map(), listeners = new Map();
   let clock = 0, id = 0, lastDelivered, jpegCount = 0, eyeValue = .3, threshold = .22, blinking = false;
   const pending = [], tracks = [], meshes = [], documentEvents = new Map();
@@ -47,8 +51,8 @@ function harness(storage = { getItem: () => null, setItem() {} }, clipboard, { w
   class FaceMesh { constructor() { this.closes = 0; meshes.push(this); } onResults(fn) { this.resultHandler = fn; } setOptions() {} send() { return new Promise(resolve => { const emit = () => this.resultHandler({ image: {}, multiFaceLandmarks: [{}] }); pending.push(() => { lastDelivered = emit; emit(); resolve(); }); }); } close() { this.closes++; } }
   const context = { document, window: { innerWidth: 500, addEventListener() {}, ...win }, navigator: { clipboard, mediaDevices: { getUserMedia: () => permission || Promise.resolve(stream()) } },
     FaceMesh, console: { log() {}, warn: (...a) => process.env.HARNESS_LOG && process.stderr.write(a.join(' ') + '\n'), error() {} }, performance: { now: () => clock }, Date,
-    createCalibrationTracker, createTrackingFreshness, createFaceLossTracker, createTapBlink, createSerializedInference, createSurpriseRound, createRewardedDemo, ...skins, ...versus, ...party, ...reel, ...balloons, ...flash, ...beat, ...clipModule, ...pump, ...feedback, formatScore, LOWER_WINS, inviteLine, challengeUrl, challengeHeadline, PUBLIC_PLAY_URL,
-    checkBlink: () => eyeValue === null ? null : ({ minEar: eyeValue, ear: eyeValue, blinking }), setBlinkThreshold(value) { threshold = value; }, resetBlinkState() {}, getBlinkThreshold: () => threshold,
+    createCalibrationTracker, createTrackingFreshness, createFaceLossTracker, createTapBlink, createBlinkTest, blinkLineFor, DEFAULT_LINE, createSerializedInference, createSurpriseRound, createRewardedDemo, ...skins, ...versus, ...party, ...reel, ...balloons, ...flash, ...beat, ...clipModule, ...pump, ...feedback, formatScore, LOWER_WINS, inviteLine, challengeUrl, challengeHeadline, PUBLIC_PLAY_URL,
+    checkBlink: () => eyeValue === null ? null : ({ minEar: eyeValue, ear: eyeValue, blinking }), setBlinkThreshold(value) { threshold = value; }, resetBlinkState() {}, getBlinkThreshold: () => threshold, getBlinkLine: () => threshold,
     audioManager: { startDrone() {}, stopDrone() {}, playGlitch() {}, playWin() {}, playHeartbeat() {}, playSurprise() {} },
     appendScore() {}, cameraErrorMessage: () => '', createGameOverCameraStop: fn => ({ cancel() {}, schedule() {} }), sharePayload() {}, shareClipboardText() {}, createSocialUI: () => ({ reset() {}, render() {} }),
     localStorage: storage,
@@ -695,4 +699,37 @@ test('Gas Pump: the Precision screen starts it, the HUD shows dollars, and a bli
   assert.match(h.el('final-score-sub').innerText, /^You stopped the pump at \$\d+\.\d{2}$/);
   assert.equal(h.el('game-over-title').innerText, 'STOPPED SHORT');
   assert.ok(saved.has('blink_best_PUMP'), 'its own best, apart from Precision');
+});
+
+test('first round: a one-blink check learns the blink line, shows it was seen, then starts', async () => {
+  const saved = {};
+  const h = harness({ getItem: () => null, setItem(k, v) { saved[k] = v; } }, undefined, { blinkTest: true });
+  h.setEye(.3);
+  h.debug.startGame('CLASSIC'); await h.settle(); await h.timers();
+  const frame = async (t, eye) => { h.setEye(eye); h.setClock(t); h.tickInference(); h.deliver(); await h.settle(); h.raf(); };
+  let t = 0;
+  for (let i = 0; i < 12; i++) await frame(t += 350, .3);
+  assert.equal(h.debug.getState(), 'CALIBRATING');
+  assert.equal(h.el('calibration-status').innerText, 'NOW BLINK ONCE');
+  await frame(t += 50, .08);
+  assert.equal(h.el('eye-light').dataset.state, 'closed');
+  await frame(t += 50, .3);
+  assert.equal(h.el('calibration-status').innerText, 'GOT IT ✓');
+  assert.equal(h.el('eye-light').dataset.state, 'seen');
+  assert.ok(Math.abs(h.threshold() - .21) < 1e-9, 'a deep blink sets the line at 70% of open');
+  assert.equal(saved.blink_line, '0.700');
+  await frame(t += 800, .3);
+  assert.equal(h.debug.getState(), 'PLAYING');
+});
+
+test('no blink seen in the check: the round starts anyway with the usual line', async () => {
+  const h = harness({ getItem: () => null, setItem() {} }, undefined, { blinkTest: true });
+  h.setEye(.3);
+  h.debug.startGame('CLASSIC'); await h.settle(); await h.timers();
+  let t = 0;
+  for (let i = 0; i < 12; i++) { h.setClock(t += 350); h.tickInference(); h.deliver(); await h.settle(); h.raf(); }
+  assert.equal(h.el('calibration-status').innerText, 'NOW BLINK ONCE');
+  for (let i = 0; i < 12; i++) { h.setClock(t += 500); h.tickInference(); h.deliver(); await h.settle(); h.raf(); }
+  assert.equal(h.debug.getState(), 'PLAYING');
+  assert.ok(Math.abs(h.threshold() - .3 * .78) < 1e-9);
 });

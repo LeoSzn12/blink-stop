@@ -1462,3 +1462,10 @@ body.in-game .footer, body.in-game footer { display: none; }
 }
 
 .effects-toggles { display: flex; flex-wrap: wrap; gap: .75rem; justify-content: center; }
+
+/* Live eye light during setup: shows the game sees your eyes, and flashes on a blink. */
+.eye-light { margin: .6rem auto 0; padding: .45rem 1rem; border-radius: 999px; font-weight: 800; font-size: 1.05rem;
+    background: rgba(0, 0, 0, .75); border: 2px solid #5a6270; color: #c8ced8; transition: background-color .12s, border-color .12s; }
+.eye-light[data-state="open"] { border-color: var(--neon-cyan); color: #fff; }
+.eye-light[data-state="closed"] { border-color: var(--neon-pink); background: rgba(255, 0, 255, .25); color: #fff; }
+.eye-light[data-state="seen"] { border-color: #39ff14; background: rgba(57, 255, 20, .2); color: #fff; }

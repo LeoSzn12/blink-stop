@@ -4,15 +4,53 @@ import { createBlinkDetector, createFaceLossTracker, createCalibrationTracker, c
 import { createSerializedInference } from '../src/inference.mjs';
 import { appendScore } from '../src/leaderboard.mjs';
 
-test('a wink sustained across dropped frames counts by elapsed time, not samples', () => {
+test('two frames in a row under the line count as a blink, whatever the frame rate', () => {
     const blink = createBlinkDetector(0.22);
-    assert.equal(blink.observe(0.1, 1000), false);
-    assert.equal(blink.observe(0.1, 1050), false);
-    assert.equal(blink.observe(0.1, 1070), true);
-    assert.equal(blink.observe(0.3, 1100), false);
-    assert.equal(blink.observe(0.1, 1200), false);
+    assert.equal(blink.observe(0.21, 1000), false);
+    assert.equal(blink.observe(0.21, 1150), true);   // slow phone: two frames 150 ms apart
+    assert.equal(blink.observe(0.3, 1200), false);
+    assert.equal(blink.observe(0.21, 1233), false);
+    assert.equal(blink.observe(0.21, 1266), true);   // fast phone: two frames 33 ms apart
     blink.reset();
-    assert.equal(blink.observe(0.1, 1300), false);
+    assert.equal(blink.observe(0.21, 1300), false);
+});
+
+test('one frame well under the line is a full closure and counts at once', () => {
+    const blink = createBlinkDetector(0.22);
+    assert.equal(blink.observe(0.3, 1000), false);
+    assert.equal(blink.observe(0.15, 1100), true);
+});
+
+test('a single noisy frame just under the line does not end the round', () => {
+    const blink = createBlinkDetector(0.22);
+    assert.equal(blink.observe(0.3, 1000), false);
+    assert.equal(blink.observe(0.205, 1050), false);
+    assert.equal(blink.observe(0.3, 1100), false);
+    assert.equal(blink.observe(0.205, 1150), false);
+});
+
+test('the line rises a little with wide-open eyes, never past its cap', () => {
+    const blink = createBlinkDetector(0.22);
+    for (let t = 0; t < 60; t++) blink.observe(0.4, t * 50);
+    assert.ok(Math.abs(blink.line() - 0.242) < 1e-9, 'capped at 10% above the calibrated line');
+    assert.equal(blink.observe(0.235, 4000), false);
+    assert.equal(blink.observe(0.235, 4050), true);   // a partial blink from a wide stare still counts
+    blink.setThreshold(0.22);
+    assert.equal(blink.line(), 0.22);
+});
+
+test('the blink test sets a personal line between open and closed eyes', async () => {
+    const { createBlinkTest, blinkLineFor } = await import('../src/gameRules.mjs');
+    const test1 = createBlinkTest();
+    assert.equal(test1.observe(0.3, 0.3), false);
+    assert.equal(test1.observe(0.2, 0.3), false);
+    assert.equal(test1.observe(0.08, 0.3), false);
+    assert.equal(test1.observe(0.29, 0.3), true);
+    assert.equal(test1.low, 0.08);
+    assert.ok(Math.abs(blinkLineFor(0.3, 0.08) - 0.3 * 0.7) < 1e-9, 'a deep blink keeps the line at 70%');
+    assert.ok(Math.abs(blinkLineFor(0.3, 0.2) - 0.25 * 0.3 / 0.3) < 1e-9 || blinkLineFor(0.3, 0.2) <= 0.3 * 0.8);
+    assert.ok(Math.abs(blinkLineFor(0.3, null) - 0.3 * 0.78) < 1e-9, 'no blink seen: the usual 78%');
+    assert.equal(blinkLineFor(0, 0.1), null);
 });
 
 test('face loss expires by elapsed time and resets on reacquisition or retry', () => {
