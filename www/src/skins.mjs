@@ -1,3 +1,4 @@
+import { pumpDollars, pumpMiss, formatDollars } from './pump.mjs';
 // Holiday and party skins. Everything here draws on canvases the game already owns:
 // the on-screen camera canvas (display only, never sent to blink detection) and the
 // selfie the player chooses to share. No images are fetched and nothing is uploaded.
@@ -205,6 +206,11 @@ export function selfieCaption({ reason, mode, elapsed, target, score }) {
     if (mode === 'BALLOON') {
         const n = Number.isFinite(score) ? score : 0;
         return { headline: `${n} BALLOON${n === 1 ? '' : 'S'} POPPED!`, detail: 'Popped just by blinking. Your turn?' };
+    }
+    if (mode === 'PUMP' && reason !== 'DISQUALIFIED') {
+        const miss = Number.isFinite(score) ? score : pumpMiss(elapsed);
+        return miss === 0 ? { headline: 'EXACTLY $10.00!', detail: 'Stopped the pump just by blinking. Your turn?' }
+            : { headline: `${formatDollars(pumpDollars(elapsed))} AT THE PUMP`, detail: `${formatDollars(miss)} off $10.00. Your turn?` };
     }
     if (reason === 'DISQUALIFIED') return { headline: 'FACE LOST!', detail: 'Stay in frame next time' };
     if (reason === 'WIN_ENDURANCE' || reason === 'WIN_SURPRISE') return { headline: 'EYES OF STEEL', detail: 'Survived all 30 seconds without blinking' };

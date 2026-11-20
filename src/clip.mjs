@@ -5,7 +5,8 @@
 import { SKINS } from './skins.mjs';
 
 export const CLIP_BEFORE_MS = 2500;
-export const CLIP_AFTER_MS = 700;
+// Long enough after the blink to catch the reaction (the laugh is the funny part).
+export const CLIP_AFTER_MS = 1500;
 export const CLIP_FPS = 15;
 export const CLIP_HOLD_MS = 1200;
 export const CLIP_WIDTH = 540;
@@ -43,7 +44,9 @@ export function createClipBuffer({ makeCanvas, before = CLIP_BEFORE_MS, after = 
         get blinkSeconds() { return blinkSeconds; },
         get ready() { return ready; },
         get waiting() { return blinkAt !== null && !ready; },
-        push(source, now) {
+        // mirror: camera frames are flipped to match the selfie view; a frame that is
+        // already composed as the player saw it (Balloon Pop) passes mirror: false.
+        push(source, now, { mirror = true } = {}) {
             if (ready || !source || !(source.width > 0) || !(source.height > 0)) return false;
             if (now - lastAt < minGap) return false;
             lastAt = now;
@@ -54,7 +57,7 @@ export function createClipBuffer({ makeCanvas, before = CLIP_BEFORE_MS, after = 
             if (canvas.width !== w) canvas.width = w;
             if (canvas.height !== h) canvas.height = h;
             const ctx = canvas.getContext('2d');
-            ctx.setTransform(-1, 0, 0, 1, w, 0); // mirrored, matching what the player saw
+            if (mirror) ctx.setTransform(-1, 0, 0, 1, w, 0); // mirrored, matching what the player saw
             ctx.drawImage(source, 0, 0, w, h);
             ctx.setTransform(1, 0, 0, 1, 0, 0);
             frames.push({ canvas, t: now });
@@ -116,7 +119,7 @@ export function drawClipFrame(ctx, frame, { skinId, seconds, blinked, stamp, cap
     if (Number.isFinite(seconds)) {
         ctx.font = font(48);
         ctx.lineWidth = 8; ctx.strokeStyle = 'rgba(0, 0, 0, 0.6)';
-        const label = `${Math.max(0, seconds).toFixed(2)}s`;
+        const label = caption?.timeLabel ? caption.timeLabel(seconds) : `${Math.max(0, seconds).toFixed(2)}s`;
         ctx.strokeText(label, width / 2, py + 44);
         ctx.fillStyle = blinked ? '#ff4d4d' : '#ffffff';
         ctx.fillText(label, width / 2, py + 44);
@@ -128,14 +131,15 @@ export function drawClipFrame(ctx, frame, { skinId, seconds, blinked, stamp, cap
         ctx.scale(stamp ? 1.1 : 1, stamp ? 1.1 : 1);
         ctx.font = font(96);
         ctx.lineWidth = 12; ctx.strokeStyle = '#000';
-        ctx.strokeText('BLINK!', 0, 0);
-        ctx.fillStyle = c.secondary; ctx.fillText('BLINK!', 0, 0);
+        const stampText = caption?.stamp || 'BLINK!';
+        ctx.strokeText(stampText, 0, 0, width - 60);
+        ctx.fillStyle = c.secondary; ctx.fillText(stampText, 0, 0, width - 60);
         ctx.restore();
     }
 
     const below = py + ph;
     ctx.fillStyle = c.text; ctx.font = font(40);
-    ctx.fillText(blinked ? (caption?.headline || 'CAUGHT BLINKING!') : "DON'T BLINK...", width / 2, below + 56, width - 40);
+    ctx.fillText(blinked ? (caption?.headline || 'CAUGHT BLINKING!') : (caption?.before || "DON'T BLINK..."), width / 2, below + 56, width - 40);
     ctx.fillStyle = c.muted; ctx.font = font(24);
     if (blinked && caption?.detail) ctx.fillText(caption.detail, width / 2, below + 104, width - 40);
     ctx.fillStyle = c.secondary; ctx.font = font(22);

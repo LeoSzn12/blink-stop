@@ -74,7 +74,7 @@ test('encoding replays every frame, holds on the blink, and returns a video', as
     const buffer = createClipBuffer({ makeCanvas: () => fakeCanvas() });
     for (let t = 0; t <= 3000; t += 67) buffer.push(source, t);
     buffer.mark(3000, 9.5);
-    for (let t = 3067; t <= 3800; t += 67) buffer.push(source, t);
+    for (let t = 3067; t <= 4600; t += 67) buffer.push(source, t);
     assert.equal(buffer.ready, true);
     const drawCalls = [];
     const out = fakeCanvas(drawCalls);

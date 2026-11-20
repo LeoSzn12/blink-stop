@@ -5,16 +5,24 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Blink Stop - Don't Blink Challenge</title>
-    <link rel="stylesheet" href="src/style.css?v=22">
+    <link rel="stylesheet" href="src/style.css?v=23">
 
     <link rel="manifest" href="manifest.json">
 
     <!-- Social Sharing Meta Tags -->
-    <meta property="og:title" content="Blink Stop - Don't Blink Challenge">
+    <meta property="og:title" content="Blink Stop - First to blink loses">
     <meta name="description"
-        content="Test your willpower in Blink Stop. Stare into the void without blinking. How long can you last?">
+        content="A family game you play with your eyes. Pop balloons with a blink, pass the phone around the table, and see who can go longest without blinking.">
+    <meta property="og:description"
+        content="A family game you play with your eyes. Pop balloons with a blink, pass the phone around the table, and see who can go longest without blinking.">
     <meta property="og:type" content="website">
-    <!-- No social preview image until approved artwork is published at the live URL. -->
+    <meta property="og:url" content="https://playblinkstop.com/">
+    <!-- Link preview: Wink Buddy artwork. Absolute URL, so it shows once this is live. -->
+    <meta property="og:image" content="https://playblinkstop.com/icons/og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="Blink Stop: First to blink loses. A family game you play with your eyes.">
+    <meta name="twitter:card" content="summary_large_image">
 
     <!-- MediaPipe Dependencies -->
     <script src="vendor/face_mesh/face_mesh.js"></script>
@@ -57,10 +65,14 @@
                     <p id="eye-tracking-status" class="eye-tracking-status" role="status" aria-live="polite"></p>
 
                     <div class="mode-selection">
-                        <button class="neon-btn mode-btn main-mode-btn play-hero" data-mode="CLASSIC">▶ PLAY<span class="btn-sub">Endurance: keep your eyes open longest</span></button>
-                        <button class="neon-btn mode-btn main-mode-btn precision-btn" data-mode="PRECISION">PRECISION<span class="btn-sub">Blink right on a target time you pick</span></button>
-                        <button class="neon-btn mode-btn main-mode-btn olympics-btn" data-mode="OLYMPICS">QUICK GAMES<span class="btn-sub">Fast games for friends</span></button>
-                        <details id="more-modes" class="more-modes">
+                        <button class="neon-btn mode-btn main-mode-btn play-hero" data-mode="BALLOON"><span class="mode-icon" aria-hidden="true">🎈</span> BALLOON POP<span class="btn-sub">Blink to pop. How many can you get?</span></button>
+                        <button class="neon-btn mode-btn main-mode-btn party-btn" data-mode="PARTY"><span class="mode-icon" aria-hidden="true">📱</span> PASS THE PHONE<span class="btn-sub">Family game for 2 to 8 players</span></button>
+                        <button class="neon-btn mode-btn main-mode-btn stare-btn" data-mode="CLASSIC"><span class="mode-icon" aria-hidden="true">👁️</span> DON'T BLINK<span class="btn-sub">Keep your eyes open longest</span></button>
+                        <button class="neon-btn mode-btn main-mode-btn precision-btn" data-mode="PRECISION"><span class="mode-icon" aria-hidden="true">🎯</span> PRECISION<span class="btn-sub">Hit a target time, or stop the gas pump at $10</span></button>
+                        <button class="neon-btn mode-btn main-mode-btn olympics-btn" data-mode="OLYMPICS"><span class="mode-icon" aria-hidden="true">⚡</span> MORE GAMES<span class="btn-sub">Flash, Blink Beat, Stare-Down, Jokes</span></button>
+                        <!-- 30 Seconds, Daily and Surprise are hidden for the holiday launch (fewer choices,
+                             no jump scare on the family screen). Their code stays; challenge links still work. -->
+                        <details id="more-modes" class="more-modes hidden" hidden>
                             <summary>More ways to play</summary>
                             <div class="more-modes-list">
                                 <button class="neon-btn mode-btn" data-mode="ENDURANCE">30 SECONDS<span class="btn-sub">Last 30 seconds, no blinking</span></button>
@@ -73,19 +85,22 @@
                     </div>
 
                     <div id="olympics-options" class="options-container prototype-options hidden">
-                        <h2>QUICK GAMES</h2>
-                        <button class="neon-btn mode-btn balloon-btn" data-mode="BALLOON">BALLOON POP<span class="btn-sub">Pop as many as you can. 3 lives.</span></button>
-                        <button class="neon-btn mode-btn flash-btn" data-mode="FLASH">FLASH<span class="btn-sub">Blink the moment it turns green</span></button>
-                        <button class="neon-btn mode-btn beat-btn" data-mode="BEAT">BLINK BEAT<span class="btn-sub">Blink to the beat as notes hit the line</span></button>
-                        <button class="neon-btn mode-btn" data-mode="VERSUS">STARE-DOWN<span class="btn-sub">2 players. First to blink loses.</span></button>
-                        <button class="neon-btn mode-btn" data-mode="PARTY">PASS THE PHONE<span class="btn-sub">2 to 8 players, one phone</span></button>
-                        <button class="neon-btn mode-btn" data-mode="DISTRACT">DISTRACTION<span class="btn-sub">Jokes try to make you blink</span></button>
+                        <h2>MORE GAMES</h2>
+                        <button class="neon-btn mode-btn flash-btn" data-mode="FLASH"><span class="mode-icon" aria-hidden="true">⚡</span> FLASH<span class="btn-sub">Blink the moment it turns green</span></button>
+                        <button class="neon-btn mode-btn beat-btn" data-mode="BEAT"><span class="mode-icon" aria-hidden="true">🎵</span> BLINK BEAT<span class="btn-sub">Blink to the beat as notes hit the line</span></button>
+                        <button class="neon-btn mode-btn" data-mode="VERSUS"><span class="mode-icon" aria-hidden="true">👀</span> STARE-DOWN<span class="btn-sub">2 players. First to blink loses.</span></button>
+                        <button class="neon-btn mode-btn" data-mode="DISTRACT"><span class="mode-icon" aria-hidden="true">😂</span> JOKES<span class="btn-sub">Jokes try to make you blink</span></button>
                         <button id="olympics-back-btn" class="neon-btn-small" type="button">Back</button>
                     </div>
 
                     <div id="party-options" class="options-container prototype-options hidden">
                         <h2>PASS THE PHONE</h2>
                         <p>Everyone takes one turn. The top two meet in a stare-down final, and the champion gets the crown.</p>
+                        <fieldset class="party-game-choice">
+                            <legend>Each turn plays</legend>
+                            <label><input type="radio" name="party-game" value="BALLOON" checked> 🎈 Balloon Pop <span class="choice-sub">most popped wins</span></label>
+                            <label><input type="radio" name="party-game" value="CLASSIC"> 👁️ Don't Blink <span class="choice-sub">longest stare wins</span></label>
+                        </fieldset>
                         <label for="party-names">Players, one per line (2 to 8)</label>
                         <textarea id="party-names" rows="4" maxlength="200" placeholder="Mom&#10;Dad&#10;Priya" spellcheck="false"></textarea>
                         <p id="party-setup-status" class="social-note" role="status" aria-live="polite"></p>
@@ -109,12 +124,14 @@
                     <!-- Precision Options (Hidden by default) -->
                     <div id="precision-options" class="options-container hidden">
                         <h2>PRECISION</h2>
-                        <p class="label">PICK YOUR TARGET: BLINK RIGHT AT</p>
+                        <p class="label">PICK A CHALLENGE</p>
+                        <p class="precision-choice-title">🎯 Classic: blink right at</p>
                         <div class="option-btns">
                             <button class="neon-btn-small option-btn" data-time="5">5 sec</button>
                             <button class="neon-btn-small option-btn active" data-time="10">10 sec</button>
                             <button class="neon-btn-small option-btn" data-time="15">15 sec</button>
                         </div>
+                        <button id="pump-start-btn" class="neon-btn pump-btn" type="button"><span class="mode-icon" aria-hidden="true">⛽</span> GAS PUMP<span class="btn-sub">Blink to stop the pump at exactly $10.00</span></button>
                         <button id="precision-back-btn" class="neon-btn-small" type="button">Back</button>
                     </div>
 
@@ -141,6 +158,7 @@
 
                 <!-- Party: pass the phone, standings, final and champion -->
                 <div id="party-screen" class="screen hidden">
+                    <div id="champion-crown" class="champion-crown hidden" aria-hidden="true">👑</div>
                     <h2 id="party-title" class="party-title">PASS THE PHONE</h2>
                     <p id="party-message" class="party-message" role="status" aria-live="polite"></p>
                     <ol id="party-standings" class="party-standings"></ol>
@@ -178,7 +196,10 @@
                             <button type="button" class="skin-btn" role="radio" aria-checked="false" data-skin="PARTY">🎉 Party</button>
                         </div>
                         <p id="skin-greeting" class="skin-greeting" aria-live="polite"></p>
-                        <button id="sound-toggle" class="neon-btn-small sound-toggle" type="button" aria-pressed="true">Sound: on</button>
+                        <div class="effects-toggles">
+                            <button id="sound-toggle" class="neon-btn-small sound-toggle" type="button" aria-pressed="true">Sound: on</button>
+                            <button id="haptics-toggle" class="neon-btn-small haptics-toggle" type="button" aria-pressed="true">Vibration: on</button>
+                        </div>
                         <button id="skin-pick-play" class="neon-btn pick-play" type="button">PLAY</button>
                         <button id="skin-pick-back" class="neon-btn-small pick-back" type="button">Back</button>
                     </div>
@@ -194,6 +215,7 @@
                     <h2 class="glitch" data-text="GET READY">GET READY</h2>
                     <p class="subtitle">Keep your eyes open normally</p>
                     <p id="calibration-hint" class="calibration-hint">Face the camera with a light in front of you.</p>
+                    <p id="calibration-light-tip" class="calibration-light-tip hidden" role="status">💡 It's dark here. Turn on a light or face a window so the camera can see your eyes.</p>
                     <div class="calibration-loader">
                         <div class="loader-bar"></div>
                     </div>
@@ -373,7 +395,7 @@
         <a href="support.html" class="footer-link">Support</a>
     </footer>
 
-    <script type="module" src="src/main.js?v=84"></script>
+    <script type="module" src="src/main.js?v=85"></script>
 </body>
 
 </html>

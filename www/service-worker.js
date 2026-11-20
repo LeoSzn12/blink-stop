@@ -1,4 +1,4 @@
-const CACHE_NAME = 'blink-stop-v27';
+const CACHE_NAME = 'blink-stop-v28';
 // The 10+ MB face model rarely changes, so it lives in its own cache: app updates
 // re-download only the small files, not the model. Bump only when vendor/face_mesh changes.
 const MODEL_CACHE = 'blink-stop-model-v1';
@@ -24,6 +24,7 @@ const ASSETS_TO_CACHE = [
     './licenses/Capacitor.txt',
     './licenses/Filesystem.txt',
     './licenses/Share.txt',
+    './licenses/Haptics.txt',
     './licenses/Synapse.txt',
     './how-to-play.html',
     './src/style.css',
@@ -44,6 +45,8 @@ const ASSETS_TO_CACHE = [
     './src/balloons.mjs',
     './src/flash.mjs',
     './src/beat.mjs',
+    './src/pump.mjs',
+    './src/feedback.mjs',
     './src/clip.mjs',
     './src/surprise.mjs',
     './src/deviceActions.mjs',

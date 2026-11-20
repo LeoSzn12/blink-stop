@@ -15,6 +15,8 @@ import { formatScore, LOWER_WINS, inviteLine, challengeUrl, challengeHeadline, P
 import * as flash from '../src/flash.mjs';
 import * as beat from '../src/beat.mjs';
 import * as clipModule from '../src/clip.mjs';
+import * as pump from '../src/pump.mjs';
+import * as feedback from '../src/feedback.mjs';
 
 const source = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8').replace(/^import .*;\s*$/gm, '');
 function harness(storage = { getItem: () => null, setItem() {} }, clipboard, { win = {}, extra = {} } = {}) {
@@ -45,7 +47,7 @@ function harness(storage = { getItem: () => null, setItem() {} }, clipboard, { w
   class FaceMesh { constructor() { this.closes = 0; meshes.push(this); } onResults(fn) { this.resultHandler = fn; } setOptions() {} send() { return new Promise(resolve => { const emit = () => this.resultHandler({ image: {}, multiFaceLandmarks: [{}] }); pending.push(() => { lastDelivered = emit; emit(); resolve(); }); }); } close() { this.closes++; } }
   const context = { document, window: { innerWidth: 500, addEventListener() {}, ...win }, navigator: { clipboard, mediaDevices: { getUserMedia: () => permission || Promise.resolve(stream()) } },
     FaceMesh, console: { log() {}, warn: (...a) => process.env.HARNESS_LOG && process.stderr.write(a.join(' ') + '\n'), error() {} }, performance: { now: () => clock }, Date,
-    createCalibrationTracker, createTrackingFreshness, createFaceLossTracker, createTapBlink, createSerializedInference, createSurpriseRound, createRewardedDemo, ...skins, ...versus, ...party, ...reel, ...balloons, ...flash, ...beat, ...clipModule, formatScore, LOWER_WINS, inviteLine, challengeUrl, challengeHeadline, PUBLIC_PLAY_URL,
+    createCalibrationTracker, createTrackingFreshness, createFaceLossTracker, createTapBlink, createSerializedInference, createSurpriseRound, createRewardedDemo, ...skins, ...versus, ...party, ...reel, ...balloons, ...flash, ...beat, ...clipModule, ...pump, ...feedback, formatScore, LOWER_WINS, inviteLine, challengeUrl, challengeHeadline, PUBLIC_PLAY_URL,
     checkBlink: () => eyeValue === null ? null : ({ minEar: eyeValue, ear: eyeValue, blinking }), setBlinkThreshold(value) { threshold = value; }, resetBlinkState() {}, getBlinkThreshold: () => threshold,
     audioManager: { startDrone() {}, stopDrone() {}, playGlitch() {}, playWin() {}, playHeartbeat() {}, playSurprise() {} },
     appendScore() {}, cameraErrorMessage: () => '', createGameOverCameraStop: fn => ({ cancel() {}, schedule() {} }), sharePayload() {}, shareClipboardText() {}, createSocialUI: () => ({ reset() {}, render() {} }),
@@ -96,7 +98,7 @@ test('a slow eye-tracking download does not eat the calibration time', async () 
   h.debug.startGame('CLASSIC'); await h.settle(); await h.timers();
   h.setClock(15000); h.raf();
   assert.equal(h.debug.getState(),'CALIBRATING','no frames yet: still loading, not a failure');
-  assert.match(h.el('calibration-status').innerText,/LOADING EYE TRACKING/);
+  assert.match(h.el('calibration-status').innerText,/DOWNLOADING EYE TRACKER \(ONE TIME\)/);
   assert.match(h.el('calibration-hint').innerText,/slow connection/i);
   // The first frame arrives late; the player still gets their full time from there.
   h.setClock(30000); h.tickInference(); h.deliver(); await h.settle(); h.raf();
@@ -468,7 +470,7 @@ test('Blink Olympics: Balloon Pop counts blinks as pops, ends on misses and shar
   assert.equal(h.jpegCount(), 1);
 });
 
-test('blink clip: a Classic blink becomes a shareable clip made on the phone; Balloon Pop and DQs make none', async () => {
+test('blink clip: a Classic blink becomes a shareable clip made on the phone; a lost face or an unfinished Balloon round makes none', async () => {
   class FakeRecorder {
     static isTypeSupported(type) { return type === 'video/mp4'; }
     constructor(stream, options) { this.options = options; FakeRecorder.made.push(this); }
@@ -494,7 +496,7 @@ test('blink clip: a Classic blink becomes a shareable clip made on the phone; Ba
   assert.equal(h.el('clip-btn').disabled, true);
   assert.equal(h.el('clip-btn').innerText, 'MAKING YOUR CLIP...');
   h.setBlinking(false);
-  for (let t = 6200; t <= 7000; t += 100) { h.setClock(t); h.tickInference(); h.deliver(); await h.settle(); }
+  for (let t = 6200; t <= 7700; t += 100) { h.setClock(t); h.tickInference(); h.deliver(); await h.settle(); }
   assert.equal(FakeRecorder.made.length, 1);
   assert.equal(FakeRecorder.made[0].options.mimeType, 'video/mp4');
   await new Promise(resolve => setTimeout(resolve, 5000));
@@ -508,7 +510,7 @@ test('blink clip: a Classic blink becomes a shareable clip made on the phone; Ba
   assert.equal(h.el('clip-btn').classList.contains('hidden'), true);
   assert.equal(h.el('clip-preview').src, '');
 
-  // Balloon Pop ends on misses, not a stare: no clip.
+  // A Balloon round ended without a real game over (no score to show): no clip.
   h.debug.startGame('BALLOON'); await h.settle(); await h.timers();
   h.debug.endGame('BALLOON_OVER');
   assert.equal(h.el('clip-btn').classList.contains('hidden'), true);
@@ -673,4 +675,24 @@ test('results have one Share button that opens and closes the share sheet', () =
   h.click('share-open-btn');
   h.debug.showMenu();
   assert.equal(h.el('share-sheet').classList.contains('hidden'), true, 'leaving the results closes the sheet');
+});
+
+test('Gas Pump: the Precision screen starts it, the HUD shows dollars, and a blink stops the pump', async () => {
+  const saved = new Map();
+  const h = harness({ getItem: key => saved.get(key) ?? null, setItem: (key, value) => saved.set(key, value) });
+  h.setEye(.3);
+  h.click('pump-start-btn'); await h.settle(); await h.timers();
+  assert.equal(h.debug.getState(), 'SKIN_PICK');
+  assert.equal(h.el('skin-pick-mode').textContent, 'Gas Pump');
+  h.click('skin-pick-play'); await h.settle();
+  for (let i = 0; i < 10; i++) { h.setClock(i * 400); h.tickInference(); h.deliver(); await h.settle(); h.raf(); }
+  assert.equal(h.debug.getState(), 'PLAYING');
+  h.raf();
+  assert.match(h.el('score').innerText, /^\$\d+\.\d{2}$/);
+  h.setBlinking(true); h.setClock(4100); h.tickInference(); h.deliver(); await h.settle();
+  assert.equal(h.debug.getState(), 'GAME_OVER');
+  assert.equal(h.el('final-score-label').innerText, 'OFF $10.00 BY');
+  assert.match(h.el('final-score-sub').innerText, /^You stopped the pump at \$\d+\.\d{2}$/);
+  assert.equal(h.el('game-over-title').innerText, 'STOPPED SHORT');
+  assert.ok(saved.has('blink_best_PUMP'), 'its own best, apart from Precision');
 });

@@ -13,10 +13,12 @@ import { SKINS, SKIN_STORAGE_KEY, resolveSkin, storedSkinValue, drawSkinOverlay,
 import { createVersusMatch, largestFace } from './versus.mjs';
 import { parseNames, createParty, createDeck, forfeitCards, jokeCards } from './party.mjs';
 import { drawReel } from './reel.mjs';
-import { createBalloonRound, drawBalloons, BALLOON_MISSES } from './balloons.mjs';
+import { createBalloonRound, drawBalloons, BALLOON_MISSES, balloonColors, balloonLevel } from './balloons.mjs';
 import { createFlashRound, FLASH_TIMEOUT_MS } from './flash.mjs';
 import { createBeatRound, BEAT_LIVES, drawBeat } from './beat.mjs';
 import { clipSupported, createClipBuffer, encodeClip, pickClipType, clipExtension } from './clip.mjs';
+import { pumpDollars, pumpMiss, formatDollars, PUMP_TARGET } from './pump.mjs';
+import { createHaptics, confetti, drawCallout, countUp, prefersReducedMotion } from './feedback.mjs';
 
 // DOM Elements
 const videoElement = document.getElementsByClassName('input_video')[0];
@@ -128,8 +130,8 @@ let quickRound = null, quickFrameId = null, quickEnd = null;
 // skin on your face, so you choose your look right before playing. Retry skips it.
 const skinPickScreen = document.getElementById('skin-pick-screen');
 const skinPickMode = document.getElementById('skin-pick-mode');
-const SKIN_PICK_MODES = ['CLASSIC', 'PRECISION', 'ENDURANCE', 'DAILY', 'VERSUS', 'DISTRACT', 'BALLOON', 'FLASH', 'BEAT', 'SURPRISE'];
-const MODE_NAMES = { CLASSIC: 'Endurance', PRECISION: 'Precision', ENDURANCE: '30 Seconds', DAILY: 'Daily', VERSUS: 'Stare-down', DISTRACT: 'Distraction', BALLOON: 'Balloon Pop', FLASH: 'Flash', BEAT: 'Blink Beat', SURPRISE: 'Surprise' };
+const SKIN_PICK_MODES = ['CLASSIC', 'PRECISION', 'PUMP', 'ENDURANCE', 'DAILY', 'VERSUS', 'DISTRACT', 'BALLOON', 'FLASH', 'BEAT', 'SURPRISE'];
+const MODE_NAMES = { CLASSIC: 'Endurance', PRECISION: 'Precision', PUMP: 'Gas Pump', ENDURANCE: '30 Seconds', DAILY: 'Daily', VERSUS: 'Stare-down', DISTRACT: 'Distraction', BALLOON: 'Balloon Pop', FLASH: 'Flash', BEAT: 'Blink Beat', SURPRISE: 'Surprise' };
 let pickSkinNext = false;
 let shareLine = 'Think you can beat me?'; // invite text that travels with a shared photo
 let shareUrl = PUBLIC_PLAY_URL; // challenge link that travels with a shared photo or clip
@@ -151,7 +153,7 @@ const challengeHudValue = document.getElementById('challenge-hud-value');
 // ---------- Blink clip ----------
 // While a solo round runs, the last few seconds of the camera view are kept as small
 // frames in memory. After a blink they become a short video, made on this phone.
-const CLIP_MODES = ['CLASSIC', 'PRECISION', 'ENDURANCE', 'DAILY', 'SURPRISE', 'DISTRACT', 'FLASH'];
+const CLIP_MODES = ['CLASSIC', 'PRECISION', 'PUMP', 'ENDURANCE', 'DAILY', 'SURPRISE', 'DISTRACT', 'FLASH', 'BALLOON', 'VERSUS'];
 const clipBtn = document.getElementById('clip-btn');
 const clipPreview = document.getElementById('clip-preview');
 const clipCanMake = clipSupported(window);
@@ -177,23 +179,62 @@ function clearClip() {
     updateClipButton();
 }
 
+const CLIP_STATES = ['PLAYING', 'ENDURANCE', 'FLASH', 'BALLOON', 'VERSUS'];
 function captureClipFrame(now) {
     if (!clipCanMake || !CLIP_MODES.includes(currentMode)) return;
-    if (gameState !== 'PLAYING' && gameState !== 'ENDURANCE' && gameState !== 'FLASH' && !clip.waiting) return;
-    clip.push(canvasElement, now);
+    if (!CLIP_STATES.includes(gameState) && !clip.waiting) return;
+    // Balloon Pop's clip shows the balloons too: the camera and the balloon layer are
+    // composed the way the player saw them, so that frame is not mirrored again.
+    if (currentMode === 'BALLOON') clip.push(balloonClipSource(), now, { mirror: false });
+    else clip.push(canvasElement, now);
     if (clip.ready) makeClip();
+}
+
+let clipView = null;
+function balloonClipSource() {
+    const lw = balloonLayer.width, lh = balloonLayer.height;
+    const cw = canvasElement.width, ch = canvasElement.height;
+    if (!(lw > 0 && lh > 0 && cw > 0 && ch > 0)) return canvasElement;
+    const scale = Math.min(1, 400 / Math.max(lw, lh));
+    const w = Math.max(1, Math.round(lw * scale)), h = Math.max(1, Math.round(lh * scale));
+    clipView ||= document.createElement('canvas');
+    if (clipView.width !== w) clipView.width = w;
+    if (clipView.height !== h) clipView.height = h;
+    const ctx = clipView.getContext('2d');
+    // The camera fills the screen like the page's object-fit: cover, mirrored like the page.
+    const s = Math.max(w / cw, h / ch), dw = cw * s, dh = ch * s;
+    ctx.setTransform(-1, 0, 0, 1, w, 0);
+    ctx.drawImage(canvasElement, (w - dw) / 2, (h - dh) / 2, dw, dh);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    if (!balloonLayer.classList.contains('hidden')) ctx.drawImage(balloonLayer, 0, 0, w, h);
+    return clipView;
 }
 
 // Called from endGame: only a real blink gets a clip.
 function startClip(reason, elapsed, score) {
     // Flash makes a clip of the last try's blink, with the reaction time instead of a clock.
     const flashHit = reason === 'QUICK_OVER' && currentMode === 'FLASH' && quickEnd?.lastHit;
-    if ((reason !== 'BLINK' && !flashHit) || !clipCanMake || !CLIP_MODES.includes(currentMode) || !clip.mark(lastFrameAt, flashHit ? NaN : elapsed)) {
+    // Balloon Pop: the clip ends on the balloon that got away, then your face after.
+    const balloonOver = reason === 'BALLOON_OVER' && currentMode === 'BALLOON' && balloonEnd && !balloonEnd.faceLost;
+    const noClock = flashHit || balloonOver;
+    if ((reason !== 'BLINK' && !flashHit && !balloonOver) || !clipCanMake || !CLIP_MODES.includes(currentMode) || !clip.mark(lastFrameAt, noClock ? NaN : elapsed)) {
         clip.reset();
         return;
     }
+    const caption = selfieCaption({ reason, mode: currentMode, elapsed, target: precisionTarget, score });
+    if (currentMode === 'PUMP') caption.timeLabel = seconds => formatDollars(pumpDollars(seconds));
+    beginClip(balloonOver ? { ...caption, stamp: 'GAME OVER', before: 'POP THEM ALL...' } : caption);
+}
+
+// The stare-down final (and any stare-down) gets a clip of the blink that decided it.
+function startVersusClip(caption, elapsed) {
+    if (!clipCanMake || !clip.mark(lastFrameAt, elapsed)) { clip.reset(); return; }
+    beginClip({ ...caption, before: 'FIRST TO BLINK LOSES...' });
+}
+
+function beginClip(caption) {
     clipMaking = true;
-    clipCaption = selfieCaption({ reason, mode: currentMode, elapsed, target: precisionTarget, score });
+    clipCaption = caption;
     clipSkin = currentSkin;
     clearTimeout(clipFinishTimer);
     // If the camera stops before the after-blink frames arrive, make it from what we have.
@@ -301,6 +342,50 @@ function glanceAwayOver(now) {
     if (banner) banner.textContent = `Come back! ${Math.ceil(left / 1000)}`;
     return false;
 }
+// Tap games (Balloon Pop, Flash, Blink Beat): a lost face pauses the game with the same
+// "Come back!" countdown instead of ending it, so passing the phone or turning away to
+// laugh doesn't throw the round. Twice per round; the game's own clock is frozen meanwhile.
+let tapAwayAt = null; // performance.now() when the pause began
+function tapAwayCheck() {
+    const banner = document.getElementById('come-back');
+    if (tapAwayAt === null) {
+        if (!tracking.stale(clock())) return 'OK';
+        if (glancesLeft <= 0) return 'OVER';
+        glancesLeft--;
+        tapAwayAt = performance.now();
+        tapBlink.reset();
+        banner?.classList.remove('hidden');
+    }
+    const left = GLANCE_GRACE_MS - (performance.now() - tapAwayAt);
+    if (left <= 0) { banner?.classList.add('hidden'); return 'OVER'; }
+    if (banner) banner.textContent = `Come back! ${Math.ceil(left / 1000)}`;
+    return 'PAUSED';
+}
+// The face is back: the paused time doesn't count, and tracking starts fresh.
+function tapAwayResume() {
+    if (tapAwayAt === null) return;
+    const away = performance.now() - tapAwayAt;
+    tapAwayAt = null;
+    pausedMs += away;
+    startTime += away;
+    document.getElementById('come-back')?.classList.add('hidden');
+    tracking.reset(clock());
+    faceLoss.reset();
+    tapBlink.reset();
+}
+function tapAwayReset() {
+    tapAwayAt = null;
+    glancesLeft = GLANCES_PER_ROUND;
+    document.getElementById('come-back')?.classList.add('hidden');
+}
+// Called with each tracked eye in a tap game. Returns the round time to use for it.
+function tapFaceSeen(now) {
+    if (tapAwayAt !== null) { tapAwayResume(); now = clock(); }
+    else if (tracking.stale(now)) tracking.reset(now);
+    tracking.observe(now);
+    faceLoss.observe(true, now);
+    return now;
+}
 function confirmDuringRound(message) {
     const askedAt = performance.now();
     const ok = confirm(message);
@@ -333,6 +418,48 @@ let surpriseRound = null;
 let soundEnabled = true;
 // One remembered sound switch (on Pick Your Look) for the beat, heartbeat and drone.
 let soundPref = true;
+// Haptics: the phone's tap engine in the app, vibration on Android web; remembered like sound.
+const haptics = createHaptics();
+try { haptics.enabled = localStorage.getItem('blink_haptics') !== 'off'; } catch { /* storage unavailable */ }
+const hapticsToggle = document.getElementById('haptics-toggle');
+function renderHapticsToggle() {
+    if (!hapticsToggle) return;
+    // Hidden where the phone can't vibrate at all (iPhone Safari): the effects still show.
+    hapticsToggle.classList.toggle('hidden', !haptics.isNative && typeof navigator.vibrate !== 'function');
+    hapticsToggle.innerText = haptics.enabled ? 'Vibration: on' : 'Vibration: off';
+    hapticsToggle.setAttribute('aria-pressed', String(haptics.enabled));
+}
+hapticsToggle?.addEventListener('click', () => {
+    haptics.enabled = !haptics.enabled;
+    try { localStorage.setItem('blink_haptics', haptics.enabled ? 'on' : 'off'); } catch { /* storage unavailable */ }
+    renderHapticsToggle();
+    haptics.fire('tick');
+});
+renderHapticsToggle();
+// A big word over the game (LEVEL 2!, +1 LIFE) drawn on the game canvas.
+let gameCallout = null;
+function callout(text, color) { gameCallout = { text, color, at: clock() }; }
+// The pop: a quick bump and flash in the balloon's colour, a thump and a tap.
+let popFxTimer = null;
+function popFx(color) {
+    if (soundEnabled) audioManager.playPop?.();
+    haptics.fire('pop');
+    const flash = document.createElement('div');
+    flash.className = 'pop-flash';
+    flash.style.setProperty('--pop-color', color || '#39ff14');
+    document.body.appendChild(flash);
+    setTimeout(() => flash.remove(), 300);
+    if (prefersReducedMotion()) return;
+    container.classList.remove('pop-hit');
+    void container.offsetWidth;
+    container.classList.add('pop-hit');
+    clearTimeout(popFxTimer);
+    popFxTimer = setTimeout(() => container.classList.remove('pop-hit'), 200);
+}
+function celebrate() {
+    confetti({ colors: balloonColors(currentSkin) });
+    haptics.fire('win');
+}
 try { soundPref = localStorage.getItem('blink_sound') !== 'off'; } catch { /* storage unavailable */ }
 const soundToggle = document.getElementById('sound-toggle');
 function renderSoundToggle() {
@@ -398,7 +525,15 @@ function setEyeTrackingStatus(text) {
 function warmEyeTracking() {
     if (eyeTrackingWarm) return eyeTrackingWarm;
     if (typeof FaceMesh !== 'function') return (eyeTrackingWarm = Promise.resolve(false));
-    setEyeTrackingStatus('Getting eye tracking ready...');
+    // MediaPipe gives no download progress, so show how long it has been and what it is.
+    const warmStart = performance.now();
+    const warmText = () => {
+        const s = Math.round((performance.now() - warmStart) / 1000);
+        return s < 3 ? 'Getting eye tracking ready...'
+            : `Downloading the eye tracker, one time only... ${s}s${s >= 12 ? ' (Wi-Fi helps)' : ''}`;
+    };
+    setEyeTrackingStatus(warmText());
+    const warmTicker = setInterval(() => { if (!eyeTrackingReady) setEyeTrackingStatus(warmText()); }, 1000);
     const mesh = new FaceMesh({ locateFile: file => `vendor/face_mesh/${file}` });
     mesh.setOptions({ maxNumFaces: 2, refineLandmarks: false, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
     eyeTrackingWarm = Promise.resolve()
@@ -414,7 +549,7 @@ function warmEyeTracking() {
             setEyeTrackingStatus('');
             return false;
         })
-        .finally(() => { try { mesh.close(); } catch {} });
+        .finally(() => { clearInterval(warmTicker); try { mesh.close(); } catch {} });
     return eyeTrackingWarm;
 }
 
@@ -622,8 +757,9 @@ modeBtns.forEach(btn => {
         } else if (mode === 'OLYMPICS') {
             modeSelection.classList.add('hidden');
             olympicsOptions.classList.remove('hidden');
-            olympicsOptions.querySelector('[data-mode="BALLOON"]').focus();
+            olympicsOptions.querySelector('[data-mode]')?.focus();
         } else if (mode === 'PARTY') {
+            modeSelection.classList.add('hidden');
             olympicsOptions.classList.add('hidden');
             partyOptions.classList.remove('hidden');
             document.getElementById('party-names').focus();
@@ -709,6 +845,13 @@ precisionBackBtn.addEventListener('click', () => {
     document.querySelector('[data-mode="PRECISION"]').focus();
 });
 
+// Gas Pump lives inside Precision: same blink-on-time idea, with a pump to stop at $10.00.
+document.getElementById('pump-start-btn')?.addEventListener('click', () => {
+    if (tapTooSoon()) return;
+    pickSkinNext = true;
+    startGame('PUMP');
+});
+
 optionBtns.forEach(btn => {
     btn.addEventListener('click', (e) => {
         if (tapTooSoon()) return;
@@ -779,6 +922,9 @@ updateHomeFab();
 // the video, detection off) instead of stopped, and the next game reuses it. A parked
 // camera is released after a minute on the menu, and right away when the app is hidden.
 const CAMERA_WARM_MS = 60000;
+// During Pass the Phone the next turn can take a while to start (passing, reading names),
+// so the camera stays ready longer and the website doesn't ask for it again mid-party.
+const CAMERA_WARM_PARTY_MS = 5 * 60000;
 let warmStream = null, warmTimer = null;
 function releaseWarmCamera() {
     clearTimeout(warmTimer);
@@ -814,7 +960,7 @@ function stopCameraAndDetection({ keepWarm = false } = {}) {
         if (keepWarm && !document.hidden) {
             releaseWarmCamera();
             warmStream = stream;
-            warmTimer = setTimeout(releaseWarmCamera, CAMERA_WARM_MS);
+            warmTimer = setTimeout(releaseWarmCamera, party ? CAMERA_WARM_PARTY_MS : CAMERA_WARM_MS);
         } else {
             stream.getTracks().forEach(track => track.stop());
             console.log('Camera stopped');
@@ -1022,6 +1168,7 @@ document.getElementById('party-new-dare-btn').addEventListener('click', () => { 
 
 function stopBalloons() {
     cancelAnimationFrame(balloonFrameId);
+    if (balloonRound) tapAwayReset();
     balloonRound = null;
     tapBlink.reset();
     balloonCtx.clearRect(0, 0, balloonLayer.width, balloonLayer.height);
@@ -1088,6 +1235,7 @@ function startBalloonRound() {
     gameState = 'BALLOON';
     balloonRound = createBalloonRound();
     tapBlink.reset();
+    tapAwayReset();
     balloonEnd = null;
     startTime = Date.now();
     balloonLayer.classList.remove('hidden');
@@ -1099,21 +1247,24 @@ function startBalloonRound() {
     livesDisplay.classList.remove('hidden');
     renderBalloonLives();
     faceStatus.classList.remove('hidden', 'not-detected');
-    faceStatusText.innerText = 'Pop as many as you can! Blink when one is in the zone';
+    faceStatusText.innerText = party && partyTurn ? `${party.current()}'s turn: blink when a balloon is in the zone!` : 'Pop as many as you can! Blink when one is in the zone';
     updateBalloonLoop();
 }
 
 function updateBalloonLoop() {
     if (gameState !== 'BALLOON' || !balloonRound) return;
+    const away = tapAwayCheck();
+    if (away === 'OVER') return endBalloon(true);
+    if (away === 'PAUSED') { balloonFrameId = requestAnimationFrame(updateBalloonLoop); return; }
     const now = clock();
-    if (tracking.stale(now)) return endBalloon(true);
     if (balloonRound.update(now).length) {
-        if (navigator.vibrate) navigator.vibrate(60);
+        haptics.fire('warn');
         renderBalloonLives();
         if (!balloonRound.over) faceStatusText.innerText = `One got away! ${balloonLivesText()}`;
     }
     sizeBalloonLayer();
     drawBalloons(balloonCtx, balloonRound, currentSkin, balloonLayer.width, balloonLayer.height, now);
+    drawCallout(balloonCtx, gameCallout, balloonLayer.width, balloonLayer.height, now, { reducedMotion: prefersReducedMotion() });
     if (balloonRound.over) return endBalloon(false);
     balloonFrameId = requestAnimationFrame(updateBalloonLoop);
 }
@@ -1122,8 +1273,7 @@ function updateBalloonLoop() {
 function handleBalloonEye(eye, now) {
     if (!balloonRound) return;
     if (eye && Number.isFinite(eye.minEar) && eye.minEar > 0 && eye.minEar <= 1) {
-        if (!tracking.observe(now)) return endBalloon(true);
-        faceLoss.observe(true, now);
+        now = tapFaceSeen(now);
         faceStatus.classList.remove('not-detected');
         currentEAR = eye.ear;
         minEARValue = eye.minEar;
@@ -1132,13 +1282,22 @@ function handleBalloonEye(eye, now) {
             if (result?.hit) {
                 bumpBalloonScore(result.score);
                 faceStatusText.innerText = `POP! ${result.score} popped`;
-                if (navigator.vibrate) navigator.vibrate(25);
+                const colors = balloonColors(currentSkin);
+                popFx(colors[result.balloon.color % colors.length]);
+                if (result.lifeBack) {
+                    renderBalloonLives();
+                    callout('+1 LIFE 🎈', '#ff4fa3');
+                    if (soundEnabled) audioManager.playLevelUp?.();
+                } else if (result.levelUp) {
+                    callout(`LEVEL ${balloonLevel(result.score)}!`, '#39ff14');
+                    if (soundEnabled) audioManager.playLevelUp?.();
+                } else if (result.streak >= 3 && result.streak % 3 === 0) callout(`${result.streak} IN A ROW!`, '#fff200');
             } else if (result?.kind === 'FREE') {
                 faceStatusText.innerText = 'Wait for the zone. That one was free!';
             } else if (result) {
                 renderBalloonLives();
                 faceStatusText.innerText = `Too early! ${balloonLivesText()}`;
-                if (navigator.vibrate) navigator.vibrate(60);
+                haptics.fire('warn');
             }
             if (balloonRound.over) return endBalloon(false);
         }
@@ -1147,7 +1306,7 @@ function handleBalloonEye(eye, now) {
         tapBlink.reset();
         faceStatus.classList.add('not-detected');
         faceStatusText.innerText = 'Face not detected – move closer & improve lighting';
-        if (faceLoss.observe(false, now)) endBalloon(true);
+        // The frame loop's "Come back!" pause decides when a lost face ends the round.
     }
 }
 
@@ -1160,6 +1319,7 @@ function endBalloon(faceLost) {
 // ---------- Flash and Blink Beat ----------
 function stopQuick() {
     cancelAnimationFrame(quickFrameId);
+    if (quickRound) tapAwayReset();
     quickRound = null;
     tapBlink.reset();
     quickStage.classList.add('hidden');
@@ -1203,6 +1363,7 @@ function startQuickRound(mode) {
     gameState = mode;
     quickRound = mode === 'FLASH' ? createFlashRound() : createBeatRound();
     tapBlink.reset();
+    tapAwayReset();
     quickEnd = null;
     startTime = Date.now();
     quickLight.classList.remove('lit', 'tap', 'right', 'wrong');
@@ -1232,8 +1393,10 @@ function startQuickRound(mode) {
 
 function updateQuickLoop() {
     if ((gameState !== 'FLASH' && gameState !== 'BEAT') || !quickRound) return;
+    const away = tapAwayCheck();
+    if (away === 'OVER') return endQuick(true);
+    if (away === 'PAUSED') { quickFrameId = requestAnimationFrame(updateQuickLoop); return; }
     const now = clock();
-    if (tracking.stale(now)) return endQuick(true);
     const event = quickRound.update(now);
     if (gameState === 'FLASH') showFlashEvent(event);
     else showBeatEvent(event, now);
@@ -1259,26 +1422,27 @@ function showFlashEvent(event) {
     }
 }
 
+let beatPulseAt = null; // when the last beat played, for the on-screen pulse
 function showBeatEvent(event, now) {
     for (let i = 0; i < (event?.beats || 0); i++) {
         if (soundEnabled) audioManager.playKick?.(beatBarsPlayed % 4 === 0);
         beatBarsPlayed++;
+        beatPulseAt = now;
     }
     if (event?.missed) {
         renderQuickLives();
-        if (navigator.vibrate) navigator.vibrate(60);
+        haptics.fire('warn');
         if (!quickRound.over) faceStatusText.innerText = quickRound.livesLeft() === 1 ? 'Missed one! Last life' : `Missed one! ${quickRound.livesLeft()} lives left`;
     }
     sizeBalloonLayer();
-    drawBeat(balloonCtx, quickRound, currentSkin, balloonLayer.width, balloonLayer.height, now);
+    drawBeat(balloonCtx, quickRound, currentSkin, balloonLayer.width, balloonLayer.height, now, { pulseAt: beatPulseAt });
 }
 
 // A blink counts the moment the eyes close; holding them shut is one blink.
 function handleQuickEye(eye, now) {
     if (!quickRound) return;
     if (eye && Number.isFinite(eye.minEar) && eye.minEar > 0 && eye.minEar <= 1) {
-        if (!tracking.observe(now)) return endQuick(true);
-        faceLoss.observe(true, now);
+        now = tapFaceSeen(now);
         faceStatus.classList.remove('not-detected');
         currentEAR = eye.ear;
         minEARValue = eye.minEar;
@@ -1288,18 +1452,19 @@ function handleQuickEye(eye, now) {
                 if (result.kind === 'EARLY') {
                     quickStage.classList.add('early');
                     quickText.textContent = 'Too early! Wait for green…';
-                    if (navigator.vibrate) navigator.vibrate(60);
+                    haptics.fire('warn');
                 } else if (result.kind === 'HIT') {
                     quickStage.classList.remove('go');
                     quickText.textContent = `${result.ms} ms`;
                     renderQuickDots(quickRound.times.length, quickRound.tries);
-                    if (navigator.vibrate) navigator.vibrate(25);
+                    haptics.fire('pop');
+                    if (soundEnabled) audioManager.playPop?.(1.3);
                 }
             } else if (gameState === 'BEAT' && result) {
                 if (result.kind === 'PERFECT' || result.kind === 'GOOD') {
                     bumpBalloonScore(result.score);
                     if (soundEnabled) audioManager.playBeep?.(result.kind === 'PERFECT' ? 880 : 660);
-                    if (navigator.vibrate) navigator.vibrate(20);
+                    haptics.fire(result.kind === 'PERFECT' ? 'pop' : 'tick');
                     if (result.lifeBack) renderQuickLives();
                     faceStatusText.innerText = result.lifeBack ? `${result.combo} in a row! Life back` : result.combo >= 3 ? `${result.combo} in a row!` : result.kind === 'PERFECT' ? 'Perfect!' : 'Good!';
                 } else if (result.kind === 'STRAY') {
@@ -1313,7 +1478,7 @@ function handleQuickEye(eye, now) {
         tapBlink.reset();
         faceStatus.classList.add('not-detected');
         faceStatusText.innerText = 'Face not detected – move closer & improve lighting';
-        if (faceLoss.observe(false, now)) endQuick(true);
+        // The frame loop's "Come back!" pause decides when a lost face ends the round.
     }
 }
 
@@ -1335,8 +1500,8 @@ function endQuick(faceLost) {
 document.getElementById('party-back-btn').addEventListener('click', () => {
     clearTapGuard();
     partyOptions.classList.add('hidden');
-    olympicsOptions.classList.remove('hidden');
-    olympicsOptions.querySelector('[data-mode="PARTY"]').focus();
+    modeSelection.classList.remove('hidden');
+    modeSelection.querySelector('[data-mode="PARTY"]')?.focus();
 });
 document.getElementById('olympics-back-btn').addEventListener('click', () => {
     clearTapGuard();
@@ -1347,7 +1512,8 @@ document.getElementById('olympics-back-btn').addEventListener('click', () => {
 document.getElementById('party-start-btn').addEventListener('click', () => {
     const status = document.getElementById('party-setup-status');
     try {
-        party = createParty(parseNames(document.getElementById('party-names').value));
+        const game = document.querySelector('input[name="party-game"]:checked')?.value || 'BALLOON';
+        party = createParty(parseNames(document.getElementById('party-names').value), { game });
     } catch (error) {
         status.textContent = error.message;
         return;
@@ -1363,7 +1529,7 @@ partyGoBtn.addEventListener('click', () => {
     if (partyStage === 'NEXT_TURN') {
         partyTurn = true;
         versusNames = null;
-        startGame('CLASSIC');
+        startGame(party.game);
     } else if (partyStage === 'FINAL') {
         partyTurn = false;
         versusNames = party.finalists();
@@ -1434,14 +1600,16 @@ function renderStandings() {
         const name = document.createElement('span');
         const score = document.createElement('span');
         name.textContent = `${index + 1}. ${entry.name}`;
-        score.textContent = `${entry.score.toFixed(2)}s`;
+        score.textContent = party.game === 'BALLOON' ? `${Math.round(entry.score)} popped` : `${entry.score.toFixed(2)}s`;
         li.append(name, score);
         partyStandings.appendChild(li);
     });
 }
 
+const championCrown = document.getElementById('champion-crown');
 function showPartyScreen(stage) {
     partyStage = stage;
+    championCrown?.classList.add('hidden');
     gameState = 'PARTY';
     partyTurn = false;
     [menuScreen, gameOverScreen, calibrationScreen, gameHud, enduranceScreen].forEach(el => { el.classList.add('hidden'); el.classList.remove('active'); });
@@ -1455,7 +1623,9 @@ function showPartyScreen(stage) {
     renderStandings();
     if (stage === 'NEXT_TURN') {
         partyTitle.textContent = 'PASS THE PHONE';
-        partyMessage.textContent = `Turn ${party.turnNumber()} of ${party.players.length}: ${party.current()}, you're up. Eyes open, no do-overs.`;
+        partyMessage.textContent = party.game === 'BALLOON'
+            ? `Turn ${party.turnNumber()} of ${party.players.length}: ${party.current()}, you're up. Pop as many balloons as you can. 3 lives.`
+            : `Turn ${party.turnNumber()} of ${party.players.length}: ${party.current()}, you're up. Eyes open, no do-overs.`;
         partyGoBtn.textContent = `START ${party.current().toUpperCase()}'S TURN`;
     } else if (stage === 'FINAL') {
         const [left, right] = party.finalists();
@@ -1465,8 +1635,11 @@ function showPartyScreen(stage) {
         partySkipBtn.classList.remove('hidden');
     } else {
         const champion = party.champion();
-        partyTitle.textContent = `👑 ${champion.toUpperCase()} WINS!`;
-        partyMessage.textContent = party.finalPlayed() ? `${champion} won the final.` : `${champion} had the longest stare.`;
+        partyTitle.textContent = `${champion.toUpperCase()} WINS!`;
+        championCrown?.classList.remove('hidden');
+        if (soundEnabled) audioManager.playWin();
+        celebrate();
+        partyMessage.textContent = party.finalPlayed() ? `${champion} won the final.` : party.game === 'BALLOON' ? `${champion} popped the most.` : `${champion} had the longest stare.`;
         partyGoBtn.textContent = 'NEW PARTY';
         const last = party.lastPlace();
         if (last && last !== champion) showDare(partyDareBox, partyDare, last);
@@ -1620,6 +1793,7 @@ function endVersus(outcome) {
         detail = `${loser} blinked first after ${time}`;
         gameOverTitle.style.color = 'var(--neon-cyan)';
         if (soundEnabled) audioManager.playWin();
+        celebrate();
         showDare(dareBox, dareText, loser);
         if (party && versusNames) {
             party.recordFinal(winner);
@@ -1644,6 +1818,8 @@ function endVersus(outcome) {
     shareUrl = PUBLIC_PLAY_URL;
     shareLine = outcome?.result === 'WIN' ? `${versusName(outcome.winner)} won our Blink Stop stare-down 👀 Who's next?` : 'Blink Stop stare-down 👀 Who can beat us?';
     const photo = makeSelfie({ headline, detail });
+    if (outcome?.result === 'WIN' || outcome?.result === 'TIE') startVersusClip({ headline, detail }, outcome?.elapsed ?? 0);
+    else clip.reset();
     if (party && versusNames) {
         if (outcome?.result === 'WIN') addToReel(photo, versusName(outcome.winner));
         partyNextBtn.textContent = party.champion() ? 'CROWN THE CHAMPION' : 'BACK TO THE PARTY';
@@ -1681,7 +1857,7 @@ function startGame(mode) {
     restartBtn.innerText = 'PLAY AGAIN';
     partyScreen.classList.add('hidden');
     partyScreen.classList.remove('active');
-    if (mode !== 'CLASSIC') partyTurn = false;
+    if (!party || mode !== party.game) partyTurn = false;
     gameOverCameraStop.cancel();
     cancelAnimationFrame(calibrationFrameId);
     cancelAnimationFrame(animationFrameId);
@@ -1712,6 +1888,12 @@ function startGame(mode) {
         targetDisplay.classList.remove('hidden');
         targetDisplay.querySelector('.digital-text-sm').innerText = `${precisionTarget.toFixed(2)}s`;
         worldRecordDisplay.classList.add('hidden');
+    } else if (mode === 'PUMP') {
+        hudLabel.innerText = "⛽ PUMP";
+        targetDisplay.classList.remove('hidden');
+        targetDisplay.querySelector('.digital-text-sm').innerText = formatDollars(PUMP_TARGET);
+        worldRecordDisplay.classList.add('hidden');
+        scoreDisplay.innerText = formatDollars(0);
     } else if (mode === 'CLASSIC') {
         hudLabel.innerText = "TIME";
         targetDisplay.classList.add('hidden');
@@ -1760,6 +1942,7 @@ const goFlash = document.getElementById('go-flash');
 let goFlashTimer = null;
 function roundTipFor(mode) {
     switch (mode) {
+        case 'PUMP': return 'Blink to stop the pump at exactly $10.00. It speeds up after $8!';
         case 'PRECISION': return `Blink right at ${precisionTarget} seconds. The clock hides after ${PRECISION_CLOCK_SHOWN_S}, so count in your head.`;
         case 'ENDURANCE': return "Don't blink for 30 seconds.";
         case 'DAILY': return `Today's twist: ${dailyTwist().name}. Don't blink!`;
@@ -1783,6 +1966,8 @@ function dailyTwist(date = new Date()) {
     return DAILY_TWISTS[day % DAILY_TWISTS.length];
 }
 function showGo() {
+    if (soundEnabled) audioManager.playGo?.();
+    haptics.fire('heavy');
     clearTimeout(goFlashTimer);
     goFlash.classList.remove('hidden');
     goFlashTimer = setTimeout(() => goFlash.classList.add('hidden'), 700);
@@ -1818,7 +2003,7 @@ document.getElementById('skin-pick-back').addEventListener('click', () => {
     if (gameState !== 'SKIN_PICK') return;
     const mode = currentMode;
     showMenu();
-    if (mode === 'PRECISION') {
+    if (mode === 'PRECISION' || mode === 'PUMP') {
         modeSelection.classList.add('hidden');
         precisionOptions.classList.remove('hidden');
     }
@@ -1845,6 +2030,7 @@ function startCalibration() {
     calibrationLastEye = null;
     calibrationStatus.innerText = 'FINDING YOUR EYES';
     calibrationHint.innerText = calibrationHintText;
+    resetLightTip();
     calibrationLoader.style.width = '0%';
     roundTip.textContent = roundTipFor(currentMode);
     countdownEl.textContent = '3';
@@ -1870,7 +2056,10 @@ function updateCalibrationLoop() {
         calibrationLoader.style.width = `${progress * 100}%`;
         // No countdown until the eyes are found, so it never sits frozen on 1.
         const count = progress > 0 ? String(Math.max(1, Math.ceil((3000 - elapsed) / 1000))) : '';
-        if (countdownEl.textContent !== count) countdownEl.textContent = count;
+        if (countdownEl.textContent !== count) {
+            countdownEl.textContent = count;
+            if (count) { if (soundEnabled) audioManager.playTick?.(); haptics.fire('tick'); }
+        }
 
         if (elapsed >= 3000 && calibration.ready(now)) {
             finishCalibration();
@@ -1901,16 +2090,52 @@ function updateCalibrationLoop() {
                 message = calibrationLastEye === null ? 'FACE NOT FOUND — TRY MORE LIGHT'
                     : calibrationLastEye >= .14 && calibrationLastEye <= .6 && progress > 0
                         ? 'EYES FOUND — HOLD STEADY' : 'LOOK FORWARD, EYES OPEN NORMALLY';
-            } else if (loading && elapsed >= 2000) message = 'LOADING EYE TRACKING...';
+            } else if (loading && elapsed >= 2000) message = eyeTrackingReady ? 'LOADING EYE TRACKING...' : `DOWNLOADING EYE TRACKER (ONE TIME) ${Math.round(elapsed / 1000)}s`;
             else if (elapsed >= 4000) message = 'WAITING FOR EYE TRACKING';
             if (calibrationStatus.innerText !== message) calibrationStatus.innerText = message;
             const hint = loading && elapsed >= 6000 ? 'Slow connection? This only happens the first time. Hang on a moment.' : calibrationHintText;
             if (calibrationHint.innerText !== hint) calibrationHint.innerText = hint;
+            updateLightTip(now);
             // Keep valid samples across the three-second warm-up. Slower cameras
             // must be able to reach the required sample count without restarting.
             calibrationFrameId = requestAnimationFrame(updateCalibrationLoop);
         }
     }
+}
+
+// Too-dark tip: twice a second, average the brightness of a tiny copy of the camera
+// picture. Dim rooms are the usual reason eyes are not found (Thanksgiving dinner light).
+const LIGHT_DARK_LUMA = 45;   // 0 to 255; a lit face is usually well above 80
+const LIGHT_CHECK_MS = 500;
+const lightTip = document.getElementById('calibration-light-tip');
+const lightCanvas = document.createElement('canvas');
+lightCanvas.width = 32; lightCanvas.height = 24;
+const lightCtx = lightCanvas.getContext('2d', { willReadFrequently: true });
+let lightCheckedAt = -Infinity;
+let darkChecks = 0;
+function resetLightTip() {
+    lightCheckedAt = -Infinity;
+    darkChecks = 0;
+    lightTip?.classList.add('hidden');
+}
+function videoLuma() {
+    if (!lightCtx || !videoElement.videoWidth) return null;
+    try {
+        lightCtx.drawImage(videoElement, 0, 0, lightCanvas.width, lightCanvas.height);
+        const { data } = lightCtx.getImageData(0, 0, lightCanvas.width, lightCanvas.height);
+        let sum = 0;
+        for (let i = 0; i < data.length; i += 4) sum += 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+        return sum / (data.length / 4);
+    } catch { return null; }
+}
+function updateLightTip(now) {
+    if (!lightTip || now - lightCheckedAt < LIGHT_CHECK_MS) return;
+    lightCheckedAt = now;
+    const luma = videoLuma();
+    if (luma === null) return;
+    // Two dark checks in a row to show it, one bright check to hide it.
+    darkChecks = luma < LIGHT_DARK_LUMA ? darkChecks + 1 : 0;
+    lightTip.classList.toggle('hidden', darkChecks < 2);
 }
 
 function finishCalibration() {
@@ -2150,7 +2375,7 @@ function onResults(results, session) {
         // Update face tracking status
         if (gameState === 'PLAYING' || gameState === 'ENDURANCE') {
             faceStatus.classList.remove('hidden', 'not-detected');
-            faceStatusText.innerText = gameState === 'PLAYING' && currentMode === 'PRECISION' && (Date.now() - startTime) / 1000 >= PRECISION_CLOCK_SHOWN_S ? 'Clock hidden. Count it in your head' : 'Tracking eyes...';
+            faceStatusText.innerText = gameState === 'PLAYING' && currentMode === 'PRECISION' && (Date.now() - startTime) / 1000 >= PRECISION_CLOCK_SHOWN_S ? 'Clock hidden. Count it in your head' : party && partyTurn ? `${party.current()}'s turn. Don't blink!` : 'Tracking eyes...';
         }
 
         // Visual Debug: Show if face is detected
@@ -2228,7 +2453,10 @@ function updateGameLoop() {
             }
         }
         // Precision: the clock shows for the first seconds, then you count in your head.
-        if (currentMode === 'PRECISION' && elapsed >= PRECISION_CLOCK_SHOWN_S) {
+        if (currentMode === 'PUMP') {
+            const shown = formatDollars(pumpDollars(elapsed));
+            if (scoreDisplay.innerText !== shown) scoreDisplay.innerText = shown;
+        } else if (currentMode === 'PRECISION' && elapsed >= PRECISION_CLOCK_SHOWN_S) {
             if (scoreDisplay.innerText !== '?.??s') scoreDisplay.innerText = '?.??s';
             if (faceStatusText.innerText !== 'Clock hidden. Count it in your head') faceStatusText.innerText = 'Clock hidden. Count it in your head';
         } else scoreDisplay.innerText = `${elapsed.toFixed(2)}s`;
@@ -2264,10 +2492,8 @@ function updateGameLoop() {
         if (!window.lastBeat || now - window.lastBeat > beatInterval) {
             if (soundEnabled) audioManager.playHeartbeat();
             
-            // Haptic feedback if available (mobile)
-            if (navigator.vibrate && currentMode !== 'SURPRISE') {
-                navigator.vibrate(50);
-            }
+            // A heartbeat you can feel (a light tap each beat; none in Surprise).
+            if (currentMode !== 'SURPRISE') haptics.fire('tick');
             
             window.lastBeat = now;
         }
@@ -2275,7 +2501,7 @@ function updateGameLoop() {
         // Visual Stages (Classic Mode only)
         if (currentMode === 'CLASSIC') {
             updateClassicVisualStage(elapsed);
-        } else if (!['DAILY', 'SURPRISE', 'DISTRACT'].includes(currentMode)) {
+        } else if (!['DAILY', 'SURPRISE', 'DISTRACT', 'PUMP'].includes(currentMode)) {
             if (elapsed > 10) container.classList.add('chaos-shake');
             if (elapsed > 20) container.classList.add('chaos-glitch');
             if (elapsed > 30) container.classList.add('chaos-invert');
@@ -2285,6 +2511,8 @@ function updateGameLoop() {
     }
 }
 
+// Results that get the fanfare and confetti (plus any new personal best).
+const WIN_TITLES = ['PERFECT!', 'EXACTLY $10.00!', 'SO CLOSE!', 'THEME UNLOCKED', 'YOU MADE IT', 'BALLOON CHAMPION!', 'ROCK STAR EYES!'];
 function endGame(reason = 'BLINK') {
     menuBtn.innerText = party ? '⌂ BACK TO PARTY' : '⌂ HOME';
     surpriseRound = null;
@@ -2316,14 +2544,12 @@ function endGame(reason = 'BLINK') {
     try {
         // Stop/Effect Audio
         audioManager.stopDrone();
-        if (soundEnabled) audioManager.playGlitch();
+        // Win fanfare or losing buzzer is decided once the result is known (below).
 
         // Reset Chaos and Tension
         container.className = 'container';
         container.classList.remove('tension-active');
 
-        // Haptic failure shock
-        if (navigator.vibrate && currentMode !== 'SURPRISE') navigator.vibrate([200, 100, 200]);
 
         const elapsed = (Date.now() - startTime) / 1000;
         let finalScoreText = '';
@@ -2372,14 +2598,12 @@ function endGame(reason = 'BLINK') {
             finalScoreLabel.innerText = 'SURPRISE SURVIVOR';
             gameOverTitle.innerText = 'YOU MADE IT';
             gameOverTitle.style.color = 'var(--neon-cyan)';
-            if (soundEnabled) audioManager.playWin();
         } else if (reason === 'WIN_ENDURANCE') {
             scoreToSave = 30;
             finalScoreText = "30.00s";
             finalScoreLabel.innerText = "EYES OF STEEL";
             gameOverTitle.innerText = "THEME UNLOCKED";
             gameOverTitle.style.color = "var(--neon-pink)";
-            audioManager.playWin();
 
             // Unlock Theme
             document.body.classList.add('theme-purple');
@@ -2425,9 +2649,26 @@ function endGame(reason = 'BLINK') {
             if (diff < 0.1) {
                 gameOverTitle.innerText = "PERFECT!";
                 gameOverTitle.style.color = "var(--neon-cyan)";
-                audioManager.playWin();
             } else {
                 gameOverTitle.innerText = elapsed < precisionTarget ? "TOO EARLY" : "TOO LATE";
+                gameOverTitle.style.color = "var(--neon-red)";
+            }
+        } else if (currentMode === 'PUMP') {
+            const pumped = pumpDollars(elapsed);
+            const miss = pumpMiss(elapsed);
+            scoreToSave = miss;
+            finalScoreText = `${formatDollars(miss)}`;
+            finalScoreLabel.innerText = "OFF $10.00 BY";
+            finalScoreSub.classList.remove('hidden');
+            finalScoreSub.innerText = `You stopped the pump at ${formatDollars(pumped)}`;
+            if (miss === 0) {
+                gameOverTitle.innerText = "EXACTLY $10.00!";
+                gameOverTitle.style.color = "var(--neon-cyan)";
+            } else if (miss <= 0.1) {
+                gameOverTitle.innerText = "SO CLOSE!";
+                gameOverTitle.style.color = "var(--neon-cyan)";
+            } else {
+                gameOverTitle.innerText = pumped < PUMP_TARGET ? "STOPPED SHORT" : "OVERFILLED";
                 gameOverTitle.style.color = "var(--neon-red)";
             }
         } else if (currentMode === 'ENDURANCE') {
@@ -2449,15 +2690,25 @@ function endGame(reason = 'BLINK') {
         lastResult = lastScore === null ? null : { mode: currentMode, score: lastScore, elapsed, target: precisionTarget };
         // Your best in this mode, saved on this device; Precision's best is the smallest miss.
         const bestScoreEl = document.getElementById('best-score');
+        let newBest = false;
         if (lastResult) {
             const bestKeyMode = currentMode === 'PRECISION' ? `PRECISION_${precisionTarget}` : currentMode;
             const { best, isNew } = recordBest(bestKeyMode, lastScore);
+            newBest = isNew;
             bestScoreEl.innerText = isNew ? 'NEW BEST!' : best !== null && best !== lastScore ? `Your best: ${formatScore(currentMode, best)}` : '';
             bestScoreEl.classList.toggle('new-best', isNew);
             bestScoreEl.classList.toggle('hidden', !bestScoreEl.innerText);
         } else bestScoreEl.classList.add('hidden');
         social.render(lastResult, activeChallenge, currentSkin);
         finalScoreVal.innerText = finalScoreText;
+        // Whole-number scores count up on the results screen.
+        if (lastResult && (currentMode === 'BALLOON' || currentMode === 'BEAT') && Number.isInteger(lastScore)) countUp(finalScoreVal, lastScore);
+        // One sound and feeling for the result: a fanfare and confetti for a win or a new best,
+        // a buzzer for a loss, the old glitch for a lost face.
+        const won = WIN_TITLES.includes(gameOverTitle.innerText) || newBest;
+        if (won) { if (soundEnabled) audioManager.playWin(); celebrate(); }
+        else if (reason === 'DISQUALIFIED' || noResult) { if (soundEnabled) audioManager.playGlitch(); haptics.fire('warn'); }
+        else { if (soundEnabled) audioManager.playBuzzer?.(); haptics.fire('fail'); }
 
         // Shareable photo: the last camera frame (with the skin's hat) in a themed frame.
         shareLine = inviteLine(lastResult, currentSkin);

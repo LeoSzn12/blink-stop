@@ -46,6 +46,10 @@ test('Surprise consent, reward demo, portrait export and friend challenge work t
         // Skins live on the game's own start screen now, not on the home screen.
         assert.equal(await page.locator('#menu-screen .skin-picker').count(), 0);
         assert.equal(await page.locator('#home-fab').isVisible(), false);
+        // Surprise is hidden from the home screen for the holiday launch (challenge links still
+        // open it). Show the hidden list here so the rest of the Surprise flow stays covered.
+        assert.equal(await page.locator('#more-modes').isVisible(), false);
+        await page.evaluate(() => { const more = document.getElementById('more-modes'); more.hidden = false; more.classList.remove('hidden'); });
         await page.locator('#more-modes > summary').click();
         await page.locator('[data-mode="SURPRISE"]').click();
         assert.equal(await page.locator('#surprise-sound').isChecked(), false);
