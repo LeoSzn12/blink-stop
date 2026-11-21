@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Blink Stop - Don't Blink Challenge</title>
-    <link rel="stylesheet" href="src/style.css?v=24">
+    <link rel="stylesheet" href="src/style.css?v=25">
 
     <link rel="manifest" href="manifest.json">
 
@@ -66,10 +66,11 @@
 
                     <div class="mode-selection">
                         <button class="neon-btn mode-btn main-mode-btn play-hero" data-mode="BALLOON"><span class="mode-icon" aria-hidden="true">🎈</span> BALLOON POP<span class="btn-sub">Blink to pop. How many can you get?</span></button>
-                        <button class="neon-btn mode-btn main-mode-btn party-btn" data-mode="PARTY"><span class="mode-icon" aria-hidden="true">📱</span> PASS THE PHONE<span class="btn-sub">Family game for 2 to 8 players</span></button>
                         <button class="neon-btn mode-btn main-mode-btn stare-btn" data-mode="CLASSIC"><span class="mode-icon" aria-hidden="true">👁️</span> DON'T BLINK<span class="btn-sub">Keep your eyes open longest</span></button>
                         <button class="neon-btn mode-btn main-mode-btn precision-btn" data-mode="PRECISION"><span class="mode-icon" aria-hidden="true">🎯</span> PRECISION<span class="btn-sub">Hit a target time, or stop the gas pump at $10</span></button>
                         <button class="neon-btn mode-btn main-mode-btn olympics-btn" data-mode="OLYMPICS"><span class="mode-icon" aria-hidden="true">⚡</span> MORE GAMES<span class="btn-sub">Flash, Blink Beat, Stare-Down, Jokes</span></button>
+                        <button class="neon-btn mode-btn main-mode-btn party-btn" data-mode="PARTY"><span class="mode-icon" aria-hidden="true">📱</span> PASS THE PHONE<span class="btn-sub">Family game for 2 to 8 players</span></button>
+                        <button id="scoreboard-btn" class="neon-btn-small scoreboard-btn" type="button">🏆 Family scoreboard</button>
                         <!-- 30 Seconds, Daily and Surprise are hidden for the holiday launch (fewer choices,
                              no jump scare on the family screen). Their code stays; challenge links still work. -->
                         <details id="more-modes" class="more-modes hidden" hidden>
@@ -91,6 +92,16 @@
                         <button class="neon-btn mode-btn" data-mode="VERSUS"><span class="mode-icon" aria-hidden="true">👀</span> STARE-DOWN<span class="btn-sub">2 players. First to blink loses.</span></button>
                         <button class="neon-btn mode-btn" data-mode="DISTRACT"><span class="mode-icon" aria-hidden="true">😂</span> JOKES<span class="btn-sub">Jokes try to make you blink</span></button>
                         <button id="olympics-back-btn" class="neon-btn-small" type="button">Back</button>
+                    </div>
+
+                    <div id="scoreboard-options" class="options-container scoreboard-options hidden">
+                        <h2>🏆 FAMILY SCOREBOARD</h2>
+                        <p class="scoreboard-note">Top scores on this phone. Type your name after a round to get on the board.</p>
+                        <div id="scoreboard-list" class="scoreboard-list"></div>
+                        <div class="prototype-actions">
+                            <button id="scoreboard-back-btn" class="neon-btn-small" type="button">Back</button>
+                            <button id="scoreboard-clear-btn" class="neon-btn-small scoreboard-clear" type="button">Clear scoreboard</button>
+                        </div>
                     </div>
 
                     <div id="party-options" class="options-container prototype-options hidden">
@@ -198,6 +209,7 @@
                         <p id="skin-greeting" class="skin-greeting" aria-live="polite"></p>
                         <div class="effects-toggles">
                             <button id="sound-toggle" class="neon-btn-small sound-toggle" type="button" aria-pressed="true">Sound: on</button>
+                            <button id="music-toggle" class="neon-btn-small music-toggle" type="button" aria-pressed="true">Music: on</button>
                             <button id="haptics-toggle" class="neon-btn-small haptics-toggle" type="button" aria-pressed="true">Vibration: on</button>
                         </div>
                         <button id="skin-pick-play" class="neon-btn pick-play" type="button">PLAY</button>
@@ -349,14 +361,14 @@
                             <button id="share-close-btn" class="neon-btn-small share-close-btn" type="button">Done</button>
                         </div>
                     </div>
-                    <details id="top-scores" class="top-scores">
-                        <summary>Your top scores</summary>
+                    <details id="top-scores" class="top-scores" open>
+                        <summary>🏆 Family scoreboard</summary>
                         <div class="name-entry-container">
-                            <input type="text" id="player-name-input" placeholder="ENTER NAME" maxlength="10">
+                            <input type="text" id="player-name-input" placeholder="YOUR NAME" maxlength="10" autocomplete="nickname">
                             <button id="save-score-btn" class="neon-btn-small">SAVE</button>
                         </div>
                         <div class="leaderboard-container">
-                            <h3>YOUR TOP SCORES</h3>
+                            <h3>TOP SCORES ON THIS PHONE</h3>
                             <ul id="leaderboard-list">
                                 <!-- Populated by JS -->
                             </ul>
@@ -396,7 +408,7 @@
         <a href="support.html" class="footer-link">Support</a>
     </footer>
 
-    <script type="module" src="src/main.js?v=87"></script>
+    <script type="module" src="src/main.js?v=88"></script>
 </body>
 
 </html>
