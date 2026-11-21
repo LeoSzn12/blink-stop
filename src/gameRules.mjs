@@ -71,7 +71,7 @@ export function createCalibrationTracker() {
         observe(ear, now) {
             prune(now);
             // Keep slower cameras' progress, but never bridge a tracking interruption.
-            if (samples.length && now - samples.at(-1).now >= 1000) samples = [];
+            if (samples.length && now - samples[samples.length - 1].now >= 1000) samples = [];
             latestOpen = Number.isFinite(ear) && ear >= 0.14 && ear <= 0.6;
             if (latestOpen) {
                 samples.push({ ear, now });
@@ -80,13 +80,13 @@ export function createCalibrationTracker() {
         ready(now) {
             prune(now);
             return latestOpen && samples.length >= 10 &&
-                samples.at(-1).now - samples[0].now >= 1000 &&
-                now >= samples.at(-1).now && now - samples.at(-1).now < 500;
+                samples[samples.length - 1].now - samples[0].now >= 1000 &&
+                now >= samples[samples.length - 1].now && now - samples[samples.length - 1].now < 500;
         },
         progress(now) {
             prune(now);
-            if (!samples.length || now - samples.at(-1).now >= 1000) return 0;
-            return Math.min(samples.length / 10, (samples.at(-1).now - samples[0].now) / 1000, 1);
+            if (!samples.length || now - samples[samples.length - 1].now >= 1000) return 0;
+            return Math.min(samples.length / 10, (samples[samples.length - 1].now - samples[0].now) / 1000, 1);
         },
         values() { return samples.map(sample => sample.ear); }
     };
@@ -147,18 +147,26 @@ export function createFaceLossTracker(durationMs = 1000) {
 // flag always counts too.
 export const TAP_CLOSE = 1.1;
 export const TAP_REOPEN = 1.17;
-export function createTapBlink({ close = TAP_CLOSE, reopen = TAP_REOPEN } = {}) {
-    let closed = false;
+// A player looking down at the notes may never open their eyes past the reopen line again,
+// so a few frames in a row of open-ish eyes also re-arm the next blink.
+export const TAP_REARM_FRAMES = 6;
+export function createTapBlink({ close = TAP_CLOSE, reopen = TAP_REOPEN, rearmFrames = TAP_REARM_FRAMES } = {}) {
+    let closed = false, openFrames = 0;
     return {
-        reset() { closed = false; },
+        reset() { closed = false; openFrames = 0; },
         get closed() { return closed; },
         // Returns true only on the frame the eyes close.
         observe(eye, threshold) {
             const minEar = eye?.minEar;
             if (!Number.isFinite(minEar) || minEar <= 0 || !Number.isFinite(threshold) || threshold <= 0) return false;
             const shut = !!eye.blinking || minEar < threshold * close;
-            if (shut && !closed) { closed = true; return true; }
-            if (!shut && minEar >= threshold * reopen) closed = false;
+            if (shut) {
+                openFrames = 0;
+                if (!closed) { closed = true; return true; }
+                return false;
+            }
+            openFrames++;
+            if (minEar >= threshold * reopen || openFrames >= rearmFrames) closed = false;
             return false;
         },
     };

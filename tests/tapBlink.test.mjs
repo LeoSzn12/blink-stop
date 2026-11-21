@@ -57,3 +57,14 @@ test('bad readings never count and reset clears a held blink', () => {
     assert.equal(tap.closed, false);
     assert.equal(tap.observe({ minEar: 0.1 }, T), true);
 });
+
+test('eyes that stay a bit narrower after a blink (looking down at the notes) still re-arm', () => {
+    const tap = createTapBlink();
+    assert.equal(tap.observe({ minEar: 0.18 }, T), true);
+    // Open again, but only to 0.255: below the reopen line, above the close line.
+    for (let i = 0; i < 5; i++) assert.equal(tap.observe({ minEar: 0.255 }, T), false);
+    assert.equal(tap.closed, true);
+    assert.equal(tap.observe({ minEar: 0.255 }, T), false);
+    assert.equal(tap.closed, false);
+    assert.equal(tap.observe({ minEar: 0.18 }, T), true);
+});

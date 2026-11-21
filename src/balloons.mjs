@@ -54,7 +54,7 @@ export function createBalloonRound({ random = Math.random, firstBalloonMs = 600 
 
     function spawn(now) {
         // Keep new balloons away from the previous one so a pop is never ambiguous.
-        const previous = balloons.at(-1);
+        const previous = balloons[balloons.length - 1];
         let x = 0.18 + random() * 0.64;
         if (previous && Math.abs(previous.x - x) < 0.2) x = x > 0.5 ? x - 0.25 : x + 0.25;
         const { speed } = difficulty(score);

@@ -12,7 +12,7 @@ class AudioManager {
     }
 
     resume() {
-        if (this.ctx.state === 'suspended') {
+        if (this.ctx.state === 'suspended' || this.ctx.state === 'interrupted') {
             this.ctx.resume();
         }
     }
