@@ -227,6 +227,7 @@ test('every game plays through in every skin on a phone screen', { timeout: 4200
         await step('family-scoreboard', async () => {
             // Save the Balloon Pop score from the results with a name, then find it on the menu's scoreboard.
             await page.locator('#game-over-screen').waitFor({ state: 'visible' });
+            await page.locator('#top-scores > summary').click();
             await page.locator('#player-name-input').fill('Tester');
             await page.locator('#save-score-btn').click();
             assert.match(await page.locator('#leaderboard-list').innerText(), /TESTER/);
@@ -241,7 +242,7 @@ test('every game plays through in every skin on a phone screen', { timeout: 4200
             await shot('scoreboard-1-menu');
             const overflow = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
             assert.ok(overflow <= 1, `scoreboard overflows sideways by ${overflow}px`);
-            page.once('dialog', dialog => dialog.accept());
+            // The page-wide dialog handler accepts the "Clear every score?" confirm.
             await page.locator('#scoreboard-clear-btn').click();
             await page.waitForFunction(() => /No scores yet/.test(document.querySelector('#scoreboard-list').innerText));
             notes.push('Family scoreboard: saved a Balloon Pop score, saw it from the menu, cleared it');
