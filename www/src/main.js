@@ -247,7 +247,7 @@ function makeClip() {
     clipEncoding = true;
     clearTimeout(clipFinishTimer);
     const token = clipToken;
-    encodeClip(clip, { skinId: clipSkin, caption: clipCaption, doc: document, Recorder: window.MediaRecorder, type: pickClipType(window.MediaRecorder) })
+    encodeClip(clip, { skinId: clipSkin, caption: clipCaption, doc: document, Recorder: window.MediaRecorder, type: pickClipType(window.MediaRecorder), cancelled: () => token !== clipToken })
         .then(blob => {
             if (token !== clipToken) return;
             clipBlob = blob;
@@ -537,9 +537,12 @@ const social = createSocialUI(beginChallenge, { onLinkedChallenge: showChallenge
 
 // Eye tracking (about 10 MB) gets ready while the player is still on the home screen,
 // so a slow connection is spent here and not inside a round's calibration time.
+// A slow phone switches to the lighter eye model for the rest of this visit only, so one
+// busy moment (a crowded party, a clip being made) never downgrades the game for good.
 const LITE_TRACKER_KEY = 'blink_lite_tracker';
 const SLOW_TRACKER_MS = 90;
-let liteTracker = (() => { try { return localStorage.getItem(LITE_TRACKER_KEY) === '1'; } catch { return false; } })();
+let liteTracker = false;
+try { localStorage.removeItem(LITE_TRACKER_KEY); } catch { /* storage unavailable */ }
 let trackerTimes = [];
 function noteTrackerTime(ms, refined) {
     if (!refined || liteTracker || !Number.isFinite(ms)) return;
@@ -549,7 +552,6 @@ function noteTrackerTime(ms, refined) {
     const sorted = [...trackerTimes].sort((a, b) => a - b);
     if (sorted[10] > SLOW_TRACKER_MS) {
         liteTracker = true;
-        try { localStorage.setItem(LITE_TRACKER_KEY, '1'); } catch { /* storage unavailable */ }
     }
 }
 let eyeTrackingWarm = null;
@@ -712,7 +714,7 @@ async function startCameraLoop(session) {
         videoElement.srcObject = stream;
         stream.getTracks().forEach(track => track.addEventListener('ended', () => {
             if (session !== cameraSession || videoElement.srcObject !== stream) return;
-            showMenu();
+            if (party) returnToParty(); else showMenu();
             showCameraProblem('Camera disconnected. Check your camera and try again.');
         }));
 
@@ -1635,6 +1637,7 @@ function endParty() {
 // From a finished round (or a cancelled one) back to the party's next step.
 function returnToParty() {
     if (!party) return showMenu();
+    resetGlance();
     gameOverCameraStop.cancel();
     cancelAnimationFrame(animationFrameId);
     cancelAnimationFrame(calibrationFrameId);
@@ -1753,6 +1756,9 @@ function startVersusCalibration() {
     versusEvent = null;
     versusLastFrame = null;
     calibrationStartTime = clock();
+    eyeLightClosedAt = -Infinity;
+    setEyeLight('off', '👁️ Looking for your eyes');
+    resetLightTip();
     calibrationStatus.innerText = 'FINDING BOTH FACES';
     roundTip.textContent = roundTipFor('VERSUS');
     countdownEl.textContent = '';
@@ -2276,7 +2282,7 @@ function measureBaseline() {
 }
 // Only a player's first solo round asks for the test; party turns and challenges skip it.
 function wantsBlinkTest() {
-    return learnedLine === null && !party && currentMode !== 'VERSUS';
+    return learnedLine === null && !party && !activeChallenge && currentMode !== 'VERSUS';
 }
 
 function finishCalibration() {
@@ -2381,6 +2387,7 @@ function updateEnduranceLoop() {
 
 function showMenu() {
     closeShareSheet();
+    resetGlance();
     social.reset();
     activeChallenge = null;
     lastResult = null;
