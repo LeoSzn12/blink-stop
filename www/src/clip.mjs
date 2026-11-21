@@ -150,7 +150,7 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 // Replays the buffered frames onto a portrait canvas while MediaRecorder records it.
 // Takes about as long as the clip itself. Resolves to a video Blob.
-export async function encodeClip(buffer, { skinId, caption, doc = globalThis.document, Recorder = globalThis.MediaRecorder, type = pickClipType(Recorder), wait = sleep, holdMs = CLIP_HOLD_MS } = {}) {
+export async function encodeClip(buffer, { skinId, caption, doc = globalThis.document, Recorder = globalThis.MediaRecorder, type = pickClipType(Recorder), wait = sleep, holdMs = CLIP_HOLD_MS, cancelled = () => false } = {}) {
     const frames = buffer.frames.slice();
     if (!frames.length || buffer.blinkAt === null) throw new Error('No clip to make');
     if (!type) throw new Error('Video recording is not available here');
@@ -179,14 +179,22 @@ export async function encodeClip(buffer, { skinId, caption, doc = globalThis.doc
         });
         recorder.ondataavailable = event => { if (event.data && event.data.size) chunks.push(event.data); };
         recorder.start(250);
+        // A new round stops the encode at once, so it never competes with the eye tracker.
+        const stopIfCancelled = async () => {
+            if (!cancelled()) return;
+            recorder.stop();
+            await stopped.catch(() => {});
+            throw new Error('Clip cancelled');
+        };
         for (let i = 0; i < frames.length; i++) {
+            await stopIfCancelled();
             draw(i);
             const next = frames[i + 1];
             await wait(next ? Math.min(200, Math.max(10, next.t - frames[i].t)) : 1000 / CLIP_FPS);
         }
         // Freeze on the blink so everyone sees the moment.
         const steps = Math.max(1, Math.round(holdMs / (1000 / CLIP_FPS)));
-        for (let s = 0; s < steps; s++) { draw(blinkIndex, s % 6 < 3); await wait(1000 / CLIP_FPS); }
+        for (let s = 0; s < steps; s++) { await stopIfCancelled(); draw(blinkIndex, s % 6 < 3); await wait(1000 / CLIP_FPS); }
         recorder.stop();
         await stopped;
     } finally {

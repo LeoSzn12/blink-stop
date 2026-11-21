@@ -57,7 +57,7 @@ export function createParty(names, { game = 'BALLOON' } = {}) {
         skipFinal() { champion = standings()[0]?.name ?? null; return champion; },
         champion: () => champion,
         finalPlayed: () => final !== null,
-        lastPlace: () => standings().at(-1)?.name ?? null,
+        lastPlace: () => { const list = standings(); return list[list.length - 1]?.name ?? null; },
     };
 }
 
@@ -73,7 +73,7 @@ export function createDeck(cards, random = Math.random) {
                     const j = Math.floor(random() * (i + 1));
                     [pile[i], pile[j]] = [pile[j], pile[i]];
                 }
-                if (pile.length > 1 && pile.at(-1) === last) pile.unshift(pile.pop());
+                if (pile.length > 1 && pile[pile.length - 1] === last) pile.unshift(pile.pop());
             }
             last = pile.pop();
             return last;

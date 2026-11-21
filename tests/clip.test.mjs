@@ -102,6 +102,15 @@ test('encoding replays every frame, holds on the blink, and returns a video', as
     assert.ok(texts.some(text => /^[0-9.]+s$/.test(text) && Number.parseFloat(text) < 9.5), 'time ticks up before the blink');
     await assert.rejects(encodeClip(createClipBuffer({ makeCanvas: () => fakeCanvas() }), { doc, Recorder, type: 'video/mp4' }), /No clip/);
     await assert.rejects(encodeClip(buffer, { doc, Recorder, type: '' }), /not available/);
+    // A new round cancels the encode: the recorder stops and the helper canvas goes.
+    const out2 = fakeCanvas();
+    const doc2 = { createElement: () => out2, body: { appendChild() {} } };
+    let frames = 0, stops = 0;
+    class Recorder2 extends Recorder { stop() { stops++; super.stop(); } }
+    await assert.rejects(encodeClip(buffer, { doc: doc2, Recorder: Recorder2, type: 'video/mp4', wait: async () => { frames++; }, cancelled: () => frames >= 3 }), /cancelled/);
+    assert.equal(frames, 3);
+    assert.equal(stops, 1);
+    assert.equal(out2.removed, true);
 });
 
 test('every skin draws a clip frame without throwing', () => {

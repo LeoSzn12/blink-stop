@@ -14,6 +14,11 @@ export function setBlinkThreshold(value) {
     console.log(`Blink threshold set to: ${blinkThreshold}`);
 }
 
+// The line the round actually uses right now (it follows the eyes' open level a little).
+export function getBlinkLine() {
+    return detector.line();
+}
+
 export function getBlinkThreshold() {
     return blinkThreshold;
 }
@@ -24,8 +29,8 @@ export function resetBlinkState() {
 }
 
 /**
- * Check if user is blinking with debouncing
- * Requires sustained eye closure for multiple frames to avoid false positives
+ * Check if the user is blinking: two frames under the line in a row, or one frame well
+ * under it (see createBlinkDetector)
  * @param {Array} landmarks - Array of 468 face landmarks
  * @returns {Object} - { blinking: boolean, ear: number }
  */
@@ -38,7 +43,7 @@ export function checkBlink(landmarks, now = performance.now(), width = 1, height
 
     const { ear: avgEAR, minEar: minEAR } = measurement;
 
-    const isBlinking = detector.observe(minEAR, now);
+    const isBlinking = detector.observe(minEAR);
 
     return {
         blinking: isBlinking,
