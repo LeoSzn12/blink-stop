@@ -1469,3 +1469,16 @@ body.in-game .footer, body.in-game footer { display: none; }
 .eye-light[data-state="open"] { border-color: var(--neon-cyan); color: #fff; }
 .eye-light[data-state="closed"] { border-color: var(--neon-pink); background: rgba(255, 0, 255, .25); color: #fff; }
 .eye-light[data-state="seen"] { border-color: #39ff14; background: rgba(57, 255, 20, .2); color: #fff; }
+
+/* Family scoreboard: top scores on this phone, from the menu. */
+.scoreboard-btn { display: block; margin: .75rem auto 0; }
+.scoreboard-options h2 { margin-bottom: .35rem; }
+.scoreboard-note { color: var(--text-muted, #bfc7d5); font-size: .95rem; margin: 0 auto .75rem; max-width: 22rem; text-align: center; }
+.scoreboard-list { max-height: 55vh; overflow-y: auto; text-align: left; margin: 0 auto 1rem; max-width: 24rem; }
+.scoreboard-game { margin-bottom: .9rem; }
+.scoreboard-game h3 { color: var(--neon-cyan); font-size: 1rem; margin: 0 0 .3rem; }
+.scoreboard-game ul { list-style: none; padding: 0; margin: 0; }
+.scoreboard-game li { display: flex; justify-content: space-between; gap: 1rem; padding: .25rem 0; border-bottom: 1px solid rgba(255, 255, 255, .08); }
+.scoreboard-empty { text-align: center; color: var(--text-muted, #bfc7d5); }
+.scoreboard-clear { border-color: var(--neon-pink); }
+.scoreboard-clear.hidden { display: none; }

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createBalloonRound, difficulty, POP_ZONE, BALLOON_MISSES, MAX_SPEED, MIN_GAP_MS, balloonColors, drawBalloons } from '../src/balloons.mjs';
+import { createBalloonRound, difficulty, POP_ZONE, BALLOON_MISSES, MAX_SPEED, MIN_GAP_MS, TOP_SPEED, TOP_GAP_MS, MIN_ZONE, STEP_POPS, GOLD_POINTS, zoneFor, lifeBackStreak, balloonColors, drawBalloons } from '../src/balloons.mjs';
 import { resultDetails, challengeCode, parseChallenge, inviteLine, formatScore, challengeOutcome } from '../src/share.mjs';
 import { selfieCaption } from '../src/skins.mjs';
 
@@ -46,8 +46,10 @@ test('blinking too early or letting balloons escape costs a miss; three misses e
 test('balloons speed up and come faster as the score grows, within limits', () => {
     assert.ok(difficulty(10).speed > difficulty(0).speed);
     assert.ok(difficulty(10).gapMs < difficulty(0).gapMs);
-    assert.equal(difficulty(1000).speed, MAX_SPEED);
-    assert.equal(difficulty(1000).gapMs, MIN_GAP_MS);
+    assert.equal(difficulty(49).speed, MAX_SPEED);
+    assert.equal(difficulty(49).gapMs, MIN_GAP_MS);
+    assert.ok(Math.abs(difficulty(1000).speed - TOP_SPEED) < 1e-9);
+    assert.equal(difficulty(1000).gapMs, TOP_GAP_MS);
     // Starts gentle: the first balloon takes over a second to cross the pop zone.
     assert.ok((POP_ZONE.bottom - POP_ZONE.top) / difficulty(0).speed > 1.4);
     // Gets harder: by 20 pops it crosses the tall zone in under a second.
@@ -118,4 +120,81 @@ test('the first five pops stay at the easy pace, levels go up every five, and a 
     assert.equal(last.streak, LIFE_BACK_STREAK);
     assert.equal(last.lifeBack, true);
     assert.equal(round.misses, 0);
+});
+
+test('every 50 pops the zone shrinks and balloons speed up, but a blink always gets about 0.4 s', () => {
+    const size = score => { const z = zoneFor(score); return z.bottom - z.top; };
+    assert.ok(Math.abs(size(0) - (POP_ZONE.bottom - POP_ZONE.top)) < 1e-9);
+    assert.equal(size(49), size(0));
+    assert.ok(size(50) < size(49));
+    assert.ok(size(100) < size(50));
+    assert.ok(Math.abs(size(10000) - MIN_ZONE) < 1e-9);
+    // The zone stays centred, so balloons still pass through the same part of the screen.
+    assert.ok(Math.abs((zoneFor(200).top + zoneFor(200).bottom) - (POP_ZONE.top + POP_ZONE.bottom)) < 1e-9);
+    assert.ok(difficulty(50).speed > difficulty(49).speed);
+    for (const score of [0, 50, 100, 150, 200, 500, 10000]) assert.ok(size(score) / difficulty(score).speed >= 0.39, `too fast at ${score}`);
+    assert.ok(lifeBackStreak(200) > lifeBackStreak(0));
+    assert.equal(lifeBackStreak(10000), 30);
+});
+
+test('crossing 50 pops says it got harder and the round uses the smaller zone', () => {
+    const round = createBalloonRound({ random: () => 0.5 });
+    let now = 0, last;
+    while (round.score < STEP_POPS) {
+        now = untilInZoneOf(round, now);
+        last = round.blink(now);
+        assert.ok(last?.hit, `missed at ${round.score}`);
+        now += 300;
+    }
+    assert.equal(last.harder, true);
+    assert.equal(last.step, 1);
+    assert.deepEqual(round.zone, zoneFor(STEP_POPS));
+});
+
+function untilInZoneOf(round, now) {
+    for (let t = now; t < now + 10000; t += 16) {
+        round.update(t);
+        const z = round.zone;
+        if (round.balloons.some(b => !b.poppedAt && b.y >= z.top && b.y <= z.bottom)) return t;
+    }
+    throw new Error('no balloon reached the zone');
+}
+
+test('a golden balloon is fast and worth 5; a holiday balloon gives a life back; missing either costs nothing', () => {
+    // Rolls near 1 make specials; everything else stays ordinary.
+    let roll = 0.5;
+    const round = createBalloonRound({ random: () => roll });
+    let now = 0;
+    while (round.score < 10) { now = untilInZoneOf(round, now); round.blink(now); now += 300; }
+    // Let a balloon escape so there's a life to win back.
+    for (let t = now; round.misses === 0; t += 16) { round.update(t); now = t; }
+    roll = 0.99;
+    let gold;
+    for (let t = now; !gold && t < now + 20000; t += 16) { round.update(t); now = t; gold = round.balloons.find(b => b.kind === 'GOLD' && !b.poppedAt); }
+    assert.ok(gold, 'a golden balloon appears');
+    roll = 0.5;
+    const ordinary = round.balloons.find(b => b.kind === 'NORMAL' && !b.poppedAt);
+    if (ordinary) assert.ok(gold.speed > ordinary.speed);
+    for (let t = now; !(gold.y >= round.zone.top && gold.y <= round.zone.bottom); t += 16) { round.update(t); now = t; }
+    const before = round.score;
+    // Pop whatever else is nearer the middle first, until the gold one is the target.
+    let hit;
+    for (let i = 0; i < 3 && !(hit?.kind === 'GOLD'); i++) { hit = round.blink(now); now += 260; round.update(now); }
+    assert.equal(hit.kind, 'GOLD');
+    assert.ok(round.score >= before + GOLD_POINTS);
+    // A holiday balloon: rolls just under the gold range.
+    roll = 0.9;
+    let life;
+    for (let t = now; !life && t < now + 20000; t += 16) { round.update(t); now = t; life = round.balloons.find(b => b.kind === 'LIFE' && !b.poppedAt); }
+    assert.ok(life, 'a holiday balloon appears');
+    roll = 0.5;
+    // Let it float away: only ordinary balloons that escape cost a life, never the special.
+    let events = 0, normalsLost = 0;
+    for (let t = now; round.balloons.includes(life) && !round.over; t += 16) {
+        const normals = round.balloons.filter(b => b.kind === 'NORMAL' && !b.poppedAt);
+        events += round.update(t).length;
+        normalsLost += normals.filter(b => !round.balloons.includes(b)).length;
+    }
+    assert.equal(life.escaped, true);
+    assert.equal(events, normalsLost);
 });

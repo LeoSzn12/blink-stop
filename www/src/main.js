@@ -471,9 +471,39 @@ soundToggle?.addEventListener('click', () => {
     soundPref = !soundPref;
     try { localStorage.setItem('blink_sound', soundPref ? 'on' : 'off'); } catch { /* storage unavailable */ }
     soundEnabled = soundPref && (currentMode !== 'SURPRISE' || surpriseSound.checked);
+    if (!soundPref) { stopGameAudio(); audioManager.playThroughSilentSwitch?.(false); }
     renderSoundToggle();
 });
 renderSoundToggle();
+
+// Party music: upbeat loop made in code. On by default, one tap to turn off, remembered on this phone.
+// Games that need you to listen or stay tense keep the quiet drone instead.
+let musicPref = true;
+try { musicPref = localStorage.getItem('blink_music') !== 'off'; } catch { /* storage unavailable */ }
+const NO_MUSIC_MODES = ['BEAT', 'FLASH', 'SURPRISE'];
+const musicToggle = document.getElementById('music-toggle');
+function renderMusicToggle() {
+    if (!musicToggle) return;
+    musicToggle.innerText = musicPref ? 'Music: on' : 'Music: off';
+    musicToggle.setAttribute('aria-pressed', String(musicPref));
+}
+musicToggle?.addEventListener('click', () => {
+    musicPref = !musicPref;
+    try { localStorage.setItem('blink_music', musicPref ? 'on' : 'off'); } catch { /* storage unavailable */ }
+    if (!musicPref) audioManager.stopMusic?.();
+    renderMusicToggle();
+});
+renderMusicToggle();
+function startGameAudio(mode = currentMode) {
+    if (!soundEnabled) return;
+    audioManager.playThroughSilentSwitch?.(true);
+    if (musicPref && !NO_MUSIC_MODES.includes(mode)) audioManager.startMusic?.();
+    else audioManager.startDrone();
+}
+function stopGameAudio() {
+    audioManager.stopDrone();
+    audioManager.stopMusic?.();
+}
 let demoRound = null;
 let demoReturnState = 'MENU';
 let demoFrameId;
@@ -864,7 +894,7 @@ function startDemoAd() {
     demoReturnState = gameState;
     gameOverCameraStop.cancel();
     stopCameraAndDetection();
-    audioManager.stopDrone();
+    stopGameAudio();
     container.classList.add('ad-demo');
     surpriseOverlay.classList.add('hidden');
     menuScreen.classList.add('hidden');
@@ -1036,6 +1066,7 @@ function stopCameraAndDetection({ keepWarm = false } = {}) {
 const gameOverCameraStop = createGameOverCameraStop(() => stopCameraAndDetection({ keepWarm: true }));
 
 // Leaderboard System
+const SCOREBOARD_SIZE = 10;
 const Leaderboard = {
     get(mode) {
         try {
@@ -1064,9 +1095,9 @@ const Leaderboard = {
             scores.sort((a, b) => b.score - a.score);
         }
 
-        const top5 = scores.slice(0, 5);
+        const top = scores.slice(0, SCOREBOARD_SIZE);
         try {
-            localStorage.setItem(`blink_lb_${mode}`, JSON.stringify(top5));
+            localStorage.setItem(`blink_lb_${mode}`, JSON.stringify(top));
             return true;
         } catch (err) {
             console.warn('Local score not saved:', err);
@@ -1086,7 +1117,7 @@ const Leaderboard = {
             return;
         }
 
-        scores.forEach((entry, index) => {
+        scores.slice(0, 5).forEach((entry, index) => {
             appendScore(leaderboardList, entry, index, mode, document);
         });
     }
@@ -1344,12 +1375,26 @@ function handleBalloonEye(eye, now) {
             const result = balloonRound.blink(now);
             if (result?.hit) {
                 bumpBalloonScore(result.score);
-                faceStatusText.innerText = `POP! ${result.score} popped`;
+                faceStatusText.innerText = result.kind === 'GOLD' ? `GOLD! +${result.points} · ${result.score} popped` : `POP! ${result.score} popped`;
                 const colors = balloonColors(currentSkin);
-                popFx(colors[result.balloon.color % colors.length]);
-                if (result.lifeBack) {
+                popFx(result.kind === 'GOLD' ? '#ffd23f' : result.kind === 'LIFE' ? '#ff4f7b' : colors[result.balloon.color % colors.length]);
+                if (result.harder) {
+                    // Every 50: the zone shrinks. Make it a moment, so it feels like a new level.
+                    if (result.lifeBack) renderBalloonLives();
+                    callout(`HARDER! 🔥 ${result.score}`, '#ff6b35');
+                    faceStatusText.innerText = `${result.score}! The zone just got smaller. Keep going!`;
+                    if (soundEnabled) audioManager.playLevelUp?.();
+                    haptics.fire('win');
+                } else if (result.kind === 'GOLD') {
+                    if (result.lifeBack) renderBalloonLives();
+                    callout(`+${result.points} GOLD! ✨`, '#ffd23f');
+                    if (soundEnabled) audioManager.playGold?.();
+                } else if (result.lifeBack) {
                     renderBalloonLives();
-                    callout('+1 LIFE 🎈', '#ff4fa3');
+                    callout(result.kind === 'LIFE' ? `+1 LIFE ${SKINS[currentSkin]?.icon || '❤️'}` : '+1 LIFE 🎈', '#ff4fa3');
+                    if (soundEnabled) audioManager.playLevelUp?.();
+                } else if (result.kind === 'LIFE') {
+                    callout(`+${result.points} BONUS`, '#ff4fa3');
                     if (soundEnabled) audioManager.playLevelUp?.();
                 } else if (result.levelUp) {
                     callout(`LEVEL ${balloonLevel(result.score)}!`, '#39ff14');
@@ -1572,6 +1617,56 @@ document.getElementById('olympics-back-btn').addEventListener('click', () => {
     modeSelection.classList.remove('hidden');
     document.querySelector('[data-mode="OLYMPICS"]').focus();
 });
+
+// Family scoreboard: everyone's best scores on this phone, per game. Saved on the device only.
+const SCOREBOARD_GAMES = [['BALLOON', '🎈 Balloon Pop'], ['CLASSIC', "👁️ Don't Blink"], ['PRECISION', '🎯 Precision'], ['PUMP', '⛽ Gas Pump'],
+    ['FLASH', '⚡ Flash'], ['BEAT', '🎵 Blink Beat'], ['DISTRACT', '😂 Jokes']];
+const scoreboardOptions = document.getElementById('scoreboard-options');
+function renderScoreboard() {
+    const list = document.getElementById('scoreboard-list');
+    if (!list) return;
+    list.innerHTML = '';
+    let any = false;
+    for (const [mode, title] of SCOREBOARD_GAMES) {
+        const scores = Leaderboard.get(mode);
+        if (!scores || !scores.length) continue;
+        any = true;
+        const section = document.createElement('section');
+        section.className = 'scoreboard-game';
+        const heading = document.createElement('h3');
+        heading.textContent = title;
+        const ol = document.createElement('ul');
+        scores.slice(0, 5).forEach((entry, index) => appendScore(ol, entry, index, mode, document));
+        section.append(heading, ol);
+        list.appendChild(section);
+    }
+    if (!any) {
+        const empty = document.createElement('p');
+        empty.className = 'scoreboard-empty';
+        empty.textContent = 'No scores yet. Play a round, type your name and tap Save.';
+        list.appendChild(empty);
+    }
+    document.getElementById('scoreboard-clear-btn')?.classList.toggle('hidden', !any);
+}
+document.getElementById('scoreboard-btn')?.addEventListener('click', () => {
+    if (tapTooSoon()) return;
+    armTapGuard();
+    renderScoreboard();
+    modeSelection.classList.add('hidden');
+    scoreboardOptions.classList.remove('hidden');
+    document.getElementById('scoreboard-back-btn')?.focus();
+});
+document.getElementById('scoreboard-back-btn')?.addEventListener('click', () => {
+    clearTapGuard();
+    scoreboardOptions.classList.add('hidden');
+    modeSelection.classList.remove('hidden');
+    document.getElementById('scoreboard-btn')?.focus();
+});
+document.getElementById('scoreboard-clear-btn')?.addEventListener('click', () => {
+    if (!confirm('Clear every score on this phone? This can\'t be undone.')) return;
+    for (const [mode] of SCOREBOARD_GAMES) { try { localStorage.removeItem(`blink_lb_${mode}`); } catch { /* storage unavailable */ } }
+    renderScoreboard();
+});
 document.getElementById('party-start-btn').addEventListener('click', () => {
     const status = document.getElementById('party-setup-status');
     try {
@@ -1642,7 +1737,7 @@ function returnToParty() {
     cancelAnimationFrame(animationFrameId);
     cancelAnimationFrame(calibrationFrameId);
     stopCameraAndDetection({ keepWarm: true });
-    audioManager.stopDrone();
+    stopGameAudio();
     hideJoke();
     clearSelfie();
     faceLoss.reset();
@@ -1787,7 +1882,7 @@ function beginVersusPlay() {
     showGo();
     startTime = Date.now();
     versusStartedAt = clock();
-    if (soundEnabled) audioManager.startDrone();
+    startGameAudio();
     gameHud.classList.remove('hidden');
     gameHud.classList.add('active');
     faceStatus.classList.remove('hidden', 'not-detected');
@@ -1835,7 +1930,7 @@ function endVersus(outcome) {
     document.getElementById('best-score').classList.add('hidden');
     cancelAnimationFrame(animationFrameId);
     gameOverCameraStop.schedule();
-    audioManager.stopDrone();
+    stopGameAudio();
     faceStatus.classList.add('hidden');
     gameHud.classList.add('hidden');
     gameHud.classList.remove('active');
@@ -2294,7 +2389,7 @@ function finishCalibration() {
     if (currentMode !== 'FLASH' && currentMode !== 'BEAT') showGo();
 
     // Start Audio Drone
-    if (soundEnabled) audioManager.startDrone();
+    startGameAudio();
 
     if (currentMode === 'DAILY') container.classList.add(dailyTwist().cls);
     resetGlance();
@@ -2399,7 +2494,7 @@ function showMenu() {
     demoScreen.classList.add('hidden');
     surpriseRound = null;
     surpriseOverlay.classList.add('hidden');
-    audioManager.stopDrone();
+    stopGameAudio();
     clearSelfie();
     clearClip();
     endParty();
@@ -2409,6 +2504,7 @@ function showMenu() {
     partyScreen.classList.remove('active');
     partyOptions.classList.add('hidden');
     olympicsOptions.classList.add('hidden');
+    scoreboardOptions?.classList.add('hidden');
     dareBox.classList.add('hidden');
     partyNextBtn.classList.add('hidden');
     gameOverScreen.classList.remove('versus-result', 'party-turn');
@@ -2455,6 +2551,7 @@ function showMenu() {
 
 document.addEventListener('visibilitychange', () => {
     if (!document.hidden) return;
+    stopGameAudio();
     // Mid-party, backgrounding releases the camera but keeps the party and its scores.
     if (party) { if (videoElement.srcObject || gameState !== 'PARTY' || loadingMsg.style.display === 'block') returnToParty(); }
     else if (videoElement.srcObject || gameState !== 'MENU' || loadingMsg.style.display === 'block') showMenu();
@@ -2676,7 +2773,7 @@ function endGame(reason = 'BLINK') {
 
     try {
         // Stop/Effect Audio
-        audioManager.stopDrone();
+        stopGameAudio();
         // Win fanfare or losing buzzer is decided once the result is known (below).
 
         // Reset Chaos and Tension
