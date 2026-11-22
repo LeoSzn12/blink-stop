@@ -4,7 +4,7 @@ import { audioManager } from './audioManager.js';
 import { createFaceLossTracker, createCalibrationTracker, createTrackingFreshness, createTapBlink, createBlinkTest, blinkLineFor, DEFAULT_LINE } from './gameRules.mjs';
 import { createSerializedInference } from './inference.mjs';
 import { appendScore } from './leaderboard.mjs';
-import { cameraErrorMessage } from './cameraHelp.mjs';
+import { cameraErrorMessage, graphicsAvailable, noGraphicsError, NO_GRAPHICS_MESSAGE } from './cameraHelp.mjs';
 import { createGameOverCameraStop } from './roundLifecycle.mjs';
 import { sharePayload, shareClipboardText, formatScore, LOWER_WINS, inviteLine, challengeUrl, challengeHeadline, PUBLIC_PLAY_URL } from './share.mjs';
 import { createSurpriseRound, createRewardedDemo } from './surprise.mjs';
@@ -592,6 +592,10 @@ function setEyeTrackingStatus(text) {
 function warmEyeTracking() {
     if (eyeTrackingWarm) return eyeTrackingWarm;
     if (typeof FaceMesh !== 'function') return (eyeTrackingWarm = Promise.resolve(false));
+    if (!graphicsAvailable()) {
+        setEyeTrackingStatus(NO_GRAPHICS_MESSAGE);
+        return (eyeTrackingWarm = Promise.resolve(false));
+    }
     // MediaPipe gives no download progress, so show how long it has been and what it is.
     const warmStart = performance.now();
     const warmText = () => {
@@ -727,6 +731,8 @@ const inference = createSerializedInference(async (image, session) => {
 let detectionInterval = null;
 
 async function startCameraLoop(session) {
+    // No WebGL means no eye tracking: say so before asking for the camera.
+    if (!graphicsAvailable()) throw noGraphicsError();
     // 1. Start Video Stream First (Independent of FaceMesh)
     try {
         const stream = takeWarmCamera() || await navigator.mediaDevices.getUserMedia({

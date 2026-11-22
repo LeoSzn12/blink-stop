@@ -54,7 +54,7 @@ function harness(storage = { getItem: () => null, setItem() {} }, clipboard, { w
     createCalibrationTracker, createTrackingFreshness, createFaceLossTracker, createTapBlink, createBlinkTest, blinkLineFor, DEFAULT_LINE, createSerializedInference, createSurpriseRound, createRewardedDemo, ...skins, ...versus, ...party, ...reel, ...balloons, ...flash, ...beat, ...clipModule, ...pump, ...feedback, formatScore, LOWER_WINS, inviteLine, challengeUrl, challengeHeadline, PUBLIC_PLAY_URL,
     checkBlink: () => eyeValue === null ? null : ({ minEar: eyeValue, ear: eyeValue, blinking }), setBlinkThreshold(value) { threshold = value; }, resetBlinkState() {}, getBlinkThreshold: () => threshold, getBlinkLine: () => threshold,
     audioManager: { startDrone() {}, stopDrone() {}, playGlitch() {}, playWin() {}, playHeartbeat() {}, playSurprise() {} },
-    appendScore() {}, cameraErrorMessage: () => '', createGameOverCameraStop: fn => ({ cancel() {}, schedule() {} }), sharePayload() {}, shareClipboardText() {}, createSocialUI: () => ({ reset() {}, render() {} }),
+    appendScore() {}, cameraErrorMessage: () => '', graphicsAvailable: () => true, noGraphicsError: () => new Error('no graphics'), NO_GRAPHICS_MESSAGE: '', createGameOverCameraStop: fn => ({ cancel() {}, schedule() {} }), sharePayload() {}, shareClipboardText() {}, createSocialUI: () => ({ reset() {}, render() {} }),
     localStorage: storage,
     setInterval: fn => { const n = ++id; intervals.set(n, fn); return n; }, clearInterval: n => intervals.delete(n), setTimeout: fn => { const n = ++id; timers.set(n, fn); return n; }, clearTimeout: n => timers.delete(n),
     Image: class { set src(value) { this._src = value; queueMicrotask(() => this.onload?.()); } get src() { return this._src; } },
