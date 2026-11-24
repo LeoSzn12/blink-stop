@@ -19,6 +19,7 @@ import { createBeatRound, BEAT_LIVES, drawBeat } from './beat.mjs';
 import { clipSupported, createClipBuffer, encodeClip, pickClipType, clipExtension } from './clip.mjs';
 import { pumpDollars, pumpMiss, formatDollars, PUMP_TARGET } from './pump.mjs';
 import { createHaptics, confetti, drawCallout, countUp, prefersReducedMotion } from './feedback.mjs';
+import { setupAppBanner } from './appBanner.mjs';
 
 // DOM Elements
 const videoElement = document.getElementsByClassName('input_video')[0];
@@ -420,6 +421,8 @@ let soundEnabled = true;
 let soundPref = true;
 // Haptics: the phone's tap engine in the app, vibration on Android web; remembered like sound.
 const haptics = createHaptics();
+// Point iPhone web players to the App Store app (not shown inside the app, or where Safari's own banner shows).
+setupAppBanner(document, window);
 try { haptics.enabled = localStorage.getItem('blink_haptics') !== 'off'; } catch { /* storage unavailable */ }
 const hapticsToggle = document.getElementById('haptics-toggle');
 function renderHapticsToggle() {

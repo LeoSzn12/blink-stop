@@ -4,8 +4,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <!-- iPhone Safari: Apple's own "Open in the App Store" banner. Ignored everywhere else. -->
+    <meta name="apple-itunes-app" content="app-id=6822026817">
     <title>Blink Stop - Don't Blink Challenge</title>
-    <link rel="stylesheet" href="src/style.css?v=25">
+    <link rel="stylesheet" href="src/style.css?v=26">
 
     <link rel="manifest" href="manifest.json">
 
@@ -43,6 +45,16 @@
                 <div id="menu-screen" class="screen active">
                     <h1 class="glitch" data-text="BLINK STOP">BLINK STOP</h1>
                     <p class="subtitle">The game you play with your eyes.</p>
+                    <p class="pitch"><strong>Pass the phone around the table.</strong> 2 to 8 players, first to blink loses.</p>
+
+                    <!-- Get the iPhone app: shown by src/appBanner.mjs on computers and on iOS browsers that don't get
+                         Apple's Smart App Banner. Never on Android or in the app itself. Menu only, never during a round. -->
+                    <aside id="app-banner" class="app-banner hidden" aria-label="Blink Stop for iPhone">
+                        <img class="app-banner-icon" src="apple-touch-icon.png" alt="" width="40" height="40">
+                        <p class="app-banner-text"><strong>Blink Stop for iPhone</strong><span>Free. Feel a buzz on every pop.</span></p>
+                        <a id="app-banner-get" class="app-banner-get" href="https://apps.apple.com/app/blink-stop/id6822026817" rel="noopener">Get</a>
+                        <button id="app-banner-close" class="app-banner-close" type="button" aria-label="Hide the app banner">✕</button>
+                    </aside>
 
                     <section id="camera-problem" class="camera-problem hidden" aria-label="Camera problem">
                         <p id="camera-error" role="alert" class="camera-error hidden"></p>
@@ -159,7 +171,7 @@
 
                     <!-- SEO About Text -->
                     <div class="about-text">
-                        Blink Stop detects blinks on your device. Camera frames stay on your device; scores are saved locally only. A framed photo preview is created after a round; saving or sharing it is your choice. Ages 13+. Blink normally and stop if uncomfortable.
+                        Ages 13+. Blink normally and stop if uncomfortable.
                     </div>
 
                     <p class="loading-text" id="loading-msg" style="display:none">INITIALIZING BLINK DETECTION...</p>
@@ -406,9 +418,11 @@
         <a href="tos.html" class="footer-link">Terms of Service</a>
         <span class="footer-separator">|</span>
         <a href="support.html" class="footer-link">Support</a>
+        <span class="footer-separator app-store-footer hidden">|</span>
+        <a href="https://apps.apple.com/app/blink-stop/id6822026817" class="footer-link app-store-footer hidden" rel="noopener">Get the iPhone app</a>
     </footer>
 
-    <script type="module" src="src/main.js?v=88"></script>
+    <script type="module" src="src/main.js?v=89"></script>
 </body>
 
 </html>
