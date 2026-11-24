@@ -1482,3 +1482,13 @@ body.in-game .footer, body.in-game footer { display: none; }
 .scoreboard-empty { text-align: center; color: var(--text-muted, #bfc7d5); }
 .scoreboard-clear { border-color: var(--neon-pink); }
 .scoreboard-clear.hidden { display: none; }
+
+/* Get the iPhone app (menu only; src/appBanner.mjs decides who sees it). */
+.app-banner { display: flex; align-items: center; gap: .6rem; width: min(100%, 24rem); margin: 0 auto 1rem; padding: .5rem .6rem; border: 1px solid var(--neon-cyan); border-radius: 12px; background: rgba(0, 0, 0, .75); box-shadow: 0 0 12px rgba(0, 243, 255, .25); text-align: left; }
+.app-banner-icon { width: 40px; height: 40px; flex: none; border-radius: 9px; }
+.app-banner-text { flex: 1; min-width: 0; margin: 0; display: flex; flex-direction: column; line-height: 1.25; color: #fff; font-size: .95rem; overflow-wrap: anywhere; }
+.app-banner-text span { color: #cfd6de; font-size: .8rem; }
+.app-banner-get { flex: none; min-height: 44px; display: inline-flex; align-items: center; padding: 0 1rem; border-radius: 999px; background: var(--neon-cyan); color: #000; font-weight: 700; text-decoration: none; }
+.app-banner-close { flex: none; width: 44px; height: 44px; margin: -.25rem -.35rem -.25rem 0; background: transparent; border: 0; color: #cfd6de; font-size: 1.1rem; cursor: pointer; }
+body.menu-sub #menu-screen .app-banner,
+#menu-screen:has(#challenge-banner:not(.hidden)) .app-banner { display: none; }

@@ -89,8 +89,18 @@ test('camera permission error and menu controls remain readable above footer', a
           document.querySelector('#camera-problem').classList.remove('hidden');
           document.querySelector('#camera-retry-btn').classList.remove('hidden');
           document.querySelector('#loading-msg').classList.add('hidden');
+          // The iPhone app banner as an iOS Chrome visitor sees it (main.js is blocked here).
+          document.querySelector('#app-banner').classList.remove('hidden');
         }, scenario);
         const initialTitleTop = await page.locator('#menu-screen h1').evaluate(el => el.getBoundingClientRect().top);
+        // The app banner fits the width, sits above the game buttons, and its Get and close are full-size taps.
+        const appBanner = await page.evaluate(() => {
+          const r = s => document.querySelector(s).getBoundingClientRect();
+          return { banner: r('#app-banner'), get: r('#app-banner-get'), close: r('#app-banner-close'), menuTop: r('.mode-selection').top, w: innerWidth };
+        });
+        assert.ok(appBanner.banner.left >= 0 && appBanner.banner.right <= appBanner.w, `app banner overflows: ${scenario.name} ${JSON.stringify(appBanner)}`);
+        assert.ok(appBanner.banner.bottom <= appBanner.menuTop, `app banner not above the game buttons: ${scenario.name} ${JSON.stringify(appBanner)}`);
+        for (const tap of [appBanner.get, appBanner.close]) assert.ok(tap.height >= 44 && tap.width >= 44, `app banner tap target too small: ${scenario.name} ${JSON.stringify(tap)}`);
         // The problem sits above the game buttons and is in view once scrolled to, as the app does.
         const errorView = await page.evaluate(() => {
           document.querySelector('#camera-problem').scrollIntoView({ block: 'start' });
