@@ -1497,3 +1497,10 @@ body.in-game .footer, body.in-game footer { display: none; }
 body.menu-sub #menu-screen .pitch,
 body.menu-sub #menu-screen .app-banner,
 #menu-screen:has(#challenge-banner:not(.hidden)) .app-banner { display: none; }
+
+/* One tap after a round: share the clip or photo (src/main.js updateQuickShare). */
+.quick-share { width: 100%; max-width: 22rem; margin: -.25rem auto 1rem; text-align: center; }
+.quick-share.hidden { display: none; }
+.quick-share-btn { width: 100%; min-height: 48px; border-color: #39ff14; color: #39ff14; }
+.quick-share-btn:disabled { opacity: .7; cursor: progress; }
+.quick-share-note { margin: .4rem 0 0; color: #cfd6de; font-size: .85rem; line-height: 1.35; overflow-wrap: anywhere; }

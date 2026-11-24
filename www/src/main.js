@@ -9,7 +9,7 @@ import { createGameOverCameraStop } from './roundLifecycle.mjs';
 import { sharePayload, shareClipboardText, formatScore, LOWER_WINS, inviteLine, challengeUrl, challengeHeadline, PUBLIC_PLAY_URL } from './share.mjs';
 import { createSurpriseRound, createRewardedDemo } from './surprise.mjs';
 import { createSocialUI } from './social.mjs';
-import { SKINS, SKIN_STORAGE_KEY, resolveSkin, storedSkinValue, drawSkinOverlay, composeSelfie, selfieCaption } from './skins.mjs';
+import { SKINS, SKIN_STORAGE_KEY, resolveSkin, storedSkinValue, drawSkinOverlay, composeSelfie, selfieCaption, BRAND_LOGO_SRC, tableChallenge, mediaShareText } from './skins.mjs';
 import { createVersusMatch, largestFace } from './versus.mjs';
 import { parseNames, createParty, createDeck, forfeitCards, jokeCards } from './party.mjs';
 import { drawReel } from './reel.mjs';
@@ -166,6 +166,30 @@ function updateClipButton() {
     clipBtn.classList.toggle('hidden', !clipCanMake || (!clipMaking && !clipBlob));
     clipBtn.disabled = !clipBlob;
     clipBtn.innerText = clipBlob ? 'SHARE CLIP' : 'MAKING YOUR CLIP...';
+    updateQuickShare();
+}
+
+// The Blink Stop logo for shared photos and clips: the app icon the game already ships,
+// drawn on the device. If it hasn't loaded, the name is drawn on its own.
+const brandLogo = new Image();
+brandLogo.src = BRAND_LOGO_SRC;
+
+// One tap after a round: the clip (or, without one, the framed photo) straight to the
+// phone's share sheet, where TikTok and Instagram Reels sit. Nothing is uploaded by us.
+const quickShare = document.getElementById('quick-share');
+const quickShareBtn = document.getElementById('quick-share-btn');
+const quickShareNote = document.getElementById('quick-share-note');
+function quickShareHint() {
+    return tableChallenge(currentSkin) ? 'Post it to TikTok or Reels: who blinks first at your table?' : 'Post it to TikTok or Reels and dare a friend.';
+}
+function updateQuickShare() {
+    if (!quickShareBtn) return;
+    const hasPhoto = !!selfieFile || !!selfiePreview?.src;
+    const icon = tableChallenge(currentSkin) ? '🦃 ' : '';
+    quickShare.classList.toggle('hidden', !clipBlob && !clipMaking && !hasPhoto);
+    quickShareBtn.disabled = !clipBlob && clipMaking;
+    quickShareBtn.innerText = clipBlob ? `${icon}SHARE YOUR CLIP` : clipMaking ? 'MAKING YOUR CLIP...' : `${icon}SHARE YOUR PHOTO`;
+    quickShareNote.innerText = quickShareHint();
 }
 
 function clearClip() {
@@ -248,7 +272,7 @@ function makeClip() {
     clipEncoding = true;
     clearTimeout(clipFinishTimer);
     const token = clipToken;
-    encodeClip(clip, { skinId: clipSkin, caption: clipCaption, doc: document, Recorder: window.MediaRecorder, type: pickClipType(window.MediaRecorder), cancelled: () => token !== clipToken })
+    encodeClip(clip, { skinId: clipSkin, caption: clipCaption, logo: brandLogo, doc: document, Recorder: window.MediaRecorder, type: pickClipType(window.MediaRecorder), cancelled: () => token !== clipToken })
         .then(blob => {
             if (token !== clipToken) return;
             clipBlob = blob;
@@ -269,15 +293,39 @@ function makeClip() {
         });
 }
 
+// Shares the finished clip: the app's share sheet, the browser's share sheet with the
+// video file, or a download where neither exists. On the web nothing is awaited before
+// navigator.share, so Safari still counts it as the player's tap.
+// Resolves to 'shared', 'cancelled' or 'downloaded'; the app's share throws when cancelled.
+async function shareClipFile() {
+    const name = `blink-stop-clip.${clipExtension(clipBlob.type)}`;
+    const text = mediaShareText(clipSkin, shareLine, shareUrl);
+    if (window.Capacitor?.isNativePlatform?.()) {
+        const { exportNativeClip } = await import('./deviceActions.mjs');
+        await exportNativeClip(clipBlob, name, text);
+        return 'shared';
+    }
+    if (clipFile && navigator.share && navigator.canShare?.({ files: [clipFile] })) {
+        try {
+            await navigator.share({ files: [clipFile], title: 'Blink Stop', text });
+            return 'shared';
+        } catch (error) {
+            if (error?.name === 'AbortError') return 'cancelled'; // The clip stays here.
+        }
+    }
+    const link = document.createElement('a');
+    link.download = name;
+    link.href = clipUrl;
+    link.click();
+    return 'downloaded';
+}
+
 clipBtn.addEventListener('click', async () => {
     if (!clipBlob || clipBtn.disabled) return;
-    const name = `blink-stop-clip.${clipExtension(clipBlob.type)}`;
-    const text = `${shareLine} Play free: ${shareUrl} #BlinkStop`;
     if (window.Capacitor?.isNativePlatform?.()) {
         clipBtn.disabled = true;
         try {
-            const { exportNativeClip } = await import('./deviceActions.mjs');
-            await exportNativeClip(clipBlob, name, text);
+            await shareClipFile();
             clipBtn.innerText = 'SHARE CLIP';
         } catch (error) {
             clipBtn.innerText = 'SHARE CANCELLED — TRY AGAIN';
@@ -286,18 +334,7 @@ clipBtn.addEventListener('click', async () => {
         }
         return;
     }
-    if (clipFile && navigator.share && navigator.canShare?.({ files: [clipFile] })) {
-        try {
-            await navigator.share({ files: [clipFile], title: 'Blink Stop', text });
-            return;
-        } catch (error) {
-            if (error?.name === 'AbortError') return; // The clip stays here.
-        }
-    }
-    const link = document.createElement('a');
-    link.download = name;
-    link.href = clipUrl;
-    link.click();
+    await shareClipFile();
 });
 const finalScoreSub = document.getElementById('final-score-sub');
 const gameOverWorldRecord = document.getElementById('game-over-world-record');
@@ -1200,16 +1237,44 @@ function clearSelfie() {
     selfieFile = null;
     selfiePreview.removeAttribute('src');
     selfieContainer.classList.add('hidden');
+    updateQuickShare();
 }
 
 // Save Selfie Logic
+// Shares the framed photo the same way as the clip (see shareClipFile).
+async function sharePhotoFile() {
+    if (window.Capacitor?.isNativePlatform?.()) {
+        const { exportNativeSelfie } = await import('./deviceActions.mjs');
+        await exportNativeSelfie(selfiePreview.src);
+        return 'shared';
+    }
+    return shareJpegOnWeb(selfiePreview.src, selfieFile, 'blink-stop-photo');
+}
+
+quickShareBtn?.addEventListener('click', async () => {
+    if (quickShareBtn.disabled) return;
+    const useClip = !!clipBlob;
+    if (!useClip && !selfiePreview.src) return;
+    const native = window.Capacitor?.isNativePlatform?.();
+    if (native) quickShareBtn.disabled = true;
+    try {
+        const result = await (useClip ? shareClipFile() : sharePhotoFile());
+        quickShareNote.innerText = result === 'downloaded'
+            ? `Saved to your downloads. Post the ${useClip ? 'video' : 'photo'} to TikTok or Reels from there.`
+            : quickShareHint();
+    } catch (error) {
+        quickShareNote.innerText = 'Share cancelled. Tap to try again.';
+    } finally {
+        if (native) quickShareBtn.disabled = false;
+    }
+});
+
 selfieBtn.addEventListener('click', async () => {
     if (!selfiePreview.src || selfieBtn.disabled) return;
     if (window.Capacitor?.isNativePlatform?.()) {
         selfieBtn.disabled = true;
         try {
-            const { exportNativeSelfie } = await import('./deviceActions.mjs');
-            await exportNativeSelfie(selfiePreview.src);
+            await sharePhotoFile();
             selfieBtn.innerText = 'SHARE PHOTO';
         } catch (error) {
             selfieBtn.innerText = 'SHARE CANCELLED — TRY AGAIN';
@@ -1218,14 +1283,14 @@ selfieBtn.addEventListener('click', async () => {
         }
         return;
     }
-    await shareJpegOnWeb(selfiePreview.src, selfieFile, 'blink-stop-photo');
+    await sharePhotoFile();
 });
 
 // Web: share sheet with the prepared file where supported, otherwise a download.
 async function shareJpegOnWeb(dataUrl, file, baseName) {
     if (file && navigator.share && navigator.canShare?.({ files: [file] })) {
         try {
-            await navigator.share({ files: [file], title: 'Blink Stop', text: `${shareLine} Play free: ${shareUrl} #BlinkStop` });
+            await navigator.share({ files: [file], title: 'Blink Stop', text: mediaShareText(currentSkin, shareLine, shareUrl) });
             return 'shared';
         } catch (error) {
             if (error?.name === 'AbortError') return 'cancelled'; // The photo stays here.
@@ -1248,7 +1313,7 @@ function jpegFile(dataUrl, name) {
 // Framed result photo from the frozen camera frame (hats included).
 function makeSelfie(caption) {
     try {
-        const dataUrl = composeSelfie(canvasElement, currentSkin, caption, document);
+        const dataUrl = composeSelfie(canvasElement, currentSkin, caption, document, brandLogo);
         selfiePreview.src = dataUrl;
         selfieContainer.classList.remove('hidden');
         selfieFile = jpegFile(dataUrl, 'blink-stop-photo.jpg');
@@ -1257,6 +1322,8 @@ function makeSelfie(caption) {
         console.error("Selfie capture failed", e);
         selfieContainer.classList.add('hidden');
         return null;
+    } finally {
+        updateQuickShare();
     }
 }
 

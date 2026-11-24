@@ -7,7 +7,7 @@
     <!-- iPhone Safari: Apple's own "Open in the App Store" banner. Ignored everywhere else. -->
     <meta name="apple-itunes-app" content="app-id=6822026817">
     <title>Blink Stop - Don't Blink Challenge</title>
-    <link rel="stylesheet" href="src/style.css?v=26">
+    <link rel="stylesheet" href="src/style.css?v=27">
 
     <link rel="manifest" href="manifest.json">
 
@@ -346,6 +346,11 @@
                         </div>
                         <video id="clip-preview" class="clip-preview hidden" muted loop playsinline autoplay aria-label="Your blink clip"></video>
                     </div>
+                    <!-- One tap: the clip (or the photo) with the Blink Stop logo, straight to the share sheet -->
+                    <div id="quick-share" class="quick-share hidden">
+                        <button id="quick-share-btn" class="neon-btn quick-share-btn" type="button">SHARE YOUR CLIP</button>
+                        <p id="quick-share-note" class="quick-share-note" role="status" aria-live="polite">Post it to TikTok or Reels and dare a friend.</p>
+                    </div>
                     <!-- One Share button opens every way to share in one place -->
                     <div id="share-sheet" class="share-sheet hidden" role="dialog" aria-modal="true" aria-labelledby="share-sheet-title">
                         <div class="share-sheet-panel">
@@ -422,7 +427,7 @@
         <a href="https://apps.apple.com/app/blink-stop/id6822026817" class="footer-link app-store-footer hidden" rel="noopener">Get the iPhone app</a>
     </footer>
 
-    <script type="module" src="src/main.js?v=89"></script>
+    <script type="module" src="src/main.js?v=90"></script>
 </body>
 
 </html>

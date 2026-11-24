@@ -20,7 +20,7 @@ import * as feedback from '../src/feedback.mjs';
 import * as appBanner from '../src/appBanner.mjs';
 
 const source = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8').replace(/^import .*;\s*$/gm, '');
-function harness(storage = { getItem: () => null, setItem() {} }, clipboard, { win = {}, extra = {}, blinkTest = false } = {}) {
+function harness(storage = { getItem: () => null, setItem() {} }, clipboard, { win = {}, extra = {}, nav = {}, blinkTest = false } = {}) {
   // Most tests start rounds as a returning player whose blink line is already learned.
   const realStorage = storage;
   storage = new Proxy(realStorage, { get: (target, key) => key === 'getItem'
@@ -50,7 +50,7 @@ function harness(storage = { getItem: () => null, setItem() {} }, clipboard, { w
   const document = { hidden: false, body: el('body'), getElementsByClassName: cls => [el(cls)], getElementById: el,
     querySelector: el, querySelectorAll: () => [], addEventListener(type, fn) { documentEvents.set(type, fn); }, createElement: el };
   class FaceMesh { constructor() { this.closes = 0; meshes.push(this); } onResults(fn) { this.resultHandler = fn; } setOptions() {} send() { return new Promise(resolve => { const emit = () => this.resultHandler({ image: {}, multiFaceLandmarks: [{}] }); pending.push(() => { lastDelivered = emit; emit(); resolve(); }); }); } close() { this.closes++; } }
-  const context = { document, window: { innerWidth: 500, addEventListener() {}, ...win }, navigator: { clipboard, mediaDevices: { getUserMedia: () => permission || Promise.resolve(stream()) } },
+  const context = { document, window: { innerWidth: 500, addEventListener() {}, ...win }, navigator: { clipboard, mediaDevices: { getUserMedia: () => permission || Promise.resolve(stream()) }, ...nav },
     FaceMesh, console: { log() {}, warn: (...a) => process.env.HARNESS_LOG && process.stderr.write(a.join(' ') + '\n'), error() {} }, performance: { now: () => clock }, Date,
     createCalibrationTracker, createTrackingFreshness, createFaceLossTracker, createTapBlink, createBlinkTest, blinkLineFor, DEFAULT_LINE, createSerializedInference, createSurpriseRound, createRewardedDemo, ...skins, ...versus, ...party, ...reel, ...balloons, ...flash, ...beat, ...clipModule, ...pump, ...feedback, ...appBanner, formatScore, LOWER_WINS, inviteLine, challengeUrl, challengeHeadline, PUBLIC_PLAY_URL,
     checkBlink: () => eyeValue === null ? null : ({ minEar: eyeValue, ear: eyeValue, blinking }), setBlinkThreshold(value) { threshold = value; }, resetBlinkState() {}, getBlinkThreshold: () => threshold, getBlinkLine: () => threshold,
@@ -528,6 +528,56 @@ test('blink clip: a Classic blink becomes a shareable clip made on the phone; a 
   h.debug.endGame('DISQUALIFIED');
   assert.equal(h.el('clip-btn').classList.contains('hidden'), true);
   assert.equal(FakeRecorder.made.length, 1);
+});
+
+test('one tap after a round shares the finished clip as a video file; without a clip it shares the photo', async () => {
+  class FakeRecorder {
+    static isTypeSupported(type) { return type === 'video/mp4'; }
+    start() {}
+    stop() { queueMicrotask(() => { this.ondataavailable({ data: new Blob(['clip'], { type: 'video/mp4' }) }); this.onstop(); }); }
+  }
+  function HTMLCanvasElement() {}
+  HTMLCanvasElement.prototype.captureStream = () => ({});
+  const shared = [];
+  const nav = { canShare: ({ files }) => files.every(f => f instanceof File), share: async data => { shared.push(data); } };
+  const h = harness(undefined, undefined, { nav, win: { MediaRecorder: FakeRecorder, HTMLCanvasElement }, extra: { File, atob, URL: { createObjectURL: () => 'blob:clip', revokeObjectURL() {} } } });
+  Object.assign(h.el('output_canvas'), { width: 640, height: 480 });
+  h.setEye(.3);
+  h.debug.startGame('CLASSIC'); await h.settle(); await h.timers();
+  assert.equal(h.el('quick-share').classList.contains('hidden'), true, 'nothing to share during a round');
+  for (let i = 0; i < 10; i++) { h.setClock(i * 400); h.tickInference(); h.deliver(); await h.settle(); h.raf(); }
+  for (let t = 4000; t <= 6000; t += 100) { h.setClock(t); h.tickInference(); h.deliver(); await h.settle(); }
+  h.setBlinking(true); h.setClock(6100); h.tickInference(); h.deliver(); await h.settle();
+  assert.equal(h.debug.getState(), 'GAME_OVER');
+  assert.equal(h.el('quick-share').classList.contains('hidden'), false);
+  assert.equal(h.el('quick-share-btn').disabled, true);
+  assert.equal(h.el('quick-share-btn').innerText, 'MAKING YOUR CLIP...');
+  h.setBlinking(false);
+  for (let t = 6200; t <= 7700; t += 100) { h.setClock(t); h.tickInference(); h.deliver(); await h.settle(); }
+  for (let waited = 0; h.el('quick-share-btn').disabled && waited < 12000; waited += 250) {
+    await new Promise(resolve => setTimeout(resolve, 250));
+    await h.settle();
+  }
+  assert.equal(h.el('quick-share-btn').disabled, false);
+  assert.match(h.el('quick-share-btn').innerText, /SHARE YOUR CLIP$/);
+  assert.match(h.el('quick-share-note').innerText, /TikTok or Reels/);
+  await h.click('quick-share-btn');
+  assert.equal(shared.length, 1);
+  assert.equal(shared[0].files[0].type, 'video/mp4');
+  assert.match(shared[0].files[0].name, /^blink-stop-clip\.mp4$/);
+  assert.match(shared[0].text, /#BlinkStop/);
+
+  // A lost face makes no clip, but the framed photo is still one tap away.
+  h.debug.startGame('CLASSIC'); await h.settle(); await h.timers();
+  h.debug.endGame('DISQUALIFIED');
+  assert.equal(h.el('quick-share').classList.contains('hidden'), false);
+  assert.match(h.el('quick-share-btn').innerText, /SHARE YOUR PHOTO$/);
+  await h.click('quick-share-btn');
+  assert.equal(shared.length, 2);
+  assert.equal(shared[1].files[0].type, 'image/jpeg');
+  // Home clears it.
+  h.debug.showMenu();
+  assert.equal(h.el('quick-share').classList.contains('hidden'), true);
 });
 
 test('a game started from the menu shows the live camera to pick a look, then calibrates; Home goes back', async () => {

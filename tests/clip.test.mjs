@@ -120,6 +120,19 @@ test('every skin draws a clip frame without throwing', () => {
     }
 });
 
+test('every clip frame carries the Blink Stop logo, and Thanksgiving clips read as a table challenge', () => {
+    const calls = [];
+    const logo = { complete: true, naturalWidth: 192 };
+    drawClipFrame(fakeContext(calls), { width: 300, height: 400 }, { skinId: 'THANKSGIVING', seconds: 3.2, blinked: true, logo,
+        caption: { headline: 'ANA WINS!', detail: 'Ben blinked first after 3.20s' } });
+    assert.ok(calls.some(([key, image]) => key === 'drawImage' && image === logo), 'logo drawn');
+    const texts = calls.filter(([key]) => key === 'fillText').map(([, text]) => text);
+    assert.ok(texts.includes('BLINK STOP'));
+    assert.ok(texts.includes('🦃 THANKSGIVING TABLE CHALLENGE 🦃'));
+    assert.ok(texts.includes('Ben blinked first after 3.20s'));
+    assert.ok(texts.some(text => text.startsWith('Who blinks first at your table? playblinkstop.com')));
+});
+
 test('the app shares one cached clip file and only accepts its own video', async () => {
     const writes = [], shares = [], deletes = [];
     const load = async () => ({

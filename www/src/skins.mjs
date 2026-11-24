@@ -220,7 +220,71 @@ export function selfieCaption({ reason, mode, elapsed, target, score }) {
 
 // Builds the 4:5 photo players share: their mirrored camera frame (as they saw it,
 // headwear included) inside a holiday frame with the result. JPEG data URL.
-export function composeSelfie(source, skinId, caption, doc = globalThis.document) {
+// ---------- Brand on shared photos and clips ----------
+// The logo is the app icon the game already ships (same site, already in the offline cache),
+// so drawing it fetches nothing new and keeps the canvas exportable.
+export const BRAND_LOGO_SRC = 'icons/icon-192.png';
+export const BRAND_NAME = 'BLINK STOP';
+
+export function logoReady(logo) {
+    return !!logo && logo.complete !== false && logo.naturalWidth > 0;
+}
+
+// Thanksgiving turns every shared photo and clip into a table challenge.
+export function tableChallenge(skinId) {
+    if (skinId !== 'THANKSGIVING') return null;
+    return {
+        banner: '🦃 THANKSGIVING TABLE CHALLENGE 🦃',
+        footer: 'Who blinks first at your table? playblinkstop.com',
+        tags: '#BlinkStop #ThanksgivingChallenge',
+    };
+}
+
+// Line under the logo: the table challenge in November, otherwise the skin's greeting.
+export function brandBanner(skinId) {
+    const skin = SKINS[skinId] || SKINS.CLASSIC;
+    const challenge = tableChallenge(skin.id);
+    if (challenge) return challenge.banner;
+    if (skin.greeting === BRAND_NAME) return `${skin.icon} DON'T BLINK CHALLENGE ${skin.icon}`;
+    return `${skin.icon} ${skin.greeting} ${skin.icon}`;
+}
+
+export function brandFooter(skinId) {
+    const challenge = tableChallenge(skinId);
+    return challenge ? `${challenge.footer}  #BlinkStop` : 'Your turn! Play free at playblinkstop.com  #BlinkStop';
+}
+
+// Words that travel with a shared photo or clip (most apps keep them; TikTok and
+// Instagram drop them, which is why the same words are drawn on the picture too).
+export function mediaShareText(skinId, line, url) {
+    const challenge = tableChallenge(skinId);
+    return challenge
+        ? `${line} Who blinks first at your table? Play free: ${url} ${challenge.tags}`
+        : `${line} Play free: ${url} #BlinkStop`;
+}
+
+// Logo + name, centred on (x, y). Without a loaded logo only the name is drawn.
+export function drawBrandLockup(ctx, logo, { x, y, size, color }) {
+    ctx.save();
+    ctx.font = `900 ${Math.round(size * 0.7)}px system-ui, sans-serif`;
+    ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    const textWidth = Number(ctx.measureText?.(BRAND_NAME)?.width) || size * 3.6;
+    const hasLogo = logoReady(logo), gap = Math.round(size * 0.26);
+    let left = x - ((hasLogo ? size + gap : 0) + textWidth) / 2;
+    if (hasLogo) {
+        ctx.save();
+        roundRect(ctx, left, y - size / 2, size, size, size * 0.22); ctx.clip();
+        ctx.drawImage(logo, left, y - size / 2, size, size);
+        ctx.restore();
+        left += size + gap;
+    }
+    ctx.lineWidth = Math.max(2, size * 0.08); ctx.strokeStyle = 'rgba(0, 0, 0, 0.45)';
+    ctx.strokeText(BRAND_NAME, left, y);
+    ctx.fillStyle = color; ctx.fillText(BRAND_NAME, left, y);
+    ctx.restore();
+}
+
+export function composeSelfie(source, skinId, caption, doc = globalThis.document, logo = null) {
     const skin = SKINS[skinId] || SKINS.CLASSIC, c = skin.colors;
     const W = 1080, H = 1350;
     const out = doc.createElement('canvas');
@@ -254,9 +318,10 @@ export function composeSelfie(source, skinId, caption, doc = globalThis.document
         ctx.fillStyle = color; ctx.font = `bold ${size}px system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji"`;
         ctx.fillText(value, W / 2, y, W - 120);
     };
-    text(`${skin.icon} ${skin.greeting} ${skin.icon}`, 105, 64, c.primary);
+    drawBrandLockup(ctx, logo, { x: W / 2, y: 70, size: 76, color: c.text });
+    text(brandBanner(skinId), 152, 40, c.primary);
     text(caption?.headline || 'CAUGHT BLINKING!', 1125, 76, c.text);
     text(caption?.detail || '', 1200, 40, c.muted);
-    text('Your turn! Play free at playblinkstop.com  #BlinkStop', 1278, 32, c.secondary);
+    text(brandFooter(skinId), 1278, 32, c.secondary);
     return out.toDataURL('image/jpeg', 0.88);
 }
