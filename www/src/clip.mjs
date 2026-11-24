@@ -2,7 +2,7 @@
 // turned into a short portrait video on this phone. Frames are small copies kept in
 // memory during a round and dropped after it; the video is made on the device and only
 // leaves it if the player chooses Share Clip. Nothing is uploaded.
-import { SKINS } from './skins.mjs';
+import { SKINS, drawBrandLockup, brandBanner, brandFooter } from './skins.mjs';
 
 export const CLIP_BEFORE_MS = 2500;
 // Long enough after the blink to catch the reaction (the laugh is the funny part).
@@ -88,9 +88,9 @@ export function createClipBuffer({ makeCanvas, before = CLIP_BEFORE_MS, after = 
     };
 }
 
-// One frame of the finished clip: holiday frame, the camera view, a ticking time,
-// and a BLINK! stamp from the blink onwards.
-export function drawClipFrame(ctx, frame, { skinId, seconds, blinked, stamp, caption, width = CLIP_WIDTH, height = CLIP_HEIGHT }) {
+// One frame of the finished clip: the Blink Stop logo, holiday frame, the camera view,
+// a ticking time, and a BLINK! stamp from the blink onwards.
+export function drawClipFrame(ctx, frame, { skinId, seconds, blinked, stamp, caption, logo = null, width = CLIP_WIDTH, height = CLIP_HEIGHT }) {
     const skin = SKINS[skinId] || SKINS.CLASSIC, c = skin.colors;
     const gradient = ctx.createLinearGradient(0, 0, width, height);
     gradient.addColorStop(0, c.bgTop); gradient.addColorStop(1, c.bgBottom);
@@ -112,8 +112,10 @@ export function drawClipFrame(ctx, frame, { skinId, seconds, blinked, stamp, cap
 
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     const font = size => `bold ${size}px system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji"`;
-    ctx.fillStyle = c.primary; ctx.font = font(34);
-    ctx.fillText(`${skin.icon} ${skin.greeting} ${skin.icon}`, width / 2, 62, width - 40);
+    drawBrandLockup(ctx, logo, { x: width / 2, y: 40, size: 50, color: c.text });
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = c.primary; ctx.font = font(24);
+    ctx.fillText(brandBanner(skin.id), width / 2, 94, width - 40);
 
     // Ticking round time over the top of the picture.
     if (Number.isFinite(seconds)) {
@@ -143,14 +145,14 @@ export function drawClipFrame(ctx, frame, { skinId, seconds, blinked, stamp, cap
     ctx.fillStyle = c.muted; ctx.font = font(24);
     if (blinked && caption?.detail) ctx.fillText(caption.detail, width / 2, below + 104, width - 40);
     ctx.fillStyle = c.secondary; ctx.font = font(22);
-    ctx.fillText('Your turn! Play free at playblinkstop.com  #BlinkStop', width / 2, height - 34, width - 40);
+    ctx.fillText(brandFooter(skin.id), width / 2, height - 34, width - 40);
 }
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 // Replays the buffered frames onto a portrait canvas while MediaRecorder records it.
 // Takes about as long as the clip itself. Resolves to a video Blob.
-export async function encodeClip(buffer, { skinId, caption, doc = globalThis.document, Recorder = globalThis.MediaRecorder, type = pickClipType(Recorder), wait = sleep, holdMs = CLIP_HOLD_MS, cancelled = () => false } = {}) {
+export async function encodeClip(buffer, { skinId, caption, logo = null, doc = globalThis.document, Recorder = globalThis.MediaRecorder, type = pickClipType(Recorder), wait = sleep, holdMs = CLIP_HOLD_MS, cancelled = () => false } = {}) {
     const frames = buffer.frames.slice();
     if (!frames.length || buffer.blinkAt === null) throw new Error('No clip to make');
     if (!type) throw new Error('Video recording is not available here');
@@ -164,7 +166,7 @@ export async function encodeClip(buffer, { skinId, caption, doc = globalThis.doc
     const secondsAt = t => buffer.blinkSeconds - (buffer.blinkAt - t) / 1000;
     const blinkIndex = Math.max(0, frames.findIndex(f => f.t >= buffer.blinkAt));
     const draw = (i, stamp = false) => drawClipFrame(ctx, frames[i].canvas, {
-        skinId, caption, stamp,
+        skinId, caption, stamp, logo,
         blinked: frames[i].t >= buffer.blinkAt,
         seconds: frames[i].t >= buffer.blinkAt ? buffer.blinkSeconds : secondsAt(frames[i].t),
     });

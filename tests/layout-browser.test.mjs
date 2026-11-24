@@ -36,8 +36,13 @@ test('game-over actions remain reachable on narrow and enlarged-text screens', a
           document.querySelector('#menu-screen').classList.add('hidden');
           document.querySelector('#game-over-screen').classList.remove('hidden');
           document.querySelector('#social-result').classList.remove('hidden');
+          // One-tap share under the photo and clip, with its longest label.
+          document.querySelector('#selfie-container').classList.remove('hidden');
+          document.querySelector('#quick-share').classList.remove('hidden');
+          document.querySelector('#quick-share-btn').innerText = '🦃 SHARE YOUR PHOTO';
+          document.querySelector('#quick-share-note').innerText = 'Post it to TikTok or Reels: who blinks first at your table?';
         }, scenario);
-        for (const selector of ['#restart-btn', '#share-open-btn', '#friend-turn-btn', '#menu-btn']) {
+        for (const selector of ['#restart-btn', '#share-open-btn', '#friend-turn-btn', '#menu-btn', '#quick-share-btn']) {
           await page.locator(selector).evaluate(el => scrollBy(0, el.getBoundingClientRect().top - 100));
           const box = await page.locator(selector).boundingBox();
           const footerTop = await page.locator('.footer').evaluate(el => el.getBoundingClientRect().top);

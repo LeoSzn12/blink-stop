@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { SKINS, SKIN_ORDER, seasonalSkin, resolveSkin, storedSkinValue, faceFrame, drawSkinOverlay, drawHeadwear, selfieCaption, composeSelfie } from '../src/skins.mjs';
+import { SKINS, SKIN_ORDER, seasonalSkin, resolveSkin, storedSkinValue, faceFrame, drawSkinOverlay, drawHeadwear, selfieCaption, composeSelfie, drawBrandLockup, tableChallenge, brandBanner, brandFooter, mediaShareText } from '../src/skins.mjs';
 import { drawScoreCard } from '../src/scoreCard.mjs';
 
 // Records every 2D call; any method returns the context so gradients work too.
@@ -75,8 +75,36 @@ test('framed photo is a 4:5 JPEG drawn from the camera canvas with the skin gree
     assert.deepEqual([out.width, out.height], [1080, 1350]);
     assert.ok(calls.some(([name, image]) => name === 'drawImage' && image === source));
     const texts = calls.filter(([name]) => name === 'fillText').map(([, text]) => text);
-    assert.ok(texts.some(text => text.includes('HAPPY THANKSGIVING')));
+    assert.ok(texts.some(text => text.includes('THANKSGIVING TABLE CHALLENGE')));
     assert.ok(texts.includes('CAUGHT BLINKING!'));
+    assert.ok(texts.includes('BLINK STOP'), 'the name is on the photo even before the logo loads');
+    assert.ok(texts.some(text => text.startsWith('Who blinks first at your table?')));
+});
+
+test('the Blink Stop logo goes on the photo when it has loaded', () => {
+    const { ctx, calls } = recorder();
+    const out = { getContext: () => ctx, toDataURL: type => `data:${type};base64,AAAA` };
+    const logo = { complete: true, naturalWidth: 192 };
+    composeSelfie({ width: 640, height: 480 }, 'CHRISTMAS', { headline: 'X WINS!', detail: 'Y blinked first after 3.00s' }, { createElement: () => out }, logo);
+    assert.ok(calls.some(([name, image]) => name === 'drawImage' && image === logo));
+    const texts = calls.filter(([name]) => name === 'fillText').map(([, text]) => text);
+    assert.ok(texts.some(text => text.includes('MERRY CHRISTMAS')), 'other skins keep their greeting');
+    assert.ok(texts.some(text => text.startsWith('Your turn! Play free at playblinkstop.com')));
+    // A logo that failed to load is skipped, never drawn broken.
+    const { ctx: ctx2, calls: calls2 } = recorder();
+    drawBrandLockup(ctx2, { complete: true, naturalWidth: 0 }, { x: 100, y: 50, size: 40, color: '#fff' });
+    assert.equal(calls2.some(([name]) => name === 'drawImage'), false);
+    assert.ok(calls2.some(([name, text]) => name === 'fillText' && text === 'BLINK STOP'));
+});
+
+test('Thanksgiving turns shared photos and clips into a table challenge; other skins stay as they were', () => {
+    assert.equal(tableChallenge('CLASSIC'), null);
+    assert.equal(tableChallenge('THANKSGIVING').banner, '🦃 THANKSGIVING TABLE CHALLENGE 🦃');
+    assert.equal(brandBanner('CLASSIC'), "👁️ DON'T BLINK CHALLENGE 👁️", 'Classic does not repeat the name under the logo');
+    assert.equal(brandBanner('PARTY'), "🎉 DON'T BLINK! 🎉");
+    assert.match(brandFooter('THANKSGIVING'), /^Who blinks first at your table\? playblinkstop\.com/);
+    assert.equal(mediaShareText('THANKSGIVING', 'Ana won!', 'https://playblinkstop.com/'), 'Ana won! Who blinks first at your table? Play free: https://playblinkstop.com/ #BlinkStop #ThanksgivingChallenge');
+    assert.equal(mediaShareText('CLASSIC', 'Beat me?', 'https://playblinkstop.com/'), 'Beat me? Play free: https://playblinkstop.com/ #BlinkStop');
 });
 
 test('holiday score card stays photo-free and keeps the challenge code', () => {
