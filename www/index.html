@@ -45,9 +45,10 @@
                 <div id="menu-screen" class="screen active">
                     <h1 class="glitch" data-text="BLINK STOP">BLINK STOP</h1>
                     <p class="subtitle">The game you play with your eyes.</p>
+                    <p class="pitch"><strong>Pass the phone around the table.</strong> 2 to 8 players, first to blink loses.</p>
 
-                    <!-- Get the iPhone app: shown by src/appBanner.mjs only on iOS browsers that don't get
-                         Apple's Smart App Banner. Never in the app itself. Menu only, never during a round. -->
+                    <!-- Get the iPhone app: shown by src/appBanner.mjs on computers and on iOS browsers that don't get
+                         Apple's Smart App Banner. Never on Android or in the app itself. Menu only, never during a round. -->
                     <aside id="app-banner" class="app-banner hidden" aria-label="Blink Stop for iPhone">
                         <img class="app-banner-icon" src="apple-touch-icon.png" alt="" width="40" height="40">
                         <p class="app-banner-text"><strong>Blink Stop for iPhone</strong><span>Free. Feel a buzz on every pop.</span></p>
@@ -170,7 +171,7 @@
 
                     <!-- SEO About Text -->
                     <div class="about-text">
-                        Blink Stop detects blinks on your device. Camera frames stay on your device; scores are saved locally only. A framed photo preview is created after a round; saving or sharing it is your choice. Ages 13+. Blink normally and stop if uncomfortable.
+                        Ages 13+. Blink normally and stop if uncomfortable.
                     </div>
 
                     <p class="loading-text" id="loading-msg" style="display:none">INITIALIZING BLINK DETECTION...</p>
@@ -417,6 +418,8 @@
         <a href="tos.html" class="footer-link">Terms of Service</a>
         <span class="footer-separator">|</span>
         <a href="support.html" class="footer-link">Support</a>
+        <span class="footer-separator app-store-footer hidden">|</span>
+        <a href="https://apps.apple.com/app/blink-stop/id6822026817" class="footer-link app-store-footer hidden" rel="noopener">Get the iPhone app</a>
     </footer>
 
     <script type="module" src="src/main.js?v=89"></script>

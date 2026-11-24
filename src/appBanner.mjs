@@ -1,7 +1,8 @@
-// "Get the iPhone app" strip for web visitors on an iPhone or iPad.
+// "Get the iPhone app" strip on the menu, and the App Store link in the footer.
 // iPhone Safari already shows Apple's own Smart App Banner (the apple-itunes-app meta tag in
-// index.html), so this strip only appears where that one can't: Chrome, Firefox, Edge and
-// in-app browsers on iOS, and the home-screen web app. Never inside the Blink Stop app itself.
+// index.html), so the strip appears where that one can't: computers, Chrome, Firefox, Edge and
+// in-app browsers on iOS, and the home-screen web app. Never on Android (no iPhone app to get
+// there) and never inside the Blink Stop app itself.
 
 export const APP_STORE_URL = 'https://apps.apple.com/app/blink-stop/id6822026817';
 export const APP_BANNER_KEY = 'blink_app_banner_dismissed';
@@ -18,11 +19,21 @@ export function isPlainIosSafari(userAgent = '') {
     return /Safari\//.test(userAgent) && !/CriOS|FxiOS|EdgiOS|OPiOS|OPT\/|DuckDuckGo|GSA\/|YaBrowser|Brave|Instagram|FBAN|FBAV|Twitter|Snapchat|TikTok|musical_ly|Line\/|LinkedInApp|Pinterest/.test(userAgent);
 }
 
+export function isAndroid(userAgent = '') {
+    return /Android/.test(userAgent);
+}
+
 export function shouldShowAppBanner({ userAgent = '', maxTouchPoints = 0, standalone = false, isNative = false, dismissed = false } = {}) {
-    if (isNative || dismissed) return false;
-    if (!isAppleTouchDevice({ userAgent, maxTouchPoints })) return false;
+    if (isNative || dismissed || isAndroid(userAgent)) return false;
+    // A computer: players can grab it on their phone next.
+    if (!isAppleTouchDevice({ userAgent, maxTouchPoints })) return true;
     // The home-screen web app looks like Safari but gets no Smart App Banner.
     return standalone || !isPlainIosSafari(userAgent);
+}
+
+// The footer link: every web visitor except Android, never inside the app.
+export function shouldShowAppStoreLink({ userAgent = '', isNative = false } = {}) {
+    return !isNative && !isAndroid(userAgent);
 }
 
 export function setupAppBanner(doc, win) {
@@ -38,6 +49,8 @@ export function setupAppBanner(doc, win) {
         dismissed,
     });
     banner.classList.toggle('hidden', !show);
+    const link = shouldShowAppStoreLink({ userAgent: win.navigator?.userAgent || '', isNative: !!win.Capacitor?.isNativePlatform?.() });
+    for (const el of doc.querySelectorAll?.('.app-store-footer') || []) el.classList.toggle('hidden', !link);
     doc.getElementById('app-banner-close')?.addEventListener('click', () => {
         banner.classList.add('hidden');
         try { win.localStorage.setItem(APP_BANNER_KEY, '1'); } catch { /* storage unavailable */ }

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { shouldShowAppBanner, isPlainIosSafari, APP_STORE_URL } from '../src/appBanner.mjs';
+import { shouldShowAppBanner, shouldShowAppStoreLink, isPlainIosSafari, APP_STORE_URL } from '../src/appBanner.mjs';
 
 const UA = {
     iphoneSafari: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Mobile/15E148 Safari/604.1',
@@ -27,11 +27,32 @@ test('the home-screen web app gets the banner, since Safari shows none there', (
     assert.equal(shouldShowAppBanner({ userAgent: UA.iphoneSafari, maxTouchPoints: 5, standalone: true }), true);
 });
 
-test('never inside the Blink Stop app, never after Not now, never off Apple touch devices', () => {
+test('computers get the banner, so players can grab the app on their phone', () => {
+    assert.equal(shouldShowAppBanner({ userAgent: UA.macChrome, maxTouchPoints: 0 }), true);
+});
+
+test('never inside the Blink Stop app, never after it is closed, never on Android', () => {
     assert.equal(shouldShowAppBanner({ userAgent: UA.iphoneChrome, maxTouchPoints: 5, isNative: true }), false);
     assert.equal(shouldShowAppBanner({ userAgent: UA.iphoneChrome, maxTouchPoints: 5, dismissed: true }), false);
-    assert.equal(shouldShowAppBanner({ userAgent: UA.macChrome, maxTouchPoints: 0 }), false);
     assert.equal(shouldShowAppBanner({ userAgent: UA.android, maxTouchPoints: 5 }), false);
+});
+
+test('the footer App Store link shows on the web, except Android and the app itself', () => {
+    assert.equal(shouldShowAppStoreLink({ userAgent: UA.iphoneSafari }), true);
+    assert.equal(shouldShowAppStoreLink({ userAgent: UA.macChrome }), true);
+    assert.equal(shouldShowAppStoreLink({ userAgent: UA.android }), false);
+    assert.equal(shouldShowAppStoreLink({ userAgent: UA.iphoneSafari, isNative: true }), false);
+});
+
+test('the menu opens with the Pass the Phone pitch and one short safety line', async () => {
+    const { readFile } = await import('node:fs/promises');
+    const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
+    const menu = html.slice(html.indexOf('id="menu-screen"'), html.indexOf('class="mode-selection"'));
+    assert.match(menu, /<p class="pitch"><strong>Pass the phone around the table\.<\/strong> 2 to 8 players/);
+    assert.ok(menu.indexOf('class="pitch"') < menu.indexOf('class="camera-promise"'));
+    assert.match(html, /Ages 13\+\. Blink normally and stop if uncomfortable\./);
+    assert.doesNotMatch(html, /Camera frames stay on your device/);
+    assert.ok(html.includes('href="privacy.html"'));
 });
 
 test('an iPad asking for the desktop site is still treated as an iPad', () => {
